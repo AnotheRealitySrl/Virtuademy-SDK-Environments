@@ -13,6 +13,7 @@
 using I2.Loc;
 
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace Virtuademy.LocalizedComponents
 {
@@ -23,25 +24,43 @@ namespace Virtuademy.LocalizedComponents
         /// <summary>Registers I2Loc as the translation backend of the LocalizedXxx elements. Idempotent.</summary>
         public static void Register()
         {
-            if (instance != null && LocalizationHelper.Provider == instance)
+            instance ??= new I2LocalizedTextProvider();
+
+            // Subscribed on every call, not once: I2 sets OnLocalizeEvent to null when the Editor
+            // exits play mode. Removing first keeps a single subscription.
+            LocalizationManager.OnLocalizeEvent -= LocalizationHelper.NotifyLanguageChanged;
+            LocalizationManager.OnLocalizeEvent += LocalizationHelper.NotifyLanguageChanged;
+
+            if (LocalizationHelper.Provider != instance)
             {
-                return;
+                LocalizationHelper.SetProvider(instance);
             }
-            if (instance == null)
-            {
-                instance = new I2LocalizedTextProvider();
-                LocalizationManager.OnLocalizeEvent += LocalizationHelper.NotifyLanguageChanged;
-            }
-            LocalizationHelper.SetProvider(instance);
         }
 
+        // The only entry point of this assembly in a player: AlwaysLinkAssembly (AssemblyInfo.cs)
+        // keeps the assembly, Preserve keeps the method.
+        [Preserve]
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void RegisterAtRuntime() => Register();
 
 #if UNITY_EDITOR
         // Edit mode too, so the UI Builder preview and the inspectors show the translations.
         [UnityEditor.InitializeOnLoadMethod]
-        private static void RegisterInEditor() => Register();
+        private static void RegisterInEditor()
+        {
+            Register();
+            // Back in edit mode I2 has dropped the subscription (see Register): take it again.
+            UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
+
+        private static void OnPlayModeStateChanged(UnityEditor.PlayModeStateChange state)
+        {
+            if (state == UnityEditor.PlayModeStateChange.EnteredEditMode)
+            {
+                Register();
+            }
+        }
 #endif
 
         public string Translate(string key) => LocalizationManager.GetTranslation(key);

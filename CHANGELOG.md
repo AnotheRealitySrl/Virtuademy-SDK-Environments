@@ -56,6 +56,19 @@
   "Published in" line.
 
 ### Fixed
+- **UI Toolkit localized elements translate in a player build again.** Since the `LocalizedXxx`
+  elements moved here, I2Loc reaches them through `I2LocalizedTextProvider`, in the
+  `Virtuademy.SDK.Environments.I2Loc` assembly, which nothing references: its only entry point is a
+  `[RuntimeInitializeOnLoadMethod]`. The player's managed code stripping dropped the whole assembly,
+  the provider was never registered, and every element kept the text authored in its UXML, with no
+  error — on WebGL, mobile and VR alike. The Editor hid it, because `[InitializeOnLoadMethod]`
+  registers the provider there anyway. The assembly now carries `[assembly: AlwaysLinkAssembly]`
+  and the method `[Preserve]`. The assembly still compiles only when `I2LOC` is defined, so a
+  project without I2Loc gets neither.
+- **Language changes reach the localized elements again after a play session in the Editor.** I2
+  sets `OnLocalizeEvent` to null when the Editor exits play mode, and the provider subscribed only
+  once, so edit-mode previews stopped following the language until the next domain reload. It now
+  subscribes on every registration and registers again when the Editor is back in edit mode.
 - **The v2026.5 -> v2026.6 update routine no longer unpins third-party git packages.** It used to
   delete `Packages/packages-lock.json` so that the renamed packages were looked up again, and that
   also released every other git dependency from the commit it was pinned to. One with no `#ref` then
