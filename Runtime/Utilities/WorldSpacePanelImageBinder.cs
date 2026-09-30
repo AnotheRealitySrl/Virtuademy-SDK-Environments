@@ -25,7 +25,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// <see cref="WorldSpaceUIDocumentRebuilder"/>), which replaces the visual tree.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpacePanelImageBinder : MonoBehaviour
+    public class WorldSpacePanelImageBinder : MonoBehaviour, IVisualTreeRebindable
     {
         [Serializable]
         public class ImageBinding
@@ -108,6 +108,20 @@ namespace Virtuademy.SDK.Environments.Utilities
                 }
                 applyRoutine = StartCoroutine(ApplyWhenReady());
             }
+        }
+
+        /// <summary>
+        /// Stops watching the old tree and re-applies against the current one. The detach watch
+        /// already covers a rebuild; this makes it explicit for <see cref="WorldSpaceUIDocumentRebuilder"/>.
+        /// </summary>
+        public void Rebind()
+        {
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+            Unwatch();
+            Apply();
         }
 
         private IEnumerator ApplyWhenReady()

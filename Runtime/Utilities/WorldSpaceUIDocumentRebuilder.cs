@@ -32,11 +32,6 @@ namespace Virtuademy.SDK.Environments.Utilities
         [SerializeField, Tooltip("Document to rebuild. If empty, the UIDocument on this object is used.")]
         private UIDocument document;
 
-        [SerializeField, Tooltip("Optional binder to refresh after the rebuild. If empty, a " +
-            "WorldSpaceButtonBinder on this object is used. Needed because the rebuild replaces the " +
-            "visual tree, so any component that cached elements from the old tree must re-bind.")]
-        private WorldSpaceButtonBinder binder;
-
         [SerializeField, Tooltip("Also rebuild once shortly after this component is enabled. Safety " +
             "net for panels instantiated AFTER scene setup completed, which would otherwise miss the " +
             "one-shot event. The rebuild is idempotent, so running it twice is harmless.")]
@@ -50,10 +45,6 @@ namespace Virtuademy.SDK.Environments.Utilities
             if (document == null)
             {
                 document = GetComponent<UIDocument>();
-            }
-            if (binder == null)
-            {
-                binder = GetComponent<WorldSpaceButtonBinder>();
             }
         }
 
@@ -81,8 +72,9 @@ namespace Virtuademy.SDK.Environments.Utilities
         }
 
         /// <summary>
-        /// Rebuilds the document's visual tree and re-binds the button binder, if any. Public so it
-        /// can also be wired to a UnityEvent or invoked from a Visual Scripting graph.
+        /// Rebuilds the document's visual tree and re-binds every <see cref="IVisualTreeRebindable"/>
+        /// on this object. Public so it can also be wired to a UnityEvent or invoked from a Visual
+        /// Scripting graph.
         /// </summary>
         public void Rebuild()
         {
@@ -104,12 +96,11 @@ namespace Virtuademy.SDK.Environments.Utilities
                 document.visualTreeAsset = source;
             }
 
-            // The tree is now a fresh instance, so a binder that cached Button elements from the old
-            // tree points at stale elements. Toggling it re-runs its bind against the new root.
-            if (binder != null && binder.enabled)
+            // The tree is now a fresh instance holding only what the UXML authored: click handlers,
+            // localization keys and images written onto the old elements are gone with them.
+            foreach (IVisualTreeRebindable rebindable in GetComponents<IVisualTreeRebindable>())
             {
-                binder.enabled = false;
-                binder.enabled = true;
+                rebindable.Rebind();
             }
         }
     }

@@ -24,7 +24,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// <see cref="WorldSpaceUIDocumentRebuilder"/>), preserving the open/closed state.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpacePOIToggle : MonoBehaviour
+    public class WorldSpacePOIToggle : MonoBehaviour, IVisualTreeRebindable
     {
         [SerializeField, Tooltip("UIDocument that renders the panel. If empty, the first UIDocument on " +
             "this object or its children is used.")]
@@ -78,6 +78,29 @@ namespace Virtuademy.SDK.Environments.Utilities
                 bindRoutine = null;
             }
             Unbind();
+        }
+
+        /// <summary>
+        /// Drops the old tree's icon handler and binds the current one, keeping the open/closed state.
+        /// The detach watch already covers a rebuild; this makes it explicit for
+        /// <see cref="WorldSpaceUIDocumentRebuilder"/>.
+        /// </summary>
+        public void Rebind()
+        {
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+            if (bindRoutine != null)
+            {
+                StopCoroutine(bindRoutine);
+                bindRoutine = null;
+            }
+            Unbind();
+            if (!TryBind())
+            {
+                bindRoutine = StartCoroutine(BindWhenReady());
+            }
         }
 
         /// <summary>Opens the panel.</summary>

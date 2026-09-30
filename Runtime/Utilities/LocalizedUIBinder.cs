@@ -24,7 +24,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// installed and the elements translate it.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class LocalizedUIBinder : MonoBehaviour
+    public class LocalizedUIBinder : MonoBehaviour, IVisualTreeRebindable
     {
         [Serializable]
         public class KeySlot
@@ -89,6 +89,29 @@ namespace Virtuademy.SDK.Environments.Utilities
                 applyRoutine = null;
             }
             applied = false;
+        }
+
+        /// <summary>
+        /// Pushes the keys again onto the document's current tree. A rebuilt tree (see
+        /// <see cref="WorldSpaceUIDocumentRebuilder"/>) holds fresh elements with only the UXML-authored
+        /// keys, so without this the panel keeps its authored text in every language.
+        /// </summary>
+        public void Rebind()
+        {
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+            if (applyRoutine != null)
+            {
+                StopCoroutine(applyRoutine);
+                applyRoutine = null;
+            }
+            applied = false;
+            if (!TryApply())
+            {
+                applyRoutine = StartCoroutine(ApplyWhenReady());
+            }
         }
 
         private IEnumerator ApplyWhenReady()

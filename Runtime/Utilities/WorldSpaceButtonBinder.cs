@@ -24,7 +24,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// simply does not show there — a tap still fires the click.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpaceButtonBinder : MonoBehaviour
+    public class WorldSpaceButtonBinder : MonoBehaviour, IVisualTreeRebindable
     {
         [Serializable]
         public class ButtonBinding
@@ -70,6 +70,30 @@ namespace Virtuademy.SDK.Environments.Utilities
                 StopCoroutine(bindRoutine);
                 bindRoutine = null;
             }
+            Unbind();
+        }
+
+        /// <summary>Drops the handlers on the old tree and binds the buttons of the current one.</summary>
+        public void Rebind()
+        {
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+            if (bindRoutine != null)
+            {
+                StopCoroutine(bindRoutine);
+                bindRoutine = null;
+            }
+            Unbind();
+            if (!TryBind())
+            {
+                bindRoutine = StartCoroutine(BindWhenReady());
+            }
+        }
+
+        private void Unbind()
+        {
             foreach ((Button button, Action handler) in registered)
             {
                 if (button != null)
