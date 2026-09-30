@@ -32,6 +32,11 @@
     margin-right: 24px;
     background-color: rgb(232, 233, 235);
     border-radius: 16px;
+    /* Keep the image's aspect ratio and fill the whole box, cropping whatever overflows
+       (no grey borders). Use 'scale-to-fit' instead to show the whole image letterboxed.
+       overflow:hidden clips the cropped edges to the rounded corners. */
+    -unity-background-scale-mode: scale-and-crop;
+    overflow: hidden;
 }
 
 .poi-media-label {
@@ -51,6 +56,12 @@
     color: rgb(56, 122, 255);
     /* Poppins Bold (.ttf, environments). */
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
+    /* Wrap to multiple lines and hard-clip anything past the height cap. NOTE: no text-overflow
+       ellipsis here on purpose — in UI Toolkit ellipsis forces the text onto a single line, which
+       breaks wrapping. The 2-line cap is the max-height in px on the Title element (font-size
+       dependent), and overflow:hidden clips whatever exceeds it. */
+    white-space: normal;
+    overflow: hidden;
     margin-bottom: 10px;
 }
 
