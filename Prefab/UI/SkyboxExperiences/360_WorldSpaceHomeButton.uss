@@ -44,7 +44,8 @@
     -unity-background-scale-mode: scale-to-fit;
     -unity-background-image-tint-color: rgb(58, 127, 255);
     background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Graphics/Arrow.png?fileID=2800000&guid=ae15ed0187d59aa42a5d7544288be705&type=3#Arrow");
-    rotate: 180deg;
+    rotate: 0;
+    translate: 5px 0;
 }
 
 .home-label {
