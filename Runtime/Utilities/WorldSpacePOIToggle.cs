@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 
 using UnityEngine;
@@ -60,6 +61,12 @@ namespace Virtuademy.SDK.Environments.Utilities
         /// <summary>Whether the panel is currently open.</summary>
         public bool IsOpen => isOpen;
 
+        /// <summary>
+        /// Raised (with this toggle) whenever the panel opens. Code-side counterpart of
+        /// <c>onOpen</c>, used by <see cref="WorldSpacePOIGroup"/> to close the other POIs.
+        /// </summary>
+        public event Action<WorldSpacePOIToggle> Opened;
+
         private void OnEnable()
         {
             isOpen = startOpen;
@@ -119,6 +126,7 @@ namespace Virtuademy.SDK.Environments.Utilities
             if (open)
             {
                 onOpen?.Invoke();
+                Opened?.Invoke(this);
             }
             else
             {
