@@ -4,7 +4,7 @@
          panel: WorldSpacePOIVideoButton opens the video directly when the icon is clicked. -->
     <ui:VisualElement name="root" picking-mode="Ignore" class="poi-root">
         <ui:Button name="icon" text="" class="poi-icon">
-            <ui:VisualElement name="dot" picking-mode="Ignore" class="poi-dot"/>
+            <ui:VisualElement name="dot" picking-mode="Ignore" class="poi-dot poi-dot--play"/>
         </ui:Button>
     </ui:VisualElement>
 </ui:UXML>

@@ -104,3 +104,14 @@
     background-color: rgb(255, 255, 255);
     border-radius: 8px;
 }
+
+/* Video POIs (SkyboxPOI Video, SkyboxPOI DirectVideo): the centre dot becomes a "play" icon.
+   Use as class="poi-dot poi-dot--play". */
+.poi-dot.poi-dot--play {
+    width: 20px;
+    height: 20px;
+    background-color: rgba(255, 255, 255, 0);
+    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Graphics/Reflectis_Icons_Spritesheet_.png?fileID=-1860801222&guid=70e6442b819a37346bf81cb5a22da56c&type=3#Reflectis_Icons_Spritesheet__play");
+    background-size: 200% 200%;
+    border-radius: 0;
+}
