@@ -1,6 +1,7 @@
 using System.Collections;
 
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.UIElements;
 using UnityEngine.Video;
 
@@ -14,6 +15,9 @@ namespace Virtuademy.SDK.Environments.Utilities
     ///
     /// The button label is a <c>LocalizedButton</c>: its key is assigned per instance through
     /// <see cref="LocalizedUIBinder"/>, like the POI title and description.
+    ///
+    /// <c>onVideoOpen</c> fires when this POI opens its video; <c>onVideoClose</c> fires when that
+    /// video goes away (closed with the X, or replaced by a video opened from another POI).
     ///
     /// Use the URL on WebGL, where imported VideoClips are not supported. When both are set the clip
     /// wins. Binds lazily and re-binds if the visual tree is rebuilt (e.g. by
@@ -40,12 +44,26 @@ namespace Virtuademy.SDK.Environments.Utilities
             "scene does not already contain a SkyboxVideoOverlay.")]
         private SkyboxVideoOverlay overlayPrefab;
 
+        [SerializeField, Tooltip("If true, the video opens by itself when the scene starts (once, not on " +
+            "every enable). If several POIs have it, the last one to start wins.")]
+        private bool startOpen = false;
+
+        [SerializeField, Tooltip("Invoked when this POI opens its video.")]
+        private UnityEvent onVideoOpen = new();
+
+        [SerializeField, Tooltip("Invoked when the video opened by this POI is closed (X) or replaced by " +
+            "another POI's video.")]
+        private UnityEvent onVideoClose = new();
+
         // Maximum number of frames to wait for the UIDocument to build its visual tree.
         private const int MaxBindFrames = 120;
 
         private Coroutine bindRoutine;
         private Button button;
         private bool bound;
+
+        // The overlay showing this POI's video; null when this POI's video is not open.
+        private SkyboxVideoOverlay openOverlay;
 
         /// <summary>Whether a clip or a URL is set.</summary>
         public bool HasVideo => clip != null || !string.IsNullOrWhiteSpace(url);
@@ -59,6 +77,17 @@ namespace Virtuademy.SDK.Environments.Utilities
             }
         }
 
+        private IEnumerator Start()
+        {
+            if (!startOpen || !HasVideo)
+            {
+                yield break;
+            }
+            // One frame later, so the camera and the rest of the scene have run their own Start.
+            yield return null;
+            OpenVideo();
+        }
+
         private void OnDisable()
         {
             if (bindRoutine != null)
@@ -67,6 +96,7 @@ namespace Virtuademy.SDK.Environments.Utilities
                 bindRoutine = null;
             }
             Unbind();
+            StopListening();
         }
 
         /// <summary>Drops the old tree's button and binds the current one.</summary>
@@ -102,7 +132,32 @@ namespace Virtuademy.SDK.Environments.Utilities
                     $"and no overlay prefab set on '{name}'.", this);
                 return;
             }
+            // Open first: if this POI's previous video was still showing, the overlay reports it
+            // closed (onVideoClose) before the new one counts as opened.
             overlay.Open(clip, url);
+            if (!overlay.IsOpen)
+            {
+                return;
+            }
+
+            openOverlay = overlay;
+            openOverlay.Closed += OnOverlayClosed;
+            onVideoOpen?.Invoke();
+        }
+
+        private void OnOverlayClosed()
+        {
+            StopListening();
+            onVideoClose?.Invoke();
+        }
+
+        private void StopListening()
+        {
+            if (openOverlay != null)
+            {
+                openOverlay.Closed -= OnOverlayClosed;
+                openOverlay = null;
+            }
         }
 
         private IEnumerator BindWhenReady()

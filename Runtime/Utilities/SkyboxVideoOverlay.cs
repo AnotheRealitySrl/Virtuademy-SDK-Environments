@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 
 using UnityEngine;
@@ -70,6 +71,12 @@ namespace Virtuademy.SDK.Environments.Utilities
         public bool IsOpen => document != null && document.gameObject.activeSelf;
 
         /// <summary>
+        /// Raised when the open video goes away: closed with the X (or <see cref="Close"/>), or
+        /// replaced because another video was opened.
+        /// </summary>
+        public event Action Closed;
+
+        /// <summary>
         /// Returns the overlay of the scene, instantiating <paramref name="prefab"/> when there is
         /// none. Returns null if there is none and no prefab is given.
         /// </summary>
@@ -139,6 +146,11 @@ namespace Virtuademy.SDK.Environments.Utilities
                 gameObject.SetActive(true);
             }
 
+            if (IsOpen)
+            {
+                // The video being replaced counts as closed for whoever opened it.
+                Closed?.Invoke();
+            }
             StopVideo();
             ShowDocument(XRSettings.isDeviceActive);
 
@@ -158,11 +170,16 @@ namespace Virtuademy.SDK.Environments.Utilities
         /// <summary>Stops the video and hides the overlay.</summary>
         public void Close()
         {
+            bool wasOpen = IsOpen;
             StopVideo();
             Unbind();
             if (document != null)
             {
                 document.gameObject.SetActive(false);
+            }
+            if (wasOpen)
+            {
+                Closed?.Invoke();
             }
         }
 
