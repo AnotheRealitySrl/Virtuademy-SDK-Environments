@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/SkyboxExperiences/SkyboxPOI/SkyboxPOI.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#SkyboxPOI"/>
     <ui:VisualElement name="root" picking-mode="Ignore" class="poi-root">
-        <ui:VisualElement name="panel" picking-mode="Ignore" class="poi-panel" style="display: flex; width: 650px; max-width: 650px;">
+        <ui:VisualElement name="panel" class="poi-panel" style="display: flex; width: 650px; max-width: 650px;">
             <ui:VisualElement name="media" picking-mode="Ignore" class="poi-media">
                 <ui:Button name="media-prev" text="‹" class="poi-media-arrow poi-media-arrow--prev"/>
                 <ui:Button name="media-next" text="›" class="poi-media-arrow poi-media-arrow--next"/>

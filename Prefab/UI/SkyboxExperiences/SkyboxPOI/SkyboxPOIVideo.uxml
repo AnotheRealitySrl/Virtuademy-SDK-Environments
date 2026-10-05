@@ -2,7 +2,7 @@
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/SkyboxExperiences/SkyboxPOI/SkyboxPOI.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#SkyboxPOI"/>
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/SkyboxExperiences/SkyboxPOI/SkyboxPOIVideo.uss?fileID=7433441132597879392&amp;guid=83a67b800387a7548b6d9734e4637d9d&amp;type=3#SkyboxPOIVideo"/>
     <ui:VisualElement name="root" picking-mode="Ignore" class="poi-root">
-        <ui:VisualElement name="panel" picking-mode="Ignore" class="poi-panel" style="display: flex;">
+        <ui:VisualElement name="panel" class="poi-panel" style="display: flex;">
             <ui:VisualElement name="media-column" picking-mode="Ignore" class="poi-media-column">
                 <ui:VisualElement name="media" picking-mode="Ignore" class="poi-media" style="width: 240px;"/>
                 <Virtuademy.LocalizedComponents.LocalizedButton name="video-button" text="Start video" class="poi-video-button"/>
