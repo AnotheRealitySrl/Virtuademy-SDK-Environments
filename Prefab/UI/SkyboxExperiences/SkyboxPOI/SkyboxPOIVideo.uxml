@@ -1,10 +1,11 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/SkyboxExperiences/SkyboxPOI/SkyboxPOI.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#SkyboxPOI"/>
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/SkyboxExperiences/SkyboxPOI/SkyboxPOIVideo.uss?fileID=7433441132597879392&amp;guid=83a67b800387a7548b6d9734e4637d9d&amp;type=3#SkyboxPOIVideo"/>
     <ui:VisualElement name="root" picking-mode="Ignore" class="poi-root">
         <ui:VisualElement name="panel" picking-mode="Ignore" class="poi-panel" style="display: flex;">
-            <ui:VisualElement name="media" picking-mode="Ignore" class="poi-media" style="width: 240px;">
-                <ui:Button name="media-prev" text="‹" class="poi-media-arrow poi-media-arrow--prev"/>
-                <ui:Button name="media-next" text="›" class="poi-media-arrow poi-media-arrow--next"/>
+            <ui:VisualElement name="media-column" picking-mode="Ignore" class="poi-media-column">
+                <ui:VisualElement name="media" picking-mode="Ignore" class="poi-media" style="width: 240px;"/>
+                <Virtuademy.LocalizedComponents.LocalizedButton name="video-button" text="Start video" class="poi-video-button"/>
             </ui:VisualElement>
             <ui:VisualElement name="text" picking-mode="Ignore" class="poi-text">
                 <Virtuademy.LocalizedComponents.LocalizedLabel text="Lorem ipsum dolor sit amet consectetur  " picking-mode="Ignore" name="Title" class="poi-title" style="padding-top: 0; padding-bottom: 0; margin-bottom: 0; margin-top: 0; font-size: 22px; max-height: 60px;"/>
@@ -12,7 +13,7 @@
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:Button name="icon" text="" class="poi-icon">
-            <ui:VisualElement name="dot" picking-mode="Ignore" class="poi-dot"/>
+            <ui:VisualElement name="dot" picking-mode="Ignore" class="poi-dot poi-dot--play"/>
         </ui:Button>
     </ui:VisualElement>
 </ui:UXML>

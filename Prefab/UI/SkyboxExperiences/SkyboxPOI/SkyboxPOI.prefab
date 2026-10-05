@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 1500000000000000005}
   - component: {fileID: 2622905604701327849}
   - component: {fileID: 1625472766691961665}
+  - component: {fileID: 228322394693724539}
   m_Layer: 5
   m_Name: SkyboxPOI
   m_TagString: Untagged
@@ -72,7 +73,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpaceUIDocumentRebuilder
   document: {fileID: 1500000000000000003}
-  binder: {fileID: 0}
   rebuildOnEnable: 1
 --- !u!114 &1500000000000000005
 MonoBehaviour:
@@ -136,3 +136,21 @@ MonoBehaviour:
   images:
   - elementName: media
     image: {fileID: 0}
+--- !u!114 &228322394693724539
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1500000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6407e68970ccf764ab901cd56d48f720, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpacePanelImageCarousel
+  document: {fileID: 1500000000000000003}
+  mediaName: media
+  previousName: media-prev
+  nextName: media-next
+  extraImages: []
+  loop: 1

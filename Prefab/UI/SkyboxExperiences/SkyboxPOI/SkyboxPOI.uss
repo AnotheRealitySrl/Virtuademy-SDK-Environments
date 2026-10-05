@@ -39,6 +39,44 @@
     overflow: hidden;
 }
 
+/* Carousel arrows over the image (WorldSpacePanelImageCarousel). Hidden by default: the script
+   shows them only when the POI has more than one image. */
+.poi-media-arrow {
+    display: none;
+    position: absolute;
+    top: 50%;
+    translate: 0 -50%;
+    width: 40px;
+    height: 40px;
+    padding: 0 0 4px 0;
+    margin: 0;
+    font-size: 30px;
+    color: rgb(255, 255, 255);
+    -unity-text-align: middle-center;
+    background-color: rgba(20, 22, 28, 0.6);
+    border-width: 2px;
+    border-color: rgb(255, 255, 255);
+    border-radius: 20px;
+    transform-origin: center;
+    transition-property: scale;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.poi-media-arrow:hover {
+    scale: 1.1 1.1;
+    background-color: rgba(20, 22, 28, 0.6);
+    border-color: rgb(255, 255, 255);
+}
+
+.poi-media-arrow--prev {
+    left: 8px;
+}
+
+.poi-media-arrow--next {
+    right: 8px;
+}
+
 .poi-media-label {
     font-size: 18px;
     color: rgb(70, 74, 80);
@@ -103,4 +141,15 @@
     height: 16px;
     background-color: rgb(255, 255, 255);
     border-radius: 8px;
+}
+
+/* Video POIs (SkyboxPOI Video, SkyboxPOI DirectVideo): the centre dot becomes a "play" icon.
+   Use as class="poi-dot poi-dot--play". */
+.poi-dot.poi-dot--play {
+    width: 20px;
+    height: 20px;
+    background-color: rgba(255, 255, 255, 0);
+    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Graphics/Reflectis_Icons_Spritesheet_.png?fileID=-1860801222&guid=70e6442b819a37346bf81cb5a22da56c&type=3#Reflectis_Icons_Spritesheet__play");
+    background-size: 200% 200%;
+    border-radius: 0;
 }
