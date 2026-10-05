@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Changed
+- **The hot-update asmdef references every whitelisted assembly from the start.** The interpreter
+  setup used to seed only `Virtuademy.ScriptingApi` and `Virtuademy.Environments.ScriptingApi`, and
+  its comment claimed the whitelist admitted nothing else first-party; `policy.json` also admits
+  `SPACS.Dialogs`, `SPACS.Tasks`, `Unity.TextMeshPro` and `UnityEngine.UI`, so a script the publish
+  would accept failed to compile until the creator added the reference by hand. The setup now adds
+  all six, on a new asmdef and on an existing one (additive: nothing the creator added is removed).
+  Since the asmdef takes part in the assembly fingerprint, the first publish after the setup renames
+  the assembly once.
 - **The graph, task and dialog engines are `SPACS-Graphs`, `SPACS-Tasks` and `SPACS-Dialogs`**
   (ids `com.anotherealitysrl.spacs-{graphs,tasks,dialogs}` 3.0.0, were
   `virtuademy-sdk-{graphs,tasks,dialogs}`), and this package's dependencies follow. The

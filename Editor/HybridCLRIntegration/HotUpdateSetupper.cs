@@ -37,19 +37,28 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         const string ASMDEF_PREFIX = "HotUpdate_";
 
         /// <summary>
-        /// The two assemblies a hot-update script is allowed to reference, and therefore the two
-        /// the asmdef should carry from the moment it exists.
+        /// The assemblies with an asmdef that the baseline whitelist (<c>policy.json</c>,
+        /// <c>allowedAssemblies</c>) admits, and therefore the ones the hot-update asmdef should
+        /// carry from the moment it exists.
         /// </summary>
         /// <remarks>
-        /// They are not a convenience: the server-side whitelist admits these two and nothing else
-        /// first-party, so an asmdef without them cannot compile a script that reaches the platform
-        /// at all, and one with more than them compiles scripts the publish will reject. A creator
-        /// used to discover the first half by compile error, which named a missing assembly
-        /// reference and left them to guess which.
+        /// A custom asmdef does not get the automatic references of Assembly-CSharp, so without
+        /// these a script that the publish would accept does not compile, and the error names a
+        /// missing assembly without saying which one is allowed. Every entry is guaranteed to be
+        /// in the project by this package's own dependencies (spacs-dialogs, spacs-tasks,
+        /// com.unity.ugui, which ships TextMeshPro), so none of them can dangle. The rest of the
+        /// whitelist needs no asmdef reference: the BCL and the UnityEngine modules come with the
+        /// engine references. Keep this list in step with the baseline policy: an assembly added
+        /// there is one creators would otherwise have to reference by hand, and one removed there
+        /// compiles scripts the publish rejects. Operator overrides (ADR 0019) are not followed.
         /// </remarks>
-        static readonly string[] SCRIPTING_API_ASSEMBLIES = {
+        static readonly string[] DEFAULT_REFERENCES = {
             "Virtuademy.ScriptingApi",
             "Virtuademy.Environments.ScriptingApi",
+            "SPACS.Dialogs",
+            "SPACS.Tasks",
+            "Unity.TextMeshPro",
+            "UnityEngine.UI",
         };
 
         // HybridCLR ships with its gitee mirrors as the default, which do not resolve outside
@@ -411,12 +420,12 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             }
 
             AlignDeclaredAssemblyName(asmdefPath, assemblyName);
-            EnsureScriptingApiReferences(asmdefPath);
+            EnsureDefaultReferences(asmdefPath);
             return true;
         }
 
         /// <summary>
-        /// Adds whichever of <see cref="SCRIPTING_API_ASSEMBLIES"/> the asmdef does not already
+        /// Adds whichever of <see cref="DEFAULT_REFERENCES"/> the asmdef does not already
         /// name. Additive only: a reference the creator added is never removed, because this
         /// cannot tell an experiment from a mistake and the publish check can.
         /// </summary>
@@ -427,7 +436,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         /// the inspector would write — and the plain name when it does not, which happens when
         /// the package is not installed yet and is worth leaving legible rather than failing on.
         /// </remarks>
-        static void EnsureScriptingApiReferences(string asmdefPath)
+        static void EnsureDefaultReferences(string asmdefPath)
         {
             try
             {
@@ -441,7 +450,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
 
                 bool changed = false;
 
-                foreach (string assembly in SCRIPTING_API_ASSEMBLIES)
+                foreach (string assembly in DEFAULT_REFERENCES)
                 {
                     string guid = GuidOfAssembly(assembly);
                     bool present = references.Values<string>()
@@ -491,7 +500,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
 $@"{{
     ""name"": ""{assemblyName}"",
     ""rootNamespace"": """",
-    ""references"": [{References(SCRIPTING_API_ASSEMBLIES)}],
+    ""references"": [{References(DEFAULT_REFERENCES)}],
     ""includePlatforms"": [],
     ""excludePlatforms"": [],
     ""allowUnsafeCode"": false,
