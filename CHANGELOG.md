@@ -3,6 +3,21 @@
 ## Unreleased
 
 ### Changed
+- **The placeholders get short paths, one folder per module.** In a creator project under
+  `C:\Users\<user>\UnityProjects\<Org>\<Project>`, 225 files of this package went past Windows'
+  260-character path limit inside `Library/PackageCache`, and Unity, Visual Studio and Notepad++
+  could not open them. The `Virtuademy.Environments.ScriptingApi` assembly folder moves from
+  `Runtime/ScriptingApi` to `ScriptingApi/`, beside `Runtime/`; each placeholder's scripts sit in
+  `ScriptingApi/Placeholders/<Module>/` (`POI`, `Quiz`, `Chatbot`…) instead of the
+  `Scripts/ScriptPlaceholders/<X Script Placeholder>` and `Scripts/Internal/SDK_*` folders; their
+  prefabs, models, materials and sprites move to `Prefabs/<Module>/`; fonts, audio and the shared UI
+  prefabs to `Common/`. `PlaceholderBases` is gone: its bases are in `Placeholders/Utilities`, the
+  spawnable object in `Placeholders/SpawnableObject`, floor and spawn point in
+  `Placeholders/Fundamentals`. Unreferenced duplicates stay, under `Prefabs/<Module>/Legacy/`.
+  Every file keeps its `.meta`, so GUIDs, prefab and scene references, the assembly, its name and
+  every namespace are unchanged: nothing a creator project or a published environment records
+  moves. The longest placeholder path is 91 characters, against 139 before.
+- Seventeen empty folders left over from the 9.0.0 merge are removed.
 - **The graph, task and dialog engines are `SPACS-Graphs`, `SPACS-Tasks` and `SPACS-Dialogs`**
   (ids `com.anotherealitysrl.spacs-{graphs,tasks,dialogs}` 3.0.0, were
   `virtuademy-sdk-{graphs,tasks,dialogs}`), and this package's dependencies follow. The

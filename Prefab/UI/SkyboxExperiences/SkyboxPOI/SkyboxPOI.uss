@@ -2,7 +2,7 @@
     flex-grow: 1;
     align-items: center;
     justify-content: flex-end;
-    -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Regular.ttf?fileID=12800000&guid=e77099ee2358c6c40bc8f4dc48c8b53c&type=3#Poppins-Regular");
+    -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-Regular.ttf?fileID=12800000&guid=e77099ee2358c6c40bc8f4dc48c8b53c&type=3#Poppins-Regular");
 }
 
 .poi-panel {
@@ -80,7 +80,7 @@
 
 .poi-title {
     color: rgb(56, 122, 255);
-    -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
+    -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
     white-space: normal;
     overflow: hidden;
     padding-top: 0;
