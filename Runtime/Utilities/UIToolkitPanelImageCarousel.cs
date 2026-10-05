@@ -6,9 +6,10 @@ using UnityEngine.UIElements;
 namespace Virtuademy.SDK.Environments.Utilities
 {
     /// <summary>
-    /// Turns the image element of a world-space panel into a small carousel with previous/next arrows.
+    /// Turns the image element of a UI Toolkit panel (world-space or screen-space) into a small
+    /// carousel with previous/next arrows.
     ///
-    /// The FIRST image is still the one assigned through <see cref="WorldSpacePanelImageBinder"/> for
+    /// The FIRST image is still the one assigned through <see cref="UIToolkitPanelImageBinder"/> for
     /// the same element (so existing panels keep working untouched); the images in
     /// <c>extraImages</c> follow it. With a single image the arrows stay hidden
     /// (<c>display: none</c>), so the panel looks exactly like a plain image panel.
@@ -18,10 +19,10 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// <see cref="WorldSpaceUIDocumentRebuilder"/>), starting again from the first image.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpacePanelImageCarousel : UIDocumentBinder
+    public class UIToolkitPanelImageCarousel : UIDocumentBinder
     {
         [SerializeField, Tooltip("Name of the image element in the UXML. Its first image is the one set " +
-            "for this name on the WorldSpacePanelImageBinder.")]
+            "for this name on the UIToolkitPanelImageBinder.")]
         private string mediaName = "media";
 
         [SerializeField, Tooltip("Name of the 'previous' arrow button in the UXML.")]
@@ -30,7 +31,7 @@ namespace Virtuademy.SDK.Environments.Utilities
         [SerializeField, Tooltip("Name of the 'next' arrow button in the UXML.")]
         private string nextName = "media-next";
 
-        [SerializeField, Tooltip("Images shown after the first one (the WorldSpacePanelImageBinder image). " +
+        [SerializeField, Tooltip("Images shown after the first one (the UIToolkitPanelImageBinder image). " +
             "Import them as Sprite (2D and UI).")]
         private List<Sprite> extraImages = new();
 
@@ -87,9 +88,9 @@ namespace Virtuademy.SDK.Environments.Utilities
         private void BuildSequence()
         {
             sequence.Clear();
-            if (TryGetComponent(out WorldSpacePanelImageBinder binder))
+            if (TryGetComponent(out UIToolkitPanelImageBinder binder))
             {
-                foreach (WorldSpacePanelImageBinder.ImageBinding binding in binder.Images)
+                foreach (UIToolkitPanelImageBinder.ImageBinding binding in binder.Images)
                 {
                     if (binding != null && binding.elementName == mediaName && binding.image != null)
                     {

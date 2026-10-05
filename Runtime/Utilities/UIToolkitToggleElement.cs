@@ -16,14 +16,14 @@ namespace Virtuademy.SDK.Environments.Utilities
     ///
     /// The trigger name may be left empty: the toggle is then driven only through <see cref="Open"/>,
     /// <see cref="Close"/>, <see cref="Toggle"/> and <see cref="SetOpen"/> (from a UnityEvent — e.g. a
-    /// <see cref="WorldSpaceButtonBinder"/> entry — a Visual Scripting graph or code).
+    /// <see cref="UIToolkitButtonBinder"/> entry — a Visual Scripting graph or code).
     ///
     /// The state is applied in two optional ways: the target's <c>display</c> (<c>useDisplay</c>), and
     /// a USS class (<c>openClassName</c>) put on both the target and the trigger while open, so USS can
     /// style the active trigger or animate the target (turn <c>useDisplay</c> off and let the class
     /// drive opacity / scale transitions). Hover feedback stays purely in USS
     /// (e.g. <c>.poi-icon:hover { scale: 1.1 1.1; }</c>). Click is delivered by Unity's native UI
-    /// Toolkit picking (the same path <see cref="WorldSpaceButtonBinder"/> documents), so it works on
+    /// Toolkit picking (the same path <see cref="UIToolkitButtonBinder"/> documents), so it works on
     /// VR (XR ray), desktop (mouse) and mobile (tap).
     ///
     /// Click-outside-to-close and mutual exclusion are intentionally NOT handled here:

@@ -132,7 +132,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 96bd39391626406f8335fa88038bf3f9, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpacePanelImageBinder
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.UIToolkitPanelImageBinder
   document: {fileID: 1500000000000000003}
   images:
   - elementName: media
@@ -148,7 +148,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6407e68970ccf764ab901cd56d48f720, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpacePanelImageCarousel
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.UIToolkitPanelImageCarousel
   document: {fileID: 1500000000000000003}
   mediaName: media
   previousName: media-prev

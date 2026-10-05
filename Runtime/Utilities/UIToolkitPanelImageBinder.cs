@@ -7,8 +7,8 @@ using UnityEngine.UIElements;
 namespace Virtuademy.SDK.Environments.Utilities
 {
     /// <summary>
-    /// Assigns images to UI Toolkit elements of a world-space panel, looked up by their UXML
-    /// <c>name</c> — the same model as <see cref="WorldSpaceButtonBinder"/> (clicks by name) and
+    /// Assigns images to UI Toolkit elements of a panel (world-space or screen-space), looked up by
+    /// their UXML <c>name</c> — the same model as <see cref="UIToolkitButtonBinder"/> (clicks by name) and
     /// <c>LocalizedUIBinder</c> (localization keys by name). Each entry pairs an element name with a
     /// <see cref="Sprite"/>, which is pushed into that element's <c>background-image</c> at runtime, so
     /// the shared UXML/USS is never touched and the same panel asset can show different images per
@@ -24,7 +24,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// <see cref="WorldSpaceUIDocumentRebuilder"/>), which replaces the visual tree.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpacePanelImageBinder : UIDocumentBinder
+    public class UIToolkitPanelImageBinder : UIDocumentBinder
     {
         [Serializable]
         public class ImageBinding
@@ -84,7 +84,7 @@ namespace Virtuademy.SDK.Environments.Utilities
                 VisualElement element = root.Q<VisualElement>(binding.elementName);
                 if (element == null)
                 {
-                    Debug.LogWarning($"[{nameof(WorldSpacePanelImageBinder)}] Element " +
+                    Debug.LogWarning($"[{nameof(UIToolkitPanelImageBinder)}] Element " +
                         $"'{binding.elementName}' not found in the document on '{name}'.", this);
                     continue;
                 }

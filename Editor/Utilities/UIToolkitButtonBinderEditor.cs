@@ -11,7 +11,7 @@ using UnityEngine.UIElements;
 namespace Virtuademy.SDK.Environments.Utilities.Editor
 {
     /// <summary>
-    /// Custom inspector for <see cref="WorldSpaceButtonBinder"/>. Instead of asking the author to type
+    /// Custom inspector for <see cref="UIToolkitButtonBinder"/>. Instead of asking the author to type
     /// the UXML button names by hand, it reads the <see cref="UIDocument"/>'s Source Asset, finds every
     /// UI Toolkit <see cref="Button"/> that has a <c>name</c> and keeps the binding list in sync with it:
     /// one entry per button appears automatically, and the author only has to wire up the <c>onClick</c>.
@@ -21,8 +21,8 @@ namespace Virtuademy.SDK.Environments.Utilities.Editor
     /// callbacks wired (so no work is silently lost) and are flagged as orphans; the empty placeholder
     /// entries are cleaned up on their own.
     /// </summary>
-    [CustomEditor(typeof(WorldSpaceButtonBinder))]
-    public class WorldSpaceButtonBinderEditor : UnityEditor.Editor
+    [CustomEditor(typeof(UIToolkitButtonBinder))]
+    public class UIToolkitButtonBinderEditor : UnityEditor.Editor
     {
         private SerializedProperty documentProp;
         private SerializedProperty buttonsProp;
@@ -234,7 +234,7 @@ namespace Virtuademy.SDK.Environments.Utilities.Editor
             UIDocument doc = documentProp.objectReferenceValue as UIDocument;
             if (doc == null)
             {
-                doc = ((WorldSpaceButtonBinder)target).GetComponentInChildren<UIDocument>(true);
+                doc = ((UIToolkitButtonBinder)target).GetComponentInChildren<UIDocument>(true);
             }
             return doc != null ? doc.visualTreeAsset : null;
         }

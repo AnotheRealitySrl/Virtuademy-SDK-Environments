@@ -15,8 +15,8 @@ namespace Virtuademy.SDK.Environments.Utilities
 {
     /// <summary>
     /// Sets the line spacing of UI Toolkit text elements of a panel, looked up by their UXML
-    /// <c>name</c> — the same model as <see cref="WorldSpaceButtonBinder"/> (clicks by name) and
-    /// <see cref="WorldSpacePanelImageBinder"/> (images by name). Works with any UIDocument, world-space
+    /// <c>name</c> — the same model as <see cref="UIToolkitButtonBinder"/> (clicks by name) and
+    /// <see cref="UIToolkitPanelImageBinder"/> (images by name). Works with any UIDocument, world-space
     /// or screen-space.
     ///
     /// USS has no <c>line-height</c> property, so the spacing is applied through the rich text tag
