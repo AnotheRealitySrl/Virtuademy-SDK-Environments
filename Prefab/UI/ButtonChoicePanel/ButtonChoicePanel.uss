@@ -89,7 +89,6 @@
 }
 
 .bcp-tag {
-    font-size: 15px;
     color: rgb(56, 122, 255);
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
     -unity-font-style: normal;
@@ -98,6 +97,7 @@
     margin-bottom: 4px;
     height: 20px;
     flex-shrink: 0;
+    font-size: 13px;
 }
 
 .bcp-name {
@@ -107,5 +107,8 @@
     height: 40px;
     flex-shrink: 0;
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Regular.ttf?fileID=12800000&guid=e77099ee2358c6c40bc8f4dc48c8b53c&type=3#Poppins-Regular");
-    font-size: 14px;
+    line-height: 40px;
+    font-size: 15px;
+    margin-top: 0;
+    padding-top: 0;
 }
