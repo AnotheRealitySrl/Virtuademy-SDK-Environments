@@ -39,6 +39,44 @@
     overflow: hidden;
 }
 
+/* Carousel arrows over the image (WorldSpacePanelImageCarousel). Hidden by default: the script
+   shows them only when the POI has more than one image. */
+.poi-media-arrow {
+    display: none;
+    position: absolute;
+    top: 50%;
+    translate: 0 -50%;
+    width: 40px;
+    height: 40px;
+    padding: 0 0 4px 0;
+    margin: 0;
+    font-size: 30px;
+    color: rgb(255, 255, 255);
+    -unity-text-align: middle-center;
+    background-color: rgba(20, 22, 28, 0.6);
+    border-width: 2px;
+    border-color: rgb(255, 255, 255);
+    border-radius: 20px;
+    transform-origin: center;
+    transition-property: scale;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.poi-media-arrow:hover {
+    scale: 1.1 1.1;
+    background-color: rgba(20, 22, 28, 0.6);
+    border-color: rgb(255, 255, 255);
+}
+
+.poi-media-arrow--prev {
+    left: 8px;
+}
+
+.poi-media-arrow--next {
+    right: 8px;
+}
+
 .poi-media-label {
     font-size: 18px;
     color: rgb(70, 74, 80);
