@@ -24,12 +24,8 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// <see cref="WorldSpaceUIDocumentRebuilder"/>), like the sibling utilities.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpacePOIVideoButton : MonoBehaviour, IVisualTreeRebindable
+    public class WorldSpacePOIVideoButton : UIDocumentBinder
     {
-        [SerializeField, Tooltip("UIDocument that renders the panel. If empty, the first UIDocument on " +
-            "this object or its children is used.")]
-        private UIDocument document;
-
         [SerializeField, Tooltip("Name of the video button element in the UXML.")]
         private string buttonName = "video-button";
 
@@ -55,27 +51,13 @@ namespace Virtuademy.SDK.Environments.Utilities
             "another POI's video.")]
         private UnityEvent onVideoClose = new();
 
-        // Maximum number of frames to wait for the UIDocument to build its visual tree.
-        private const int MaxBindFrames = 120;
-
-        private Coroutine bindRoutine;
         private Button button;
-        private bool bound;
 
         // The overlay showing this POI's video; null when this POI's video is not open.
         private SkyboxVideoOverlay openOverlay;
 
         /// <summary>Whether a clip or a URL is set.</summary>
         public bool HasVideo => clip != null || !string.IsNullOrWhiteSpace(url);
-
-        private void OnEnable()
-        {
-            if (!TryBind())
-            {
-                // rootVisualElement is not always built during OnEnable on the first frame; keep trying.
-                bindRoutine = StartCoroutine(BindWhenReady());
-            }
-        }
 
         private IEnumerator Start()
         {
@@ -88,34 +70,10 @@ namespace Virtuademy.SDK.Environments.Utilities
             OpenVideo();
         }
 
-        private void OnDisable()
+        protected override void OnDisable()
         {
-            if (bindRoutine != null)
-            {
-                StopCoroutine(bindRoutine);
-                bindRoutine = null;
-            }
-            Unbind();
+            base.OnDisable();
             StopListening();
-        }
-
-        /// <summary>Drops the old tree's button and binds the current one.</summary>
-        public void Rebind()
-        {
-            if (!isActiveAndEnabled)
-            {
-                return;
-            }
-            if (bindRoutine != null)
-            {
-                StopCoroutine(bindRoutine);
-                bindRoutine = null;
-            }
-            Unbind();
-            if (!TryBind())
-            {
-                bindRoutine = StartCoroutine(BindWhenReady());
-            }
         }
 
         /// <summary>Opens the video in the overlay. Does nothing when no video is set.</summary>
@@ -160,37 +118,9 @@ namespace Virtuademy.SDK.Environments.Utilities
             }
         }
 
-        private IEnumerator BindWhenReady()
+        protected override bool BindTo(VisualElement root)
         {
-            for (int frame = 0; frame < MaxBindFrames && !bound; frame++)
-            {
-                yield return null;
-                if (TryBind())
-                {
-                    break;
-                }
-            }
-            bindRoutine = null;
-        }
-
-        private bool TryBind()
-        {
-            if (bound)
-            {
-                return true;
-            }
-            if (document == null)
-            {
-                document = GetComponentInChildren<UIDocument>(true);
-            }
-            if (document == null)
-            {
-                Debug.LogWarning($"[{nameof(WorldSpacePOIVideoButton)}] No UIDocument found on '{name}'.", this);
-                return false;
-            }
-
-            VisualElement root = document.rootVisualElement;
-            button = root?.Q<Button>(buttonName);
+            button = root.Q<Button>(buttonName);
             if (button == null)
             {
                 // Tree not built yet (or the name is wrong); retry.
@@ -199,18 +129,16 @@ namespace Virtuademy.SDK.Environments.Utilities
 
             button.style.display = HasVideo ? DisplayStyle.Flex : DisplayStyle.None;
             button.clicked += OpenVideo;
-            bound = true;
             return true;
         }
 
-        private void Unbind()
+        protected override void UnbindFromTree()
         {
             if (button != null)
             {
                 button.clicked -= OpenVideo;
                 button = null;
             }
-            bound = false;
         }
     }
 }

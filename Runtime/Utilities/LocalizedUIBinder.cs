@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -24,7 +23,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// installed and the elements translate it.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class LocalizedUIBinder : MonoBehaviour, IVisualTreeRebindable
+    public class LocalizedUIBinder : UIDocumentBinder
     {
         [Serializable]
         public class KeySlot
@@ -48,19 +47,9 @@ namespace Virtuademy.SDK.Environments.Utilities
             public List<KeySlot> slots = new();
         }
 
-        [SerializeField, Tooltip("UIDocument that renders the UXML. If empty, the first UIDocument on " +
-            "this object or its children is used.")]
-        private UIDocument document;
-
         [SerializeField, Tooltip("One entry per localized element found in the UXML. Populated " +
             "automatically in the Inspector.")]
         private List<LocalizedElementBinding> bindings = new();
-
-        // Maximum number of frames to wait for the UIDocument to build its visual tree.
-        private const int MaxApplyFrames = 120;
-
-        private Coroutine applyRoutine;
-        private bool applied;
 
         public IReadOnlyList<LocalizedElementBinding> Bindings => bindings;
 
@@ -71,85 +60,11 @@ namespace Virtuademy.SDK.Environments.Utilities
         /// </summary>
         public static string KeyPrefix { get; set; } = string.Empty;
 
-        private void OnEnable()
+        // Rebind (e.g. after WorldSpaceUIDocumentRebuilder) pushes the keys again onto the current tree:
+        // a rebuilt tree holds fresh elements with only the UXML-authored keys, so without it the panel
+        // would keep its authored text in every language.
+        protected override bool BindTo(VisualElement root)
         {
-            if (TryApply())
-            {
-                return;
-            }
-            // rootVisualElement is not always built during OnEnable on the first frame; keep trying.
-            applyRoutine = StartCoroutine(ApplyWhenReady());
-        }
-
-        private void OnDisable()
-        {
-            if (applyRoutine != null)
-            {
-                StopCoroutine(applyRoutine);
-                applyRoutine = null;
-            }
-            applied = false;
-        }
-
-        /// <summary>
-        /// Pushes the keys again onto the document's current tree. A rebuilt tree (see
-        /// <see cref="WorldSpaceUIDocumentRebuilder"/>) holds fresh elements with only the UXML-authored
-        /// keys, so without this the panel keeps its authored text in every language.
-        /// </summary>
-        public void Rebind()
-        {
-            if (!isActiveAndEnabled)
-            {
-                return;
-            }
-            if (applyRoutine != null)
-            {
-                StopCoroutine(applyRoutine);
-                applyRoutine = null;
-            }
-            applied = false;
-            if (!TryApply())
-            {
-                applyRoutine = StartCoroutine(ApplyWhenReady());
-            }
-        }
-
-        private IEnumerator ApplyWhenReady()
-        {
-            for (int frame = 0; frame < MaxApplyFrames && !applied; frame++)
-            {
-                yield return null;
-                if (TryApply())
-                {
-                    break;
-                }
-            }
-            applyRoutine = null;
-        }
-
-        private bool TryApply()
-        {
-            if (applied)
-            {
-                return true;
-            }
-            if (document == null)
-            {
-                document = GetComponentInChildren<UIDocument>(true);
-            }
-            if (document == null)
-            {
-                Debug.LogWarning($"[{nameof(LocalizedUIBinder)}] No UIDocument found on '{name}'.", this);
-                return false;
-            }
-
-            VisualElement root = document.rootVisualElement;
-            if (root == null)
-            {
-                // The document has not built its tree yet; the caller will retry.
-                return false;
-            }
-
             foreach (LocalizedElementBinding binding in bindings)
             {
                 if (binding == null || string.IsNullOrEmpty(binding.elementName))
@@ -166,9 +81,11 @@ namespace Virtuademy.SDK.Environments.Utilities
                 ApplySlots(element, binding);
             }
 
-            applied = true;
             return true;
         }
+
+        // The keys are written into the elements themselves; there is nothing to release.
+        protected override void UnbindFromTree() { }
 
         // Writes each slot's value onto the matching localized attribute via reflection. Setting the
         // attribute triggers the element's own logic (it translates through I2 when present).

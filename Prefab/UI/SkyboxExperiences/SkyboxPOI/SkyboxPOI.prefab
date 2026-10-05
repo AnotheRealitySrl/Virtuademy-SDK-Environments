@@ -86,10 +86,10 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b4cd1136a8214f68aa5998dfaf186b11, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpacePOIToggle
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.UIToolkitToggleElement
   document: {fileID: 1500000000000000003}
-  iconName: icon
-  panelName: panel
+  triggerName: icon
+  targetName: panel
   startOpen: 0
   onOpen:
     m_PersistentCalls:

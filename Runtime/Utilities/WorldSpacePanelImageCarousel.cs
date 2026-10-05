@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -19,12 +18,8 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// <see cref="WorldSpaceUIDocumentRebuilder"/>), starting again from the first image.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpacePanelImageCarousel : MonoBehaviour, IVisualTreeRebindable
+    public class WorldSpacePanelImageCarousel : UIDocumentBinder
     {
-        [SerializeField, Tooltip("UIDocument that renders the panel. If empty, the first UIDocument on " +
-            "this object or its children is used.")]
-        private UIDocument document;
-
         [SerializeField, Tooltip("Name of the image element in the UXML. Its first image is the one set " +
             "for this name on the WorldSpacePanelImageBinder.")]
         private string mediaName = "media";
@@ -43,16 +38,11 @@ namespace Virtuademy.SDK.Environments.Utilities
             "If false, the arrow at the end is hidden.")]
         private bool loop = true;
 
-        // Maximum number of frames to wait for the UIDocument to build its visual tree.
-        private const int MaxBindFrames = 120;
-
         private readonly List<Sprite> sequence = new();
-        private Coroutine bindRoutine;
         private VisualElement media;
         private Button previousButton;
         private Button nextButton;
         private int index;
-        private bool bound;
 
         /// <summary>Number of images in the carousel (first image included).</summary>
         public int Count
@@ -66,44 +56,6 @@ namespace Virtuademy.SDK.Environments.Utilities
 
         /// <summary>Index of the image currently shown.</summary>
         public int CurrentIndex => index;
-
-        private void OnEnable()
-        {
-            if (!TryBind())
-            {
-                // rootVisualElement is not always built during OnEnable on the first frame; keep trying.
-                bindRoutine = StartCoroutine(BindWhenReady());
-            }
-        }
-
-        private void OnDisable()
-        {
-            if (bindRoutine != null)
-            {
-                StopCoroutine(bindRoutine);
-                bindRoutine = null;
-            }
-            Unbind();
-        }
-
-        /// <summary>Drops the old tree's elements and binds the current one, back on the first image.</summary>
-        public void Rebind()
-        {
-            if (!isActiveAndEnabled)
-            {
-                return;
-            }
-            if (bindRoutine != null)
-            {
-                StopCoroutine(bindRoutine);
-                bindRoutine = null;
-            }
-            Unbind();
-            if (!TryBind())
-            {
-                bindRoutine = StartCoroutine(BindWhenReady());
-            }
-        }
 
         /// <summary>Shows the next image (wraps around when looping).</summary>
         public void Next()
@@ -170,37 +122,10 @@ namespace Virtuademy.SDK.Environments.Utilities
             }
         }
 
-        private IEnumerator BindWhenReady()
+        // Every bind (first one or after a rebuild of the tree) starts again from the first image.
+        protected override bool BindTo(VisualElement root)
         {
-            for (int frame = 0; frame < MaxBindFrames && !bound; frame++)
-            {
-                yield return null;
-                if (TryBind())
-                {
-                    break;
-                }
-            }
-            bindRoutine = null;
-        }
-
-        private bool TryBind()
-        {
-            if (bound)
-            {
-                return true;
-            }
-            if (document == null)
-            {
-                document = GetComponentInChildren<UIDocument>(true);
-            }
-            if (document == null)
-            {
-                Debug.LogWarning($"[{nameof(WorldSpacePanelImageCarousel)}] No UIDocument found on '{name}'.", this);
-                return false;
-            }
-
-            VisualElement root = document.rootVisualElement;
-            media = root?.Q<VisualElement>(mediaName);
+            media = root.Q<VisualElement>(mediaName);
             if (media == null)
             {
                 // Tree not built yet (or the name is wrong); retry.
@@ -230,11 +155,10 @@ namespace Virtuademy.SDK.Environments.Utilities
                 RefreshArrows();
             }
 
-            bound = true;
             return true;
         }
 
-        private void Unbind()
+        protected override void UnbindFromTree()
         {
             if (previousButton != null)
             {
@@ -247,7 +171,6 @@ namespace Virtuademy.SDK.Environments.Utilities
                 nextButton = null;
             }
             media = null;
-            bound = false;
         }
     }
 }

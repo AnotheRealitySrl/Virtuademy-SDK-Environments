@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 
 using UnityEngine;
@@ -24,7 +23,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// simply does not show there — a tap still fires the click.
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
-    public class WorldSpaceButtonBinder : MonoBehaviour, IVisualTreeRebindable
+    public class WorldSpaceButtonBinder : UIDocumentBinder
     {
         [Serializable]
         public class ButtonBinding
@@ -36,63 +35,15 @@ namespace Virtuademy.SDK.Environments.Utilities
             public UnityEvent onClick = new();
         }
 
-        [SerializeField, Tooltip("UIDocument that renders the panel. If empty, the first UIDocument on " +
-            "this object or its children is used.")]
-        private UIDocument document;
-
         [SerializeField, Tooltip("One entry per button you want to expose to the Inspector. Reference " +
             "each button by the 'name' it has in the UXML.")]
         private List<ButtonBinding> buttons = new() { new ButtonBinding() };
 
-        // Maximum number of frames to wait for the UIDocument to build its visual tree.
-        private const int MaxBindFrames = 120;
-
         private readonly List<(Button button, Action handler)> registered = new();
-        private Coroutine bindRoutine;
-        private bool bound;
 
         public IReadOnlyList<ButtonBinding> Buttons => buttons;
 
-        private void OnEnable()
-        {
-            if (TryBind())
-            {
-                return;
-            }
-            // rootVisualElement is not always built during OnEnable on the first frame; keep trying.
-            bindRoutine = StartCoroutine(BindWhenReady());
-        }
-
-        private void OnDisable()
-        {
-            if (bindRoutine != null)
-            {
-                StopCoroutine(bindRoutine);
-                bindRoutine = null;
-            }
-            Unbind();
-        }
-
-        /// <summary>Drops the handlers on the old tree and binds the buttons of the current one.</summary>
-        public void Rebind()
-        {
-            if (!isActiveAndEnabled)
-            {
-                return;
-            }
-            if (bindRoutine != null)
-            {
-                StopCoroutine(bindRoutine);
-                bindRoutine = null;
-            }
-            Unbind();
-            if (!TryBind())
-            {
-                bindRoutine = StartCoroutine(BindWhenReady());
-            }
-        }
-
-        private void Unbind()
+        protected override void UnbindFromTree()
         {
             foreach ((Button button, Action handler) in registered)
             {
@@ -102,45 +53,10 @@ namespace Virtuademy.SDK.Environments.Utilities
                 }
             }
             registered.Clear();
-            bound = false;
         }
 
-        private IEnumerator BindWhenReady()
+        protected override bool BindTo(VisualElement root)
         {
-            for (int frame = 0; frame < MaxBindFrames && !bound; frame++)
-            {
-                yield return null;
-                if (TryBind())
-                {
-                    break;
-                }
-            }
-            bindRoutine = null;
-        }
-
-        private bool TryBind()
-        {
-            if (bound)
-            {
-                return true;
-            }
-            if (document == null)
-            {
-                document = GetComponentInChildren<UIDocument>(true);
-            }
-            if (document == null)
-            {
-                Debug.LogWarning($"[{nameof(WorldSpaceButtonBinder)}] No UIDocument found on '{name}'.", this);
-                return false;
-            }
-
-            VisualElement root = document.rootVisualElement;
-            if (root == null)
-            {
-                // The document has not built its tree yet; the caller will retry.
-                return false;
-            }
-
             foreach (ButtonBinding binding in buttons)
             {
                 if (binding == null || string.IsNullOrEmpty(binding.buttonName))
@@ -160,8 +76,7 @@ namespace Virtuademy.SDK.Environments.Utilities
                 registered.Add((button, handler));
             }
 
-            bound = registered.Count > 0;
-            return bound;
+            return registered.Count > 0;
         }
     }
 }

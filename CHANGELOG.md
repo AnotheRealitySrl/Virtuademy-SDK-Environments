@@ -3,6 +3,24 @@
 ## Unreleased
 
 ### Changed
+- **The POI toggle and group are general UI Toolkit components.** `WorldSpacePOIToggle` is
+  `UIToolkitToggleElement` (a trigger element shows/hides a target element) and `WorldSpacePOIGroup`
+  is `UIToolkitToggleGroup`; neither is tied to POIs nor to world-space panels. Fields `iconName` /
+  `panelName` are `triggerName` / `targetName`, and the group's `pois` is `toggles`
+  (`[FormerlySerializedAs]` on all three, same script GUIDs, so prefabs keep working). New options:
+  an empty trigger name (the toggle is driven only from code / UnityEvents), `useDisplay`,
+  `openClassName` (a USS class on target and trigger while open), `SetOpen(bool)`, a `Closed` event,
+  and the group's `exclusive` flag (off: several toggles may stay open, the group only closes them
+  on an outside tap). No `[RenamedFrom]`: the two were never released and no graph names them.
+- **The UI Toolkit binders share one base, `UIDocumentBinder`.** The document lookup, the lazy
+  bind retried for up to 120 frames, `Rebind()` and the detach watch that re-binds after a rebuild
+  were copied in every binder; `WorldSpaceButtonBinder`, `WorldSpacePanelImageBinder`,
+  `WorldSpacePanelImageCarousel`, `LocalizedUIBinder`, `WorldSpacePOIVideoButton` and
+  `UIToolkitToggleElement` now inherit them and only implement `BindTo(root)` /
+  `UnbindFromTree()`. The `document` field keeps its name, so scenes and prefabs are untouched.
+  `WorldSpacePanelImageBinder.Apply()` is now `Rebind()`: on a disabled component it waits for
+  OnEnable instead of writing the images right away. `SpaceLineHeightBinder` keeps its own cycle
+  (it also binds in Edit Mode).
 - **The graph, task and dialog engines are `SPACS-Graphs`, `SPACS-Tasks` and `SPACS-Dialogs`**
   (ids `com.anotherealitysrl.spacs-{graphs,tasks,dialogs}` 3.0.0, were
   `virtuademy-sdk-{graphs,tasks,dialogs}`), and this package's dependencies follow. The

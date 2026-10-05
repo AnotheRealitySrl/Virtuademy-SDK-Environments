@@ -2,40 +2,47 @@ using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 namespace Virtuademy.SDK.Environments.Utilities
 {
     /// <summary>
-    /// Makes a set of <see cref="WorldSpacePOIToggle"/> mutually exclusive: when one POI opens, every
-    /// other POI in the group that is currently open gets closed.
+    /// Manages a set of <see cref="UIToolkitToggleElement"/>s, world-space or screen-space alike.
     ///
-    /// The POIs come from the serialized <c>pois</c> list. If the list is left empty, the group
-    /// collects every <see cref="WorldSpacePOIToggle"/> in its children instead, so it can simply sit
-    /// on the parent of the POIs.
+    /// When <c>exclusive</c> is on (the default), the toggles are mutually exclusive: when one opens,
+    /// every other toggle in the group that is currently open gets closed. Turn it off to let several
+    /// stay open and use the group only to close them all on an outside tap.
     ///
-    /// Only POIs that are actually open are closed, so <c>onClose</c> never fires on a POI that was
-    /// already closed.
+    /// The toggles come from the serialized <c>toggles</c> list. If the list is left empty, the group
+    /// collects every <see cref="UIToolkitToggleElement"/> in its children instead, so it can simply
+    /// sit on their parent.
     ///
-    /// Optionally closes every POI on a tap outside all of them (empty space, the scene, or any other
-    /// UI). A press is "inside" when one of the POIs reports it through
-    /// <see cref="WorldSpacePOIToggle.PressedInside"/> — the same UI Toolkit picking that delivers the
-    /// clicks, so mouse, touch and XR ray behave alike. Only a real tap closes: a drag (e.g. looking
-    /// around the skybox on mobile or with the mouse) leaves the POIs open.
+    /// Only toggles that are actually open are closed, so <c>onClose</c> never fires on a toggle that
+    /// was already closed.
+    ///
+    /// Optionally closes every toggle on a tap outside all of them (empty space, the scene, or any
+    /// other UI). A press is "inside" when one of the toggles reports it through
+    /// <see cref="UIToolkitToggleElement.PressedInside"/> — the same UI Toolkit picking that delivers
+    /// the clicks, so mouse, touch and XR ray behave alike. Only a real tap closes: a drag (e.g.
+    /// looking around a skybox on mobile or with the mouse) leaves the toggles open.
     /// </summary>
     [DisallowMultipleComponent]
-    public class WorldSpacePOIGroup : MonoBehaviour
+    public class UIToolkitToggleGroup : MonoBehaviour
     {
-        [SerializeField, Tooltip("POIs in this group. If empty, every WorldSpacePOIToggle in the " +
-            "children of this object is used.")]
-        private List<WorldSpacePOIToggle> pois = new();
+        [SerializeField, FormerlySerializedAs("pois"), Tooltip("Toggles in this group. If empty, every " +
+            "UIToolkitToggleElement in the children of this object is used.")]
+        private List<UIToolkitToggleElement> toggles = new();
 
-        [SerializeField, Tooltip("Close every open POI when the user taps outside all of them " +
+        [SerializeField, Tooltip("When a toggle opens, close every other open toggle of the group.")]
+        private bool exclusive = true;
+
+        [SerializeField, Tooltip("Close every open toggle when the user taps outside all of them " +
             "(empty space, the scene or any other UI).")]
         private bool closeOnOutsideTap = true;
 
         [SerializeField, Tooltip("Mouse / touch: maximum movement, in screen pixels, between press and " +
             "release for it to count as a tap. Beyond this it is a drag (e.g. looking around) and the " +
-            "POIs stay open.")]
+            "toggles stay open.")]
         private float maxTapDistance = 25f;
 
         [SerializeField, Tooltip("XR controllers (no screen position): maximum press duration, in " +
@@ -50,30 +57,30 @@ namespace Virtuademy.SDK.Environments.Utilities
         private Vector2 pressPosition;
         private bool pressHasPosition;
 
-        // Frame of the last press reported by a POI, and of a tap still waiting to be evaluated.
+        // Frame of the last press reported by a toggle, and of a tap still waiting to be evaluated.
         private int lastInsideFrame = -1;
         private int pendingTapFrame = -1;
 
         private void Awake()
         {
-            if (pois.Count == 0)
+            if (toggles.Count == 0)
             {
-                GetComponentsInChildren(true, pois);
+                GetComponentsInChildren(true, toggles);
             }
         }
 
         private void OnEnable()
         {
-            foreach (WorldSpacePOIToggle poi in pois)
+            foreach (UIToolkitToggleElement toggle in toggles)
             {
-                if (poi != null)
+                if (toggle != null)
                 {
-                    poi.Opened += OnPOIOpened;
-                    poi.PressedInside += OnPOIPressedInside;
+                    toggle.Opened += OnToggleOpened;
+                    toggle.PressedInside += OnTogglePressedInside;
                 }
             }
 
-            pressAction = new InputAction("POIOutsideTap", InputActionType.Button);
+            pressAction = new InputAction("ToggleGroupOutsideTap", InputActionType.Button);
             pressAction.AddBinding("<Pointer>/press");
             pressAction.AddBinding("<XRController>/{TriggerButton}");
             pressAction.started += OnPressStarted;
@@ -83,12 +90,12 @@ namespace Virtuademy.SDK.Environments.Utilities
 
         private void OnDisable()
         {
-            foreach (WorldSpacePOIToggle poi in pois)
+            foreach (UIToolkitToggleElement toggle in toggles)
             {
-                if (poi != null)
+                if (toggle != null)
                 {
-                    poi.Opened -= OnPOIOpened;
-                    poi.PressedInside -= OnPOIPressedInside;
+                    toggle.Opened -= OnToggleOpened;
+                    toggle.PressedInside -= OnTogglePressedInside;
                 }
             }
 
@@ -102,25 +109,29 @@ namespace Virtuademy.SDK.Environments.Utilities
             pendingTapFrame = -1;
         }
 
-        private void OnPOIOpened(WorldSpacePOIToggle opened)
+        private void OnToggleOpened(UIToolkitToggleElement opened)
         {
-            foreach (WorldSpacePOIToggle poi in pois)
+            if (!exclusive)
             {
-                if (poi != null && poi != opened && poi.IsOpen)
+                return;
+            }
+            foreach (UIToolkitToggleElement toggle in toggles)
+            {
+                if (toggle != null && toggle != opened && toggle.IsOpen)
                 {
-                    poi.Close();
+                    toggle.Close();
                 }
             }
         }
 
-        private void OnPOIPressedInside(WorldSpacePOIToggle _) => lastInsideFrame = Time.frameCount;
+        private void OnTogglePressedInside(UIToolkitToggleElement _) => lastInsideFrame = Time.frameCount;
 
         private void OnPressStarted(InputAction.CallbackContext context)
         {
             pressFrame = Time.frameCount;
             pressTime = context.time;
             // Forget the previous press; the input callbacks run before the EventSystem dispatches
-            // this new press to the POIs, so their report for it still arrives after this reset.
+            // this new press to the toggles, so their report for it still arrives after this reset.
             lastInsideFrame = -1;
             pressHasPosition = context.control.device is Pointer;
             pressPosition = pressHasPosition ? ((Pointer)context.control.device).position.ReadValue() : default;
@@ -145,8 +156,8 @@ namespace Virtuademy.SDK.Environments.Utilities
 
             if (isTap)
             {
-                // Decide later: the UI may not have dispatched this press to the POIs yet (a quick tap
-                // can press and release within a single input update).
+                // Decide later: the UI may not have dispatched this press to the toggles yet (a quick
+                // tap can press and release within a single input update).
                 pendingTapFrame = Time.frameCount;
             }
         }
@@ -160,7 +171,7 @@ namespace Virtuademy.SDK.Environments.Utilities
             }
             pendingTapFrame = -1;
 
-            // A POI reported the press (on its icon or panel) somewhere between press and release.
+            // A toggle reported the press (on its trigger or target) somewhere between press and release.
             bool pressedInside = lastInsideFrame >= 0;
             if (!pressedInside)
             {
@@ -168,14 +179,14 @@ namespace Virtuademy.SDK.Environments.Utilities
             }
         }
 
-        /// <summary>Closes every open POI of the group.</summary>
+        /// <summary>Closes every open toggle of the group.</summary>
         public void CloseAll()
         {
-            foreach (WorldSpacePOIToggle poi in pois)
+            foreach (UIToolkitToggleElement toggle in toggles)
             {
-                if (poi != null && poi.IsOpen)
+                if (toggle != null && toggle.IsOpen)
                 {
-                    poi.Close();
+                    toggle.Close();
                 }
             }
         }
