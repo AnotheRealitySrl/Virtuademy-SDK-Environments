@@ -18,7 +18,8 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// picking (the same path <see cref="WorldSpaceButtonBinder"/> documents), so it works on VR (XR
     /// ray), desktop (mouse) and mobile (tap).
     ///
-    /// Click-outside-to-close is intentionally NOT handled here.
+    /// Click-outside-to-close is intentionally NOT handled here: <see cref="WorldSpacePOIGroup"/> does
+    /// it, using <see cref="PressedInside"/> to tell presses on a POI from presses elsewhere.
     ///
     /// Like the sibling utilities, it binds lazily (the visual tree is not built on the first
     /// <c>OnEnable</c>) and re-binds itself if the tree is rebuilt at runtime (e.g. by
@@ -66,6 +67,13 @@ namespace Virtuademy.SDK.Environments.Utilities
         /// <c>onOpen</c>, used by <see cref="WorldSpacePOIGroup"/> to close the other POIs.
         /// </summary>
         public event Action<WorldSpacePOIToggle> Opened;
+
+        /// <summary>
+        /// Raised (with this toggle) when a pointer goes down on the icon or on the open panel — mouse,
+        /// touch or XR ray alike, since it comes from the same UI Toolkit picking as the clicks. Used by
+        /// <see cref="WorldSpacePOIGroup"/> to tell presses on a POI from presses outside every POI.
+        /// </summary>
+        public event Action<WorldSpacePOIToggle> PressedInside;
 
         private void OnEnable()
         {
@@ -199,6 +207,10 @@ namespace Virtuademy.SDK.Environments.Utilities
                 iconElement.RegisterCallback<PointerDownEvent>(OnIconPointerDown);
             }
 
+            // Trickle-down: seen before any child (a Button) can stop the event's propagation.
+            iconElement.RegisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
+            panel.RegisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
+
             // Re-bind automatically if the tree gets rebuilt (the elements detach from the panel).
             Watch(iconElement);
 
@@ -207,6 +219,8 @@ namespace Virtuademy.SDK.Environments.Utilities
         }
 
         private void OnIconPointerDown(PointerDownEvent _) => Toggle();
+
+        private void OnPointerDownInside(PointerDownEvent _) => PressedInside?.Invoke(this);
 
         private void Unbind()
         {
@@ -219,6 +233,8 @@ namespace Virtuademy.SDK.Environments.Utilities
             {
                 iconElement.UnregisterCallback<PointerDownEvent>(OnIconPointerDown);
             }
+            iconElement?.UnregisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
+            panel?.UnregisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
             iconElement = null;
             panel = null;
             Unwatch();
