@@ -6,11 +6,16 @@
     flex-direction: column;
     flex-shrink: 0;
     margin-right: 24px;
+    /* Take the full panel height (set by the text column), so the button can sit at the bottom. */
+    align-self: stretch;
 }
 
-/* The column now carries the spacing the image had in SkyboxPOI.uss. */
+/* The column now carries the spacing the image had in SkyboxPOI.uss. The image fills whatever
+   height the button leaves free (height: 100% would resolve against the auto-height column). */
 .poi-media-column > .poi-media {
     margin-right: 0;
+    height: auto;
+    flex-grow: 1;
 }
 
 .poi-video-button {

@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 2622905604701327849}
   - component: {fileID: 1625472766691961665}
   - component: {fileID: 228322394693724539}
+  - component: {fileID: 3751206768185955010}
   m_Layer: 5
   m_Name: SkyboxPOI
   m_TagString: Untagged
@@ -154,3 +155,23 @@ MonoBehaviour:
   nextName: media-next
   extraImages: []
   loop: 1
+--- !u!114 &3751206768185955010
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1500000000000000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2e2044a6622a24b439dbeb3b4f19b655, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpaceLineHeightBinder
+  document: {fileID: 1500000000000000003}
+  lineHeights:
+  - elementName: Title
+    value: 80
+    unit: 0
+  - elementName: Description
+    value: 90
+    unit: 0

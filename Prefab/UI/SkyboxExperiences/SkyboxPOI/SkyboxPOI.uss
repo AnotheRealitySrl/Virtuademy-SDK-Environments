@@ -1,17 +1,10 @@
-/* SkyboxPOI — world-space UI Toolkit point-of-interest.
-   A circular icon (circle + centre dot) toggles an info panel. Only the icon hover-enlarge is USS;
-   the open/close is driven by WorldSpacePOIToggle (it flips .poi-panel's display). */
-
 .poi-root {
     flex-grow: 1;
     align-items: center;
-    /* Keep the icon anchored at the bottom so it does not move when the panel shows/hides. */
     justify-content: flex-end;
-    /* Poppins Regular (.ttf, environments) as base font; title overrides to Bold below. */
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Regular.ttf?fileID=12800000&guid=e77099ee2358c6c40bc8f4dc48c8b53c&type=3#Poppins-Regular");
 }
 
-/* ---- Info popup (hidden by default; the toggle script shows it) ---- */
 .poi-panel {
     display: none;
     flex-direction: row;
@@ -24,23 +17,18 @@
 }
 
 .poi-media {
-    width: 200px;
-    height: 300px;
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
-    margin-right: 24px;
     background-color: rgb(232, 233, 235);
     border-radius: 16px;
-    /* Keep the image's aspect ratio and fill the whole box, cropping whatever overflows
-       (no grey borders). Use 'scale-to-fit' instead to show the whole image letterboxed.
-       overflow:hidden clips the cropped edges to the rounded corners. */
     -unity-background-scale-mode: scale-and-crop;
     overflow: hidden;
+    height: 100%;
+    margin-right: 24px;
+    width: 275px;
 }
 
-/* Carousel arrows over the image (WorldSpacePanelImageCarousel). Hidden by default: the script
-   shows them only when the POI has more than one image. */
 .poi-media-arrow {
     display: none;
     position: absolute;
@@ -86,31 +74,37 @@
 .poi-text {
     flex-direction: column;
     flex-shrink: 1;
-    max-width: 290px;
+    width: 350px;
+    max-width: 350px;
 }
 
 .poi-title {
-    font-size: 30px;
     color: rgb(56, 122, 255);
-    /* Poppins Bold (.ttf, environments). */
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
-    /* Wrap to multiple lines and hard-clip anything past the height cap. NOTE: no text-overflow
-       ellipsis here on purpose — in UI Toolkit ellipsis forces the text onto a single line, which
-       breaks wrapping. The 2-line cap is the max-height in px on the Title element (font-size
-       dependent), and overflow:hidden clips whatever exceeds it. */
     white-space: normal;
     overflow: hidden;
-    margin-bottom: 10px;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    margin-top: 0;
+    font-size: 22px;
+    max-height: 60px;
 }
 
 .poi-body {
-    font-size: 16px;
     color: rgb(28, 32, 40);
     white-space: normal;
     -unity-text-align: upper-left;
+    height: 261px;
+    margin-top: 0;
+    width: auto;
+    letter-spacing: -3px;
+    word-spacing: 0;
+    -unity-paragraph-spacing: -3px;
+    padding-top: 10px;
+    font-size: 15px;
 }
 
-/* ---- POI icon (circle + centre dot), always visible ---- */
 .poi-icon {
     width: 54px;
     height: 54px;
@@ -129,7 +123,6 @@
     transition-timing-function: ease-out;
 }
 
-/* Hover enlarges the ICON only (not the panel). */
 .poi-icon:hover {
     scale: 1.1 1.1;
     background-color: rgba(20, 22, 28, 0.6);
@@ -143,8 +136,6 @@
     border-radius: 8px;
 }
 
-/* Video POIs (SkyboxPOI Video, SkyboxPOI DirectVideo): the centre dot becomes a "play" icon.
-   Use as class="poi-dot poi-dot--play". */
 .poi-dot.poi-dot--play {
     width: 20px;
     height: 20px;
