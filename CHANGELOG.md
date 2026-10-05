@@ -27,6 +27,8 @@
   `LocalizedUITypes`; their inspectors into `Editor/UIKit/UIToolkit/`. Same assembly, same
   namespace, same GUIDs. `Prefab/` keeps only the hand reference prefabs.
 - Seventeen empty folders left over from the 9.0.0 merge are removed.
+- **The analytics ControlManager/Informative-Item prefabs and graphs get short paths.** The folders `Runtime/Analytics/Prefabs/ControlManager_Informative_Item` and `Runtime/Analytics/Graphs/ControlManager_InformativeItem` become `.../ControlManager`, and the ` Variant` suffix Unity appends to prefab-variant file names is dropped across the package (26 prefabs). The longest analytics path is 93 characters, against 115 before.
+- **The Visual Scripting scripts get short folders.** `Runtime/VisualScripting` and `Editor/VisualScripting` become `Runtime/VS` and `Editor/VS`; the `Nodes/` level is removed so `Unit/` and `EventUnit/` sit directly under `VS/Scripts/`; `VisualScriptingInteraction` becomes `VSInteraction` and `SyncedVariable` becomes `SyncVar`. The longest VS path drops from 106 to 73 characters. Same assembly, same namespaces (set in each asmdef's `rootNamespace`), same GUIDs — the Visual Scripting node database is regenerated locally (it is gitignored).
 - **The graph, task and dialog engines are `SPACS-Graphs`, `SPACS-Tasks` and `SPACS-Dialogs`**
   (ids `com.anotherealitysrl.spacs-{graphs,tasks,dialogs}` 3.0.0, were
   `virtuademy-sdk-{graphs,tasks,dialogs}`), and this package's dependencies follow. The
