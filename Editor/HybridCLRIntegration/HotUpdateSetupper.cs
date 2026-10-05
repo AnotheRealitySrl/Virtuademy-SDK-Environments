@@ -581,22 +581,34 @@ $@"{{
                 return;
             }
 
-            AssemblyDefinitionAsset[] current = settings.hotUpdateAssemblyDefinitions;
+            AssemblyDefinitionAsset[] current = settings.hotUpdateAssemblyDefinitions ?? new AssemblyDefinitionAsset[0];
 
-            if (current != null && current.Any(a => a == asmdefAsset))
+            // Entries whose asmdef no longer exists. The list used to only grow: an asmdef deleted
+            // or replaced (a hot-update folder removed and set up again, say) stayed registered as
+            // a missing reference, beside the one in use. Only missing ones are dropped — an
+            // assembly the creator registered by hand is theirs to keep.
+            AssemblyDefinitionAsset[] kept = current.Where(a => a != null).ToArray();
+            int pruned = current.Length - kept.Length;
+
+            bool registered = kept.Any(a => a == asmdefAsset);
+            if (!registered)
+            {
+                kept = kept.Append(asmdefAsset).ToArray();
+            }
+
+            if (registered && pruned == 0)
             {
                 Debug.Log("[Setup] asmdef already registered in HybridCLR, skipping.");
                 return;
             }
 
-            int len = current?.Length ?? 0;
-            AssemblyDefinitionAsset[] updated = new AssemblyDefinitionAsset[len + 1];
-            current?.CopyTo(updated, 0);
-            updated[len] = asmdefAsset;
-            settings.hotUpdateAssemblyDefinitions = updated;
-
+            settings.hotUpdateAssemblyDefinitions = kept;
             SaveHybridCLRSettings(settings);
-            Debug.Log("[Setup] asmdef registered in the Hot Update Assembly Definitions.");
+
+            if (pruned > 0)
+                Debug.Log($"[Setup] Removed {pruned} missing asmdef reference(s) from the Hot Update Assembly Definitions.");
+            if (!registered)
+                Debug.Log("[Setup] asmdef registered in the Hot Update Assembly Definitions.");
         }
 
         static void SaveHybridCLRSettings(HybridCLRSettings settings)
