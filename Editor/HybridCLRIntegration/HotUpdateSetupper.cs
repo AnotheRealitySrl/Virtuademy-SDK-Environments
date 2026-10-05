@@ -682,6 +682,19 @@ $@"{{
                        "being interpreted. Re-run the interpreter configuration.";
             }
 
+            // A missing entry is not cosmetic: HybridCLR reads `.text` off every entry to collect
+            // the hot-update assembly names (SettingsUtil.HotUpdateAssemblyNamesExcludePreserved),
+            // so one null throws NullReferenceException in the DLL compile. Reported here so the
+            // setup window shows the project as not ready and its button — which runs the setup,
+            // which drops them — is enabled again.
+            int missing = defs.Count(a => a == null);
+            if (missing > 0)
+            {
+                return $"{missing} entr{(missing == 1 ? "y" : "ies")} in HybridCLR's Hot Update Assembly " +
+                       "Definitions point at an asmdef that no longer exists, and HybridCLR fails on them " +
+                       "when it compiles the hot-update DLLs. Re-run the interpreter configuration to remove them.";
+            }
+
             return null;
         }
 

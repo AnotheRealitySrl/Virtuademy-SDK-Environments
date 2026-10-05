@@ -59,7 +59,10 @@
 - **The interpreter setup drops missing asmdefs from HybridCLR's Hot Update Assembly Definitions.**
   The list only ever grew: an asmdef deleted or replaced — a hot-update folder removed and set up
   again — stayed registered as a missing reference beside the one in use. `RegisterHotUpdateAssembly`
-  now removes the entries whose asset no longer exists, and only those.
+  now removes the entries whose asset no longer exists, and only those. `GetSetupIssue` reports them
+  — HybridCLR reads `.text` off every entry and throws on a missing one when it compiles the DLLs —
+  so the setup window shows the project as not ready and its button, which runs the cleanup, is
+  enabled.
 - **"Install interpreter" configures the project in one click.** After the window installs the
   HybridCLR package, `HotUpdateSetupper` finishes the setup on the reload that follows. It ran
   inside `[InitializeOnLoadMethod]`, where asset database work is deferred: the hot-update asmdef was
