@@ -85,13 +85,13 @@
     height: 35px;
     width: 48px;
     rotate: 90deg;
-    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Graphics/arrow.svg?fileID=7388822144124034973&guid=b0f06a8ff78c6b54fbf8a0ed4c69afa3&type=3#arrow");
+    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/Graphics/arrow.svg?fileID=7388822144124034973&guid=b0f06a8ff78c6b54fbf8a0ed4c69afa3&type=3#arrow");
 }
 
 .tp-arrow-white {
     -unity-background-image-tint-color: rgb(255, 255, 255);
     scale: 1 1;
-    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Graphics/arrow.svg?fileID=7388822144124034973&guid=b0f06a8ff78c6b54fbf8a0ed4c69afa3&type=3#arrow");
+    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/Graphics/arrow.svg?fileID=7388822144124034973&guid=b0f06a8ff78c6b54fbf8a0ed4c69afa3&type=3#arrow");
 }
 
 .tp-arrow-blue {

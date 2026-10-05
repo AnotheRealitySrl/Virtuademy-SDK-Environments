@@ -140,7 +140,7 @@
     width: 20px;
     height: 20px;
     background-color: rgba(255, 255, 255, 0);
-    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Graphics/Reflectis_Icons_Spritesheet_.png?fileID=-1860801222&guid=70e6442b819a37346bf81cb5a22da56c&type=3#Reflectis_Icons_Spritesheet__play");
+    background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/Graphics/Reflectis_Icons_Spritesheet_.png?fileID=-1860801222&guid=70e6442b819a37346bf81cb5a22da56c&type=3#Reflectis_Icons_Spritesheet__play");
     background-size: 200% 200%;
     border-radius: 0;
 }

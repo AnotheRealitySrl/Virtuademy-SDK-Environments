@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/ButtonChoicePanel/ButtonChoicePanel.uss?fileID=7433441132597879392&amp;guid=9fd2636b2bf749be89f0cb5e54197787&amp;type=3#ButtonChoicePanel"/>
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Prefabs/UI/ButtonChoicePanel/ButtonChoicePanel.uss?fileID=7433441132597879392&amp;guid=9fd2636b2bf749be89f0cb5e54197787&amp;type=3#ButtonChoicePanel"/>
     <ui:VisualElement name="panel" picking-mode="Ignore" class="bcp-panel" style="border-top-left-radius: 30px; border-top-right-radius: 30px; border-bottom-right-radius: 30px; border-bottom-left-radius: 30px; background-color: rgba(0, 0, 0, 0.902);">
         <ui:VisualElement name="header" picking-mode="Ignore" class="bcp-header">
             <Virtuademy.LocalizedComponents.LocalizedLabel text="BENVENUTI ALL&apos;ISTITUTO" picking-mode="Ignore" name="Welcome" class="bcp-welcome" style="margin-bottom: -5px;"/>

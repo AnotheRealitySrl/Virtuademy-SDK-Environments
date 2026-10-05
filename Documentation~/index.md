@@ -37,12 +37,13 @@ ones carry no platform and can be used on their own.
 
 | Folder | Holds |
 |---|---|
-| `Runtime/` | the `Virtuademy.SDK.Environments` assembly |
+| `Runtime/` | the `Virtuademy.SDK.Environments` assembly, one folder per module: `SkyboxExperiences/` holds the components of the skybox experiences' world-space UI, `UIKit/UIToolkit/` the UI Toolkit helpers any world-space panel reuses (binders, rebuilder, localized text) |
 | `ScriptingApi/` | the `Virtuademy.Environments.ScriptingApi` assembly: the facade at its root, the interaction, spawner and chatbot contracts, and `Placeholders/<Module>/` with each placeholder's scripts. `Placeholders/Utilities/` holds the bases every placeholder derives from |
 | `Prefabs/<Module>/` | each placeholder's prefabs and what they are built from (models, materials, sprites), one folder per module of `ScriptingApi/Placeholders/`. A `Legacy/` subfolder keeps the copies nothing in the package references, which published environments may still use |
-| `Common/` | fonts, audio and UI prefabs shared across modules |
-| `Prefab/`, `Graphics/` | the world-space UI prefabs of the skybox experiences and their graphics |
-| `Editor/` | the editor assemblies |
+| `Prefabs/SkyboxExperiences/` | the skybox experiences' world-space UI: the 360 buttons, the POI panels, the video overlay, their styles and graphics |
+| `Common/` | fonts, audio and the UI prefabs several modules share, among them the generic world-space panels `WorldSpaceButtonPanel` and `ButtonChoicePanel` |
+| `Prefab/` | the hand reference prefabs `SpawnableObjectPlaceholder` loads by path in the editor |
+| `Editor/` | the editor assemblies, mirroring the `Runtime/` modules (`Editor/UIKit/UIToolkit/` for the binders' inspectors) |
 
 The placeholders sit outside `Runtime/` to keep paths short: inside a creator project's
 `Library/PackageCache/com.anotherealitysrl.virtuademy-sdk-environments@<hash>/`, Windows leaves

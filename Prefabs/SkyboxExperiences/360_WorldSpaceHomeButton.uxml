@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/SkyboxExperiences/360_WorldSpaceHomeButton.uss?fileID=7433441132597879392&amp;guid=78470061ac7d495bbcdf069070229f9f&amp;type=3#360_WorldSpaceHomeButton"/>
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/360_WorldSpaceHomeButton.uss?fileID=7433441132597879392&amp;guid=78470061ac7d495bbcdf069070229f9f&amp;type=3#360_WorldSpaceHomeButton"/>
     <ui:VisualElement name="root" picking-mode="Ignore" class="home-root">
         <ui:Button name="button" class="home-button">
             <ui:VisualElement name="icon" picking-mode="Ignore" class="home-icon"/>

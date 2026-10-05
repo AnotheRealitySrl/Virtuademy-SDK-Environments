@@ -17,6 +17,15 @@
   Every file keeps its `.meta`, so GUIDs, prefab and scene references, the assembly, its name and
   every namespace are unchanged: nothing a creator project or a published environment records
   moves. The longest placeholder path is 91 characters, against 139 before.
+- **The skybox experiences' world-space UI follows the same rule.** Its prefabs, styles and graphics
+  move from `Prefab/UI/SkyboxExperiences` and `Graphics/` to `Prefabs/SkyboxExperiences/`; the
+  generic panels `WorldSpaceButtonPanel` and `ButtonChoicePanel`, their panel settings and
+  `ButtonTheme.tss` to `Common/Prefabs/UI/`. `Runtime/Utilities` splits by audience: what only the
+  skybox prefabs use (`SkyboxVideoOverlay`, `WorldSpacePOIGroup`, `WorldSpacePOIToggle`,
+  `WorldSpacePOIVideoButton`, `WorldSpacePanelImageCarousel`) into `Runtime/SkyboxExperiences/`,
+  the binders and the rebuilder any world-space panel reuses into `Runtime/UIKit/UIToolkit/`, beside
+  `LocalizedUITypes`; their inspectors into `Editor/UIKit/UIToolkit/`. Same assembly, same
+  namespace, same GUIDs. `Prefab/` keeps only the hand reference prefabs.
 - Seventeen empty folders left over from the 9.0.0 merge are removed.
 - **The graph, task and dialog engines are `SPACS-Graphs`, `SPACS-Tasks` and `SPACS-Dialogs`**
   (ids `com.anotherealitysrl.spacs-{graphs,tasks,dialogs}` 3.0.0, were
