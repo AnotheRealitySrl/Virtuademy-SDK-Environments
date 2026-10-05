@@ -56,6 +56,15 @@
   "Published in" line.
 
 ### Fixed
+- **"Install interpreter" configures the project in one click.** After the window installs the
+  HybridCLR package, `HotUpdateSetupper` finishes the setup on the reload that follows. It ran
+  inside `[InitializeOnLoadMethod]`, where asset database work is deferred: the hot-update asmdef was
+  renamed but could not be loaded, so its registration in HybridCLR's Hot Update Assembly
+  Definitions failed, the project was not ready to build, and the log still said the configuration
+  had completed. The setup now runs on the first editor tick after the reload, imports the asmdef
+  synchronously before registering it, and keeps its pending flag until the setup passes — retried
+  on the reload a rename causes, up to three times, then reported as an error. `Setup()` logs an
+  incomplete run as a warning instead of an error.
 - **UI Toolkit localized elements translate in a player build again.** Since the `LocalizedXxx`
   elements moved here, I2Loc reaches them through `I2LocalizedTextProvider`, in the
   `Virtuademy.SDK.Environments.I2Loc` assembly, which nothing references: its only entry point is a

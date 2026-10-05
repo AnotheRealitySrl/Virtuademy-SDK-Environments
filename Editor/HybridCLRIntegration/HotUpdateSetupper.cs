@@ -257,22 +257,73 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             SessionState.SetString(PENDING_REFUSAL_KEY, reason);
         }
 
+        /// <summary>How many domain reloads the post-install setup may take before it gives up.</summary>
+        const int MAX_PENDING_SETUP_ATTEMPTS = 3;
+        const string PENDING_SETUP_ATTEMPTS_KEY = "PENDING_HYBRIDCLR_SETUP_ATTEMPTS";
+
+        /// <summary>
+        /// Finishes the setup the window started by installing the HybridCLR package, so that one
+        /// click on "Install interpreter" leaves the project ready to build.
+        ///
+        /// It used to call <see cref="Setup"/> right here, inside [InitializeOnLoadMethod]. Asset
+        /// database work is deferred in that context: the asmdef was renamed but could not be
+        /// loaded yet, so the HybridCLR registration failed — and the line after it announced a
+        /// completed configuration anyway. The creator had to press the button a second time.
+        /// Now the setup runs on the first editor tick after the reload, and the pending flag is
+        /// only lowered when the setup actually passes: a rename recompiles, so a run that comes
+        /// up short is retried on the reload it caused, up to <see cref="MAX_PENDING_SETUP_ATTEMPTS"/>.
+        /// </summary>
         [InitializeOnLoadMethod]
         static void OnReloadAfterInstall()
         {
             if (!SessionState.GetBool(PENDING_SETUP_KEY, false))
                 return;
 
+            EditorApplication.delayCall += CompletePendingSetup;
+        }
+
+        static void CompletePendingSetup()
+        {
+            int attempt = SessionState.GetInt(PENDING_SETUP_ATTEMPTS_KEY, 0) + 1;
+            SessionState.SetInt(PENDING_SETUP_ATTEMPTS_KEY, attempt);
+
+            string issue = RunSetup();
+
+            if (issue == null)
+            {
+                ClearPendingSetup();
+                Debug.Log("[Setup] HybridCLR configured after the install. The project is ready to build interpreted scripts.");
+                return;
+            }
+
+            if (attempt >= MAX_PENDING_SETUP_ATTEMPTS)
+            {
+                ClearPendingSetup();
+                Debug.LogError($"[Setup] HybridCLR is installed but the configuration did not complete after {attempt} attempts: " +
+                               $"{issue} Press \"Install interpreter\" in Virtuademy/Setup/Setup project to retry.");
+                return;
+            }
+
+            // Kept raised: the next domain reload — the recompilation the rename just started —
+            // runs the setup again with the asset imported.
+            Debug.Log($"[Setup] HybridCLR configuration continues after the recompilation ({issue})");
+        }
+
+        static void ClearPendingSetup()
+        {
             SessionState.SetBool(PENDING_SETUP_KEY, false);
-            Setup();
-            Debug.Log("[Setup] HybridCLR configuration completed automatically after the install.");
+            SessionState.EraseInt(PENDING_SETUP_ATTEMPTS_KEY);
         }
 
         // ============================================================
         //  SETUP — run once to prepare the project
         // ============================================================
         //[MenuItem("Virtuademy/Setup/Interpreted scripting")]
-        public static void Setup()
+        public static void Setup() => RunSetup();
+
+        /// <summary>Runs the setup and returns what the build gate would still refuse, or null
+        /// when the project is ready.</summary>
+        static string RunSetup()
         {
             // Step 1: the interpreter itself, inside this Editor's IL2CPP. Nothing below matters
             // if the player is going to be built without it.
@@ -290,7 +341,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             string assemblyName = HotUpdateAssemblyName;
 
             if (!EnsureAsmdef(assemblyName))
-                return;
+                return GetSetupIssue() ?? "the hot-update assembly definition could not be prepared.";
 
             WarnAboutNestedAsmdefs();
             RegisterHotUpdateAssembly(assemblyName);
@@ -299,12 +350,13 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             string issue = GetSetupIssue();
             if (issue != null)
             {
-                Debug.LogError($"[Setup] Setup incomplete: {issue}");
-                return;
+                Debug.LogWarning($"[Setup] Setup incomplete: {issue}");
+                return issue;
             }
 
             Debug.Log($"[Setup] Done. Write your scripts in {HOTUPDATE_FOLDER}; " +
                       $"they compile into '{assemblyName}'.");
+            return null;
         }
 
         /// <summary>
@@ -518,7 +570,14 @@ $@"{{
                 AssetDatabase.LoadAssetAtPath<AssemblyDefinitionAsset>(asmdefPath);
             if (asmdefAsset == null)
             {
-                Debug.LogError($"[Setup] Cannot load the asmdef to register at {asmdefPath}.");
+                // Just renamed or rewritten, and not imported yet: import it now rather than leave
+                // the registration to a second run.
+                AssetDatabase.ImportAsset(asmdefPath, ImportAssetOptions.ForceSynchronousImport | ImportAssetOptions.ForceUpdate);
+                asmdefAsset = AssetDatabase.LoadAssetAtPath<AssemblyDefinitionAsset>(asmdefPath);
+            }
+            if (asmdefAsset == null)
+            {
+                Debug.LogWarning($"[Setup] Cannot load the asmdef to register at {asmdefPath} yet.");
                 return;
             }
 
