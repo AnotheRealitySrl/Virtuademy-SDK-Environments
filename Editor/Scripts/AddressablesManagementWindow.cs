@@ -578,12 +578,7 @@ namespace Virtuademy.SDK.Environments.Editor
             await RunBuildAndDeployAsync(worldIds);
         }
 
-        /// <summary>
-        /// The build and deploy itself, with the world ids passed in rather than read off the
-        /// window. That is what makes it re-runnable after a domain reload: the selection lives in
-        /// a dictionary that is not serialized, so it does not survive one, while the ids parked in
-        /// SessionState do.
-        /// </summary>
+        /// <summary>The build and deploy itself, with the world ids passed in rather than read off the window.</summary>
         private async Task RunBuildAndDeployAsync(List<int> worldIds)
         {
             SetDeployButtonsEnabled(false);
@@ -592,16 +587,6 @@ namespace Virtuademy.SDK.Environments.Editor
             //    check). Block the whole build & deploy if it fails.
             if (!await BuildAndVerifyInterpretedDLLAsync())
             {
-                if (InterpretedDllAwaitingRecompile())
-                {
-                    // Nothing failed: the gate renamed the hot-update assembly because the scripts
-                    // changed, and Unity is recompiling it. Park what was asked and let the reload
-                    // press the button again — the creator sees a pause, not a question.
-                    ParkDeployForResume(ResumeWorlds + string.Join(",", worldIds));
-                    SetDeployButtonsEnabled(true);
-                    return;
-                }
-
                 LogDeployError("Interpreted script DLL failed the security checks. Build & deploy aborted (see Console).");
                 EditorUtility.DisplayDialog("Build & Deploy blocked",
                     "The interpreted script DLL did not pass the security checks. See the Console. " +
@@ -805,7 +790,7 @@ namespace Virtuademy.SDK.Environments.Editor
             await RunTenantBuildAndDeployAsync();
         }
 
-        /// <summary>Same as above for the tenant deploy, which needs no inputs to be re-runnable.</summary>
+        /// <summary>Same as above for the tenant deploy.</summary>
         private async Task RunTenantBuildAndDeployAsync()
         {
             SetDeployButtonsEnabled(false);
@@ -813,13 +798,6 @@ namespace Virtuademy.SDK.Environments.Editor
             // 0. Build + verify the interpreted DLL. Block the whole build & deploy if it fails.
             if (!await BuildAndVerifyInterpretedDLLAsync())
             {
-                if (InterpretedDllAwaitingRecompile())
-                {
-                    ParkDeployForResume(ResumeTenant);
-                    SetDeployButtonsEnabled(true);
-                    return;
-                }
-
                 LogDeployError("Interpreted script DLL failed the security checks. Tenant build & deploy aborted (see Console).");
                 EditorUtility.DisplayDialog("Build & Deploy blocked",
                     "The interpreted script DLL did not pass the security checks. See the Console. " +
@@ -2106,40 +2084,11 @@ namespace Virtuademy.SDK.Environments.Editor
 
         #region Build
 
-        /// <summary>
-        /// Builds the interpreted hot-update DLL and verifies it (local whitelist + authoritative
-        /// server check). Returns true if the build may proceed. Called via reflection so this
-        /// window stays decoupled from the HYBRIDCLR_INSTALLED-gated assembly; when HybridCLR is
-        /// not installed the setupper is absent and we simply proceed (nothing to gate).
-        /// </summary>
-        // A deploy interrupted by the hot-update assembly's rename, waiting for the recompilation
-        // that follows it. SessionState and not EditorPrefs: this must survive a domain reload and
-        // nothing else — an editor that restarts should not silently start deploying.
-        private const string ResumeKey = "Virtuademy_AddressablesDeploy_ResumeAfterRecompile";
-        private const string ResumeWorlds = "worlds:";
-        private const string ResumeTenant = "tenant";
-        private const string ResumeBuild = "build";
-
-        /// <summary>
-        /// Builds the interpreted DLL, verifies it, and builds the addressables only if it passed.
-        ///
-        /// Extracted from the button's own handler so it can be resumed: this path used to report
-        /// EVERY refusal as "did not pass the security checks", including the one case that is not
-        /// a refusal at all — the gate renaming the hot-update assembly because the scripts changed.
-        /// A creator got told their code had failed a check it had not yet been put through, and had
-        /// to press the button again to find out. The two Build &amp; Deploy paths already parked and
-        /// resumed; this one now does the same.
-        /// </summary>
+        /// <summary>Builds the interpreted DLL, verifies it, and builds the addressables only if it passed.</summary>
         private async Task RunBuildAddressablesAsync()
         {
             if (!await BuildAndVerifyInterpretedDLLAsync())
             {
-                if (InterpretedDllAwaitingRecompile())
-                {
-                    ParkDeployForResume(ResumeBuild);
-                    return;
-                }
-
                 EditorUtility.DisplayDialog("Build blocked",
                     "The interpreted script DLL did not pass the security checks. " +
                     "See the Console for the offending lines. Addressables were NOT built.",
@@ -2150,89 +2099,12 @@ namespace Virtuademy.SDK.Environments.Editor
             BuildAndZipScenes();
         }
 
-        private static void ParkDeployForResume(string payload)
-        {
-            SessionState.SetString(ResumeKey, payload);
-
-            Debug.Log("[HotUpdate] The deploy is waiting for that recompilation and will carry on by " +
-                      "itself when it finishes.");
-        }
-
         /// <summary>
-        /// Picks a parked deploy back up on the first reload after the recompilation that
-        /// interrupted it. The marker is cleared before anything is re-run, so a deploy that fails
-        /// again cannot turn into a loop, and it is only ever written by the path that renamed the
-        /// assembly — a build that stopped for any other reason stays stopped.
+        /// Builds the interpreted hot-update DLL and verifies it (local whitelist + authoritative
+        /// server check). Returns true if the build may proceed. Called via reflection so this
+        /// window stays decoupled from the HYBRIDCLR_INSTALLED-gated assembly; when HybridCLR is
+        /// not installed the setupper is absent and we simply proceed (nothing to gate).
         /// </summary>
-        [DidReloadScripts]
-        private static void ResumeParkedDeploy()
-        {
-            string parked = SessionState.GetString(ResumeKey, string.Empty);
-            if (string.IsNullOrEmpty(parked))
-                return;
-
-            SessionState.EraseString(ResumeKey);
-
-            AddressablesManagementWindow window =
-                Resources.FindObjectsOfTypeAll<AddressablesManagementWindow>().FirstOrDefault();
-
-            if (window == null)
-            {
-                Debug.LogWarning("[HotUpdate] The deploy was waiting for a recompilation, but its window " +
-                                 "has been closed. Nothing was resumed.");
-                return;
-            }
-
-            // Next editor tick, not this callback: the domain has just come back and the window's
-            // UI is still being rebuilt around us.
-            EditorApplication.delayCall += () =>
-            {
-                Debug.Log("[HotUpdate] Recompilation finished — resuming the deploy.");
-
-                // Fire and forget by design, exactly as the button click is: both paths log their
-                // own failures, and there is nobody left to await them.
-                if (parked == ResumeBuild)
-                {
-                    _ = window.RunBuildAddressablesAsync();
-                    return;
-                }
-
-                if (parked == ResumeTenant)
-                {
-                    _ = window.RunTenantBuildAndDeployAsync();
-                    return;
-                }
-
-                List<int> worldIds = parked.Substring(ResumeWorlds.Length)
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(x => int.TryParse(x, out int id) ? id : -1)
-                    .Where(x => x > 0)
-                    .ToList();
-
-                if (worldIds.Count == 0)
-                {
-                    Debug.LogWarning("[HotUpdate] The parked deploy named no world it could still reach. " +
-                                     "Nothing was resumed.");
-                    return;
-                }
-
-                _ = window.RunBuildAndDeployAsync(worldIds);
-            };
-        }
-
-        /// <summary>
-        /// Whether the verify step stopped to let Unity recompile a renamed assembly, rather than
-        /// because anything was refused. It already told the creator what to do — through a dialog
-        /// that survives the reload the rename triggers — so the caller must not follow it with a
-        /// second, wrong explanation.
-        /// </summary>
-        private bool InterpretedDllAwaitingRecompile()
-        {
-            return FindHotUpdateSetupperType()?
-                .GetProperty("AwaitingRecompile", BindingFlags.Public | BindingFlags.Static)?
-                .GetValue(null) as bool? ?? false;
-        }
-
         private async Task<bool> BuildAndVerifyInterpretedDLLAsync()
         {
             Type setupperType = FindHotUpdateSetupperType();

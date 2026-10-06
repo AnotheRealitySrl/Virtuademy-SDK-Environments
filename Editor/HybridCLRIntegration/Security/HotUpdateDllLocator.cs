@@ -1,9 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-
-using HybridCLR.Editor.Settings;
 
 using UnityEditor;
 
@@ -12,15 +9,13 @@ using UnityEngine;
 namespace Virtuademy.SDK.Environments.HybridCLR.Editor
 {
     /// <summary>
-    /// Resolves the project's hot-update assembly automatically (no manual browsing). The
-    /// authoritative source is <c>HybridCLRSettings.hotUpdateAssemblyDefinitions</c> — the
-    /// exact asmdef(s) HybridCLR compiles — so we match whatever name the setupper produced
-    /// (e.g. <c>HotUpdate_&lt;productGUID&gt;</c>), NOT a guessed "HotUpdate".
+    /// Finds the project's compiled hot-update assembly. Every creator project compiles it under
+    /// the same name, <see cref="HotUpdateSetupper.ScriptAlias"/>, so there is nothing to guess: the
+    /// editor's copy in Library/ScriptAssemblies (with its PDB, for line numbers) or HybridCLR's
+    /// per-target copy in HybridCLRData/HotUpdateDlls.
     /// </summary>
     internal static class HotUpdateDllLocator
     {
-        [Serializable] private class AsmdefName { public string name; }
-
         public static string ProjectRoot => Directory.GetParent(Application.dataPath)!.FullName;
 
         public static string ScriptAssembliesDll(string assemblyName)
@@ -29,89 +24,19 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         public static string HotUpdateDll(string assemblyName, string target)
             => Path.Combine(ProjectRoot, "HybridCLRData", "HotUpdateDlls", target, assemblyName + ".dll");
 
-        private static IEnumerable<string> RegisteredHotUpdateNames()
-        {
-            HybridCLRSettings settings = null;
-            try { settings = HybridCLRSettings.Instance; } catch { /* HybridCLR not ready */ }
-
-            var defs = settings?.hotUpdateAssemblyDefinitions;
-            if (defs == null)
-                yield break;
-
-            List<string> others = new();
-            foreach (UnityEditorInternal.AssemblyDefinitionAsset def in defs)
-            {
-                foreach (string name in NamesOf(def))
-                {
-                    if (name.StartsWith("HotUpdate", StringComparison.OrdinalIgnoreCase))
-                        yield return name;
-                    else
-                        others.Add(name);
-                }
-            }
-            foreach (string name in others)
-                yield return name;
-        }
-
-        private static IEnumerable<string> NamesOf(UnityEditorInternal.AssemblyDefinitionAsset def)
-        {
-            if (def == null)
-                yield break;
-
-            string jsonName = null;
-            try { jsonName = JsonUtility.FromJson<AsmdefName>(def.text)?.name; } catch { }
-            if (!string.IsNullOrEmpty(jsonName))
-                yield return jsonName;
-
-            if (!string.IsNullOrEmpty(def.name) && def.name != jsonName)
-                yield return def.name;
-        }
-
-        public static string ResolveAssemblyName()
-            => RegisteredHotUpdateNames().FirstOrDefault();
+        public static string ResolveAssemblyName() => HotUpdateSetupper.ScriptAlias;
 
         public static string ResolveDefaultDllPath(out string assemblyName)
         {
-            string saDir = Path.Combine(ProjectRoot, "Library", "ScriptAssemblies");
-
-            foreach (string name in RegisteredHotUpdateNames())
-            {
-                string dll = ScriptAssembliesDll(name);
-                if (File.Exists(dll)) { assemblyName = name; return dll; }
-            }
-
-            if (Directory.Exists(saDir))
-            {
-                string newest = Directory.GetFiles(saDir, "HotUpdate*.dll")
-                    .OrderByDescending(File.GetLastWriteTimeUtc)
-                    .FirstOrDefault();
-                if (newest != null) { assemblyName = Path.GetFileNameWithoutExtension(newest); return newest; }
-            }
-
-            assemblyName = null;
-            return null;
+            assemblyName = HotUpdateSetupper.ScriptAlias;
+            string dll = ScriptAssembliesDll(assemblyName);
+            return File.Exists(dll) ? dll : null;
         }
 
         public static string ResolveTargetDllPath(string target, out string assemblyName)
         {
-            string dir = Path.Combine(ProjectRoot, "HybridCLRData", "HotUpdateDlls", target);
-
-            foreach (string name in RegisteredHotUpdateNames())
-            {
-                string dll = HotUpdateDll(name, target);
-                if (File.Exists(dll)) { assemblyName = name; return dll; }
-            }
-
-            if (Directory.Exists(dir))
-            {
-                string newest = Directory.GetFiles(dir, "HotUpdate*.dll")
-                    .OrderByDescending(File.GetLastWriteTimeUtc)
-                    .FirstOrDefault();
-                if (newest != null) { assemblyName = Path.GetFileNameWithoutExtension(newest); return newest; }
-            }
-
-            assemblyName = ResolveAssemblyName();
-            return string.IsNullOrEmpty(assemblyName) ? null : HotUpdateDll(assemblyName, target);
+            assemblyName = HotUpdateSetupper.ScriptAlias;
+            return HotUpdateDll(assemblyName, target);
         }
 
         /// <summary>SHA-256 of the bytes as lowercase hex (informational, shown in the log).</summary>
