@@ -22,7 +22,7 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// The optional <c>panel</c> reference is only used to tell presses on the open panel from presses
     /// elsewhere (<see cref="PressedInside"/>): every UIDocument under it counts as "inside". A USS class
     /// (<c>openClassName</c>) can be put on the trigger while open, to style the active trigger. Hover
-    /// feedback stays purely in USS (e.g. <c>.poi-icon:hover { scale: 1.1 1.1; }</c>). Click is
+    /// feedback stays purely in USS (e.g. <c>.toggle-icon:hover { scale: 1.1 1.1; }</c>). Click is
     /// delivered by Unity's native UI Toolkit picking (the same path <see cref="UIToolkitButtonBinder"/>
     /// documents), so it works on VR (XR ray), desktop (mouse) and mobile (tap).
     ///

@@ -1,11 +1,11 @@
-.poi-root {
+.toggle-root {
     flex-grow: 1;
     align-items: center;
     justify-content: flex-end;
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Regular.ttf?fileID=12800000&guid=e77099ee2358c6c40bc8f4dc48c8b53c&type=3#Poppins-Regular");
 }
 
-.poi-panel {
+.toggle-panel {
     display: none;
     flex-direction: row;
     align-items: flex-start;
@@ -16,7 +16,7 @@
     border-radius: 24px;
 }
 
-.poi-media {
+.toggle-media {
     flex-shrink: 0;
     align-items: center;
     justify-content: center;
@@ -29,7 +29,7 @@
     width: 275px;
 }
 
-.poi-media-arrow {
+.toggle-media-arrow {
     display: none;
     position: absolute;
     top: 50%;
@@ -51,34 +51,34 @@
     transition-timing-function: ease-out;
 }
 
-.poi-media-arrow:hover {
+.toggle-media-arrow:hover {
     scale: 1.1 1.1;
     background-color: rgba(20, 22, 28, 0.6);
     border-color: rgb(255, 255, 255);
 }
 
-.poi-media-arrow--prev {
+.toggle-media-arrow--prev {
     left: 8px;
 }
 
-.poi-media-arrow--next {
+.toggle-media-arrow--next {
     right: 8px;
 }
 
-.poi-media-label {
+.toggle-media-label {
     font-size: 18px;
     color: rgb(70, 74, 80);
     -unity-font-style: bold;
 }
 
-.poi-text {
+.toggle-text {
     flex-direction: column;
     flex-shrink: 1;
     width: 350px;
     max-width: 350px;
 }
 
-.poi-title {
+.toggle-title {
     color: rgb(56, 122, 255);
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
     white-space: normal;
@@ -91,7 +91,7 @@
     max-height: 60px;
 }
 
-.poi-body {
+.toggle-body {
     color: rgb(28, 32, 40);
     white-space: normal;
     -unity-text-align: upper-left;
@@ -105,7 +105,7 @@
     font-size: 15px;
 }
 
-.poi-icon {
+.toggle-icon {
     width: 54px;
     height: 54px;
     flex-shrink: 0;
@@ -123,20 +123,20 @@
     transition-timing-function: ease-out;
 }
 
-.poi-icon:hover {
+.toggle-icon:hover {
     scale: 1.1 1.1;
     background-color: rgba(20, 22, 28, 0.6);
     border-color: rgb(255, 255, 255);
 }
 
-.poi-dot {
+.toggle-dot {
     width: 16px;
     height: 16px;
     background-color: rgb(255, 255, 255);
     border-radius: 8px;
 }
 
-.poi-dot.poi-dot--play {
+.toggle-dot.toggle-dot--play {
     width: 20px;
     height: 20px;
     background-color: rgba(255, 255, 255, 0);
@@ -145,9 +145,9 @@
     border-radius: 0;
 }
 
-/* Keeps the panel where it was when the icon shared its document: the icon now lives in its own
-   document (SkyboxPOIToggle.uxml) at the same spot, so the panel reserves the icon's height. */
-.poi-icon-spacer {
+/* Keeps the panel above the toggle button: the button lives in its own document
+   (ToggleButton.uxml) at the same spot, so the panel reserves the button's height. */
+.toggle-icon-spacer {
     width: 54px;
     height: 54px;
     flex-shrink: 0;

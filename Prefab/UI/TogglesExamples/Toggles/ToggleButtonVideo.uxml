@@ -1,0 +1,8 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/TogglesExamples/Toggles/Toggle.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#Toggle"/>
+    <ui:VisualElement name="root" picking-mode="Ignore" class="toggle-root">
+        <ui:Button name="icon" text="" class="toggle-icon">
+            <ui:VisualElement name="dot" picking-mode="Ignore" class="toggle-dot toggle-dot--play"/>
+        </ui:Button>
+    </ui:VisualElement>
+</ui:UXML>

@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 3809833781733237025}
   - component: {fileID: 5989720395080392124}
   m_Layer: 5
-  m_Name: SkyboxPOI DirectVideo
+  m_Name: ToggleWithOverlayVideo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Changed
+- **The toggle and video UI are generic examples under `Prefab/UI/TogglesExamples`.** Prefabs:
+  `Toggles/SimpleToggle` (was SkyboxPOI), `Toggles/ToggleWithVideo` (SkyboxPOI Video),
+  `Toggles/ToggleWithOverlayVideo` (SkyboxPOI DirectVideo), `VideoOverlay/VideoOverlay`
+  (SkyboxVideoScreen); `MenuPanel/ButtonChoicePanel` and the 360 buttons moved alongside. UXML/USS:
+  `TogglePanel`, `TogglePanelWithVideo`, `ToggleButton`, `ToggleButtonVideo`, `Toggle.uss`,
+  `TogglePanelWithVideo.uss`, `VideoOverlay.uxml/.uss`, `VideoOverlayScreenPanelSettings`; USS classes
+  `poi-*` are `toggle-*`. Same GUIDs, so scenes and prefabs keep their references; element names
+  (`icon`, `panel`, `media`, `Title`, `Description`, `video-button`, `close-button`…) are unchanged.
 - **`UIToolkitToggleElement` only raises events.** `targetName` and `useDisplay` are gone: what
   "open" means is up to `onOpen` / `onClose` (typically `panel.SetActive(true/false)`). The new
   `panel` field is only used to count presses on the open panel's UIDocuments as inside for

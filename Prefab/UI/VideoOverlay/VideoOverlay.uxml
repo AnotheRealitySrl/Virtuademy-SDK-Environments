@@ -1,5 +1,5 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-    <Style src="SkyboxVideoOverlay.uss"/>
+    <Style src="VideoOverlay.uss"/>
     <ui:VisualElement name="overlay-root" class="video-overlay">
         <ui:VisualElement name="video-frame" picking-mode="Ignore" class="video-frame">
             <ui:VisualElement name="video-surface" picking-mode="Ignore" class="video-surface"/>

@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 7437053764601697080}
   - component: {fileID: 4458965035876771387}
   m_Layer: 5
-  m_Name: SkyboxVideoScreen
+  m_Name: VideoOverlay
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

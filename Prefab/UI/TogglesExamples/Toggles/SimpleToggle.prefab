@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 1500000000000000002}
   - component: {fileID: 1500000000000000005}
   m_Layer: 5
-  m_Name: SkyboxPOI
+  m_Name: SimpleToggle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -1,8 +1,8 @@
-/* SkyboxPOI Video — additions on top of SkyboxPOI.uss.
+/* TogglePanelWithVideo — additions on top of Toggle.uss.
    The media column stacks the image and the "Start video" button, wired by a UIToolkitButtonBinder
-   to open the POI's video (SkyboxVideoScreen). */
+   to open the toggle's video (VideoOverlay prefab). */
 
-.poi-media-column {
+.toggle-media-column {
     flex-direction: column;
     flex-shrink: 0;
     margin-right: 24px;
@@ -10,15 +10,15 @@
     align-self: stretch;
 }
 
-/* The column now carries the spacing the image had in SkyboxPOI.uss. The image fills whatever
+/* The column now carries the spacing the image had in Toggle.uss. The image fills whatever
    height the button leaves free (height: 100% would resolve against the auto-height column). */
-.poi-media-column > .poi-media {
+.toggle-media-column > .toggle-media {
     margin-right: 0;
     height: auto;
     flex-grow: 1;
 }
 
-.poi-video-button {
+.toggle-video-button {
     height: 44px;
     margin: 12px 0 0 0;
     padding: 0 16px;
@@ -28,16 +28,16 @@
     color: rgb(255, 255, 255);
     font-size: 18px;
     -unity-text-align: middle-center;
-    /* Poppins Bold (.ttf, environments), like the POI title. */
+    /* Poppins Bold (.ttf, environments), like the panel title. */
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
     transition-property: background-color;
     transition-duration: 0.12s;
 }
 
-.poi-video-button:hover {
+.toggle-video-button:hover {
     background-color: rgb(30, 98, 235);
 }
 
-.poi-video-button:active {
+.toggle-video-button:active {
     background-color: rgb(20, 80, 200);
 }
