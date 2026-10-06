@@ -3,6 +3,21 @@
 ## Unreleased
 
 ### Changed
+- **A scene zip uploaded by hand carries its scripts.** Every addressables build now writes
+  `<scene>/environment-dll.json` into each scene zip, naming the interpreted assembly the scenes were
+  compiled against (`null` without HybridCLR), and builds the assembly bundle beside them as
+  `ServerData/<AssemblyName>.zip` — before, only Build & Deploy built it. Upload the bundle next to
+  the scene zips and the platform's archive import registers it and links the scenes, which until
+  now only the window's deploy did: a scene zip imported from the Backoffice loaded with every
+  scripted component missing. Needs the platform's matching import (SPACS-Virtuademy with the
+  `environment-dll.json` support); an older platform ignores the file.
+- **Build & Deploy to worlds uploads the assembly before the scenes, every time.** The import of a
+  scene now refuses one whose declared assembly is not registered, so the bundle has to be there
+  first. It is no longer skipped when the scripts are unchanged: that marker is per project, not per
+  tenant, and a deploy to a second tenant went out without its scripts. A scene whose assembly the
+  platform rejects is not published, instead of being published without its scripts. The explicit
+  link after the scenes stays, so the window still works against a platform that predates the
+  declaration. Deploy to Tenant is unchanged: tenant environments still cannot carry scripts.
 - **The hot-update asmdef references every whitelisted assembly from the start.** The interpreter
   setup used to seed only `Virtuademy.ScriptingApi` and `Virtuademy.Environments.ScriptingApi`, and
   its comment claimed the whitelist admitted nothing else first-party; `policy.json` also admits

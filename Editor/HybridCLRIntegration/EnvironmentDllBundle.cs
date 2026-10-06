@@ -13,8 +13,10 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
     ///
     ///     &lt;Platform&gt;/&lt;AssemblyName&gt;.dll.bytes
     ///
-    /// The assembly belongs to the PROJECT, not to a scene: it is uploaded once per deploy,
-    /// not once per world, which is why this does not live in the per-scene zip.
+    /// The assembly belongs to the PROJECT, not to a scene, which is why this does not live in
+    /// the per-scene zip: it is built once per addressables build, beside the scene zips, and
+    /// each scene zip names it in its environment-dll.json. The window uploads it once per world;
+    /// someone importing from the Backoffice uploads it next to the scene zips by hand.
     /// </summary>
     public static class EnvironmentDllBundle
     {

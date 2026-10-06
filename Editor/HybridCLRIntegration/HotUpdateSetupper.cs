@@ -862,8 +862,10 @@ $@"{{
 
         /// <summary>
         /// True when the last <see cref="CompileVerifyAsync"/> found the published bundle already
-        /// current, so the caller can skip building, uploading and importing it. Meaningful only
-        /// within the run that set it — this is the verdict of that check, not stored state.
+        /// current, which is why it skipped compiling and verifying. The bundle is still built from
+        /// the DLLs on disk and uploaded with the scenes: the marker is per project, not per tenant.
+        /// Meaningful only within the run that set it — this is the verdict of that check, not
+        /// stored state.
         /// </summary>
         public static bool BundleIsCurrent { get; private set; }
 
@@ -943,9 +945,9 @@ $@"{{
                 return false;
             }
 
-            // 2) Nothing to rebuild? Then nothing to verify or republish either. The scenes still
-            //    get linked to the assembly afterwards — a new scene against unchanged scripts is
-            //    exactly the case that must not be skipped.
+            // 2) Nothing to rebuild? Then nothing to verify either. The bundle is still built from
+            //    the DLLs on disk and the scenes still declare it — a new scene against unchanged
+            //    scripts is exactly the case that must not be skipped.
             //
             //    Read once and carried through the steps below: the property rescans the source on
             //    every access, and this run must not straddle two identities.
@@ -957,7 +959,7 @@ $@"{{
                 BundleIsCurrent = true;
                 Debug.Log($"[HotUpdate] '{expected}' is unchanged since the last publish " +
                           "(scripts, assembly definition, build inputs and whitelist all match). Skipping " +
-                          "compile, verification and upload; the scenes are still linked to it.");
+                          "compile and verification; the bundle is still built and declared by the scenes.");
                 return true;
             }
 

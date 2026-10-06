@@ -19,7 +19,7 @@
         </engine:VisualElement>
         <engine:GroupBox name="scene-configuration">
             <engine:VisualElement name="scene-configuration-scriptable" style="flex-grow: 1; margin-top: 8px; margin-right: 4px; margin-bottom: 8px; margin-left: 4px;" />
-            <engine:Button text="Build Addressables" name="build-addressables-button" tooltip="Build addressable scenes and create zip files." />
+            <engine:Button text="Build Addressables" name="build-addressables-button" tooltip="Build addressable scenes and create zip files: one per scene, plus the interpreted-scripts bundle when the project has one. To publish by hand, upload them all to the same folder and import the scene zips from the Backoffice." />
         </engine:GroupBox>
         <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
         <engine:VisualElement name="deploy-section" style="display: none;">
