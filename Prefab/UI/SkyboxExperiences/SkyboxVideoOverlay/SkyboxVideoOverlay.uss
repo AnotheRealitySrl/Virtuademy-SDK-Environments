@@ -1,6 +1,6 @@
-/* SkyboxVideoOverlay — video opened from a SkyboxPOI.
+/* SkyboxVideoOverlay — the UXML of SkyboxVideoScreen, the video opened from a SkyboxPOI.
    The root is the semi-transparent backdrop (it fills the screen, or the whole panel in VR) and
-   blocks clicks to the UI behind it. SkyboxVideoOverlay sizes .video-frame to the video's aspect
+   blocks clicks to the UI behind it. UIToolkitVideoBinder sizes .video-frame to the video's aspect
    ratio; the surface shows the video's RenderTexture. */
 
 .video-overlay {

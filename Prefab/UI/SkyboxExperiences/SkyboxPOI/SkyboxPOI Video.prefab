@@ -1,5 +1,96 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &2263857229977608161
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 4977490563732574477}
+    m_Modifications:
+    - target: {fileID: 3297208129197547502, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_Name
+      value: Video
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 3650413191660978191}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: SetActive
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: UnityEngine.GameObject, UnityEngine
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+--- !u!1 &3650413191660978191 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3297208129197547502, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+  m_PrefabInstance: {fileID: 2263857229977608161}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &5765396147692379358 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+  m_PrefabInstance: {fileID: 2263857229977608161}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &5891424398660178191
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -94,18 +185,21 @@ PrefabInstance:
       objectReference: {fileID: 9197481963319205126, guid: 3e08df3fd0074394ba567e4a044431e3, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 1500000000000000002, guid: 7b8625e86fe34ff9a1d705da459a884a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5765396147692379358}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 5553334936619455180, guid: 7b8625e86fe34ff9a1d705da459a884a, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 7141766457881610820}
+      addedObject: {fileID: 162684856046402043}
   m_SourcePrefab: {fileID: 100100000, guid: 7b8625e86fe34ff9a1d705da459a884a, type: 3}
 --- !u!1 &2077254496446940099 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 5553334936619455180, guid: 7b8625e86fe34ff9a1d705da459a884a, type: 3}
   m_PrefabInstance: {fileID: 5891424398660178191}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &7141766457881610820
+--- !u!114 &162684856046402043
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -114,21 +208,27 @@ MonoBehaviour:
   m_GameObject: {fileID: 2077254496446940099}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 428ca55fecaa2044da0bb2009f39dbf8, type: 3}
+  m_Script: {fileID: 11500000, guid: 153a2e6a3ca80fe4eb3aa8cc981c3d37, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpacePOIVideoButton
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.UIToolkitButtonBinder
   document: {fileID: 4977490563732574476}
-  buttonName: video-button
-  clip: {fileID: 0}
-  url: 
-  overlayPrefab: {fileID: 4613723230398772889, guid: c8b17f825b88a14498ab407bf9f9725a, type: 3}
-  startOpen: 0
-  onVideoOpen:
-    m_PersistentCalls:
-      m_Calls: []
-  onVideoClose:
-    m_PersistentCalls:
-      m_Calls: []
+  buttons:
+  - buttonName: video-button
+    onClick:
+      m_PersistentCalls:
+        m_Calls:
+        - m_Target: {fileID: 3650413191660978191}
+          m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+          m_MethodName: SetActive
+          m_Mode: 6
+          m_Arguments:
+            m_ObjectArgument: {fileID: 0}
+            m_ObjectArgumentAssemblyTypeName: 
+            m_IntArgument: 0
+            m_FloatArgument: 0
+            m_StringArgument: 
+            m_BoolArgument: 1
+          m_CallState: 2
 --- !u!114 &4977490563732574476 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 1500000000000000003, guid: 7b8625e86fe34ff9a1d705da459a884a, type: 3}
@@ -140,3 +240,8 @@ MonoBehaviour:
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+--- !u!4 &4977490563732574477 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1500000000000000002, guid: 7b8625e86fe34ff9a1d705da459a884a, type: 3}
+  m_PrefabInstance: {fileID: 5891424398660178191}
+  m_PrefabAsset: {fileID: 0}

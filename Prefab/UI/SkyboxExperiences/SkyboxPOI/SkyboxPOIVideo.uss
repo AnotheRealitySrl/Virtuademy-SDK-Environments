@@ -1,6 +1,6 @@
 /* SkyboxPOI Video — additions on top of SkyboxPOI.uss.
-   The media column stacks the image and the "Start video" button; WorldSpacePOIVideoButton hides
-   the button (display: none) when the POI has no video. */
+   The media column stacks the image and the "Start video" button, wired by a UIToolkitButtonBinder
+   to open the POI's video (SkyboxVideoScreen). */
 
 .poi-media-column {
     flex-direction: column;

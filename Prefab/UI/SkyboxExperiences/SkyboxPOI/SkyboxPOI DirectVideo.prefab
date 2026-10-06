@@ -9,9 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3809833781733237025}
-  - component: {fileID: 1754746947634765760}
-  - component: {fileID: 691182472251891185}
-  - component: {fileID: 3275812617308867273}
+  - component: {fileID: 5989720395080392124}
   m_Layer: 5
   m_Name: SkyboxPOI DirectVideo
   m_TagString: Untagged
@@ -31,10 +29,12 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 456174178279009146}
+  - {fileID: 8704617728319119660}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1754746947634765760
+--- !u!114 &5989720395080392124
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -43,12 +43,92 @@ MonoBehaviour:
   m_GameObject: {fileID: 3320673059349931945}
   m_Enabled: 1
   m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4cd1136a8214f68aa5998dfaf186b11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.UIToolkitToggleElement
+  document: {fileID: 2633372332674643384}
+  triggerName: icon
+  panel: {fileID: 7277453838829811627}
+  startOpen: 0
+  openClassName: 
+  onOpen:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 7277453838829811627}
+        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+        m_MethodName: SetActive
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 1
+        m_CallState: 2
+  onClose:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 7277453838829811627}
+        m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+        m_MethodName: SetActive
+        m_Mode: 6
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: 
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+--- !u!1 &6737784613376652189
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8704617728319119660}
+  - component: {fileID: 2633372332674643384}
+  - component: {fileID: 2461640383435545482}
+  m_Layer: 5
+  m_Name: Toggle
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8704617728319119660
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6737784613376652189}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3809833781733237025}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2633372332674643384
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6737784613376652189}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
   m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
   m_PanelSettings: {fileID: 11400000, guid: 3443c7831aae7b547abd689ce276cb03, type: 2}
   m_ParentUI: {fileID: 0}
-  sourceAsset: {fileID: 9197481963319205126, guid: b22337a97b693a7478c055e97dab9ef4, type: 3}
+  sourceAsset: {fileID: 9197481963319205126, guid: 3e08df3fd0074394ba567e4a044431e3, type: 3}
   m_SortingOrder: 0
   m_Position: 0
   m_WorldSpaceSizeMode: 1
@@ -57,34 +137,108 @@ MonoBehaviour:
   m_PivotReferenceSize: 0
   m_Pivot: 0
   m_WorldSpaceCollider: {fileID: 0}
---- !u!114 &691182472251891185
+--- !u!114 &2461640383435545482
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3320673059349931945}
+  m_GameObject: {fileID: 6737784613376652189}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b7e4c2a9f1d34e6a8c5b0f2d3a9e1c74, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpaceUIDocumentRebuilder
-  document: {fileID: 1754746947634765760}
+  document: {fileID: 2633372332674643384}
   rebuildOnEnable: 1
---- !u!114 &3275812617308867273
-MonoBehaviour:
+--- !u!1001 &5277300566104041541
+PrefabInstance:
   m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 3809833781733237025}
+    m_Modifications:
+    - target: {fileID: 3297208129197547502, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_Name
+      value: TogglePanel
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 5989720395080392124}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: Close
+      objectReference: {fileID: 0}
+    - target: {fileID: 7437053764601697080, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+      propertyPath: buttons.Array.data[0].onClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: Virtuademy.SDK.Environments.Utilities.UIToolkitToggleElement, Virtuademy.SDK.Environments
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+--- !u!4 &456174178279009146 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5721853116528182079, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+  m_PrefabInstance: {fileID: 5277300566104041541}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 3320673059349931945}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 428ca55fecaa2044da0bb2009f39dbf8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Utilities.WorldSpacePOIVideoButton
-  document: {fileID: 1754746947634765760}
-  buttonName: icon
-  clip: {fileID: 0}
-  url: 
-  overlayPrefab: {fileID: 4613723230398772889, guid: c8b17f825b88a14498ab407bf9f9725a, type: 3}
+--- !u!1 &7277453838829811627 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3297208129197547502, guid: 5562f9015bbd6c24982e5e4e8bc604d9, type: 3}
+  m_PrefabInstance: {fileID: 5277300566104041541}
+  m_PrefabAsset: {fileID: 0}
