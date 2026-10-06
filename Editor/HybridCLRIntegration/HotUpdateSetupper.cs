@@ -16,6 +16,8 @@ using UnityEditorInternal;
 
 using UnityEngine;
 
+using Mono.Cecil;
+
 namespace Virtuademy.SDK.Environments.HybridCLR.Editor
 {
     public static class HotUpdateSetupper
@@ -35,6 +37,22 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
 
         const string HOTUPDATE_FOLDER = "Assets/HotUpdate";
         const string ASMDEF_PREFIX = "HotUpdate_";
+
+        /// <summary>
+        /// The name the hot-update assembly is COMPILED under, in every creator project, and so
+        /// the only assembly name the scenes reference. The published DLL is renamed afterwards to
+        /// <see cref="HotUpdateAssemblyName"/>, its unique name.
+        /// </summary>
+        /// <remarks>
+        /// Unity binds a scene's script by the assembly name in its MonoScript, and only accepts
+        /// names that were in the player's scripting-assembly list when the player was built. No
+        /// player can list a name made of a fingerprint, so a scene that referenced the unique name
+        /// came up with every scripted component missing although the DLL loaded fine. The player
+        /// lists this one name and its IL2CPP answers for it from the environment being loaded.
+        /// Must equal Virtuademy.Core.ScriptAlias.Name in the player (Virtuademy-Unity): a creator
+        /// project and a player that disagree on it bring the missing scripts back.
+        /// </remarks>
+        public const string ScriptAlias = "VirtuademyEnvironmentScripts";
 
         /// <summary>
         /// The assemblies with an asmdef that the baseline whitelist (<c>policy.json</c>,
@@ -102,9 +120,10 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         public static string ProjectAssemblyPrefix => ASMDEF_PREFIX + PlayerSettings.productGUID + "_";
 
         /// <summary>
-        /// Assembly name of this project's hot-update code AS IT STANDS: prefix plus a digest of
-        /// the source it would compile from. The name therefore changes when the code changes,
-        /// which is the whole mechanism —
+        /// Name the published DLL of this project's hot-update code carries AS IT STANDS: prefix
+        /// plus a digest of the source it would compile from. It is not what the asmdef declares —
+        /// that is always <see cref="ScriptAlias"/> — but what the compiled DLL is renamed to before
+        /// it is bundled. The name changes when the code changes, which is the whole mechanism —
         ///
         ///   * the backend keys its record on the name, so republishing unchanged code is
         ///     recognised and stored once instead of overwriting anything;
@@ -113,8 +132,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         ///   * and the DLLs already on disk under this name are, by definition, current.
         ///
         /// Falls back to the prefix alone when the fingerprint cannot be computed (no hot-update
-        /// folder yet): that shape is refused by <see cref="GetSetupIssue"/> rather than
-        /// published.
+        /// folder yet), which the build gate refuses rather than publishes.
         /// </summary>
         public static string HotUpdateAssemblyName
         {
@@ -129,10 +147,10 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         }
 
         /// <summary>
-        /// Whether a declared assembly name is one this project produces — prefix plus an 8-digit
-        /// hex fingerprint. Used where the question is "is this ours" rather than "is this
-        /// current": the fingerprint of a name written before the last edit is legitimately
-        /// stale, and staleness is not a setup problem, it is a rebuild.
+        /// Whether a name has the shape of this project's published assemblies — prefix plus an
+        /// 8-digit hex fingerprint. Also the shape the asmdef itself declared before it compiled as
+        /// <see cref="ScriptAlias"/>, which is how a project set up then is recognised and moved
+        /// to the alias (once) by the build gate.
         /// </summary>
         public static bool LooksLikeProjectAssembly(string declared)
         {
@@ -144,12 +162,8 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             return suffix.Length == 8 && suffix.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
         }
 
-        /// <summary>
-        /// Asset path the asmdef SHOULD have: the one that produces
-        /// <see cref="HotUpdateAssemblyName"/>. Since that name tracks the source, this path moves
-        /// with every edit — use it to create or rename towards, never to check what exists.
-        /// </summary>
-        public static string HotUpdateAsmdefPath => $"{HOTUPDATE_FOLDER}/{HotUpdateAssemblyName}.asmdef";
+        /// <summary>Asset path the asmdef has: named after <see cref="ScriptAlias"/>.</summary>
+        public static string HotUpdateAsmdefPath => $"{HOTUPDATE_FOLDER}/{ScriptAlias}.asmdef";
 
         /// <summary>
         /// <see cref="TARGETS"/> as the folder/platform names shared with the backend: the
@@ -161,8 +175,9 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         /// <summary>
         /// Asset path of the asmdef that is actually on disk at the root of the hot-update folder,
         /// or null when there is none. This is what "is the project set up" has to be asked about:
-        /// after an edit the file is still there, correctly, under the name of the previous
-        /// fingerprint — looking for <see cref="HotUpdateAsmdefPath"/> would report it missing.
+        /// a project set up before the alias still has its asmdef under a fingerprinted name until
+        /// the build gate moves it, and looking for <see cref="HotUpdateAsmdefPath"/> would report
+        /// it missing.
         /// </summary>
         public static string ExistingAsmdefPath
         {
@@ -179,19 +194,19 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         }
 
         /// <summary>
-        /// Brings the asmdef's name to the digest of the current source, if it is not there
-        /// already. Returns true when the project is in a state where the question even applies —
-        /// so a caller can tell "nothing to do" from "not set up".
+        /// Brings the asmdef to <see cref="ScriptAlias"/>, if it is not there already. Returns true
+        /// when the project is in a state where the question even applies — so a caller can tell
+        /// "nothing to do" from "not set up".
         ///
-        /// Called from the build gate and nowhere else. Doing it on every script reload instead
-        /// would keep the name always current, at the price of a second recompilation after every
-        /// save the creator makes — too much to pay all day for something only a publish needs.
+        /// Happens once per project: the asmdef of a project set up before the alias declared its
+        /// fingerprinted name and was renamed on every edit. Called from the build gate and from
+        /// the setup.
         /// </summary>
         /// <param name="renamed">
         /// True when a rename actually happened, which means Unity is now recompiling and the
         /// assembly on disk is not the one the name promises until it finishes.
         /// </param>
-        static bool AlignAssemblyNameToSource(out bool renamed)
+        static bool AlignAsmdefToAlias(out bool renamed)
         {
             renamed = false;
 
@@ -199,28 +214,27 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             if (asmdefPath == null)
                 return false;
 
-            string expected = HotUpdateAssemblyName;
-
-            // The fallback shape, prefix with no digest, means the fingerprint could not be
-            // computed. Renaming to that would strip the project's identity down to something two
-            // publishes could share, so leave the asmdef alone and let GetSetupIssue explain.
-            if (expected == ProjectAssemblyPrefix)
-                return false;
-
             string declared = ReadDeclaredAssemblyName(asmdefPath);
-            if (declared == expected)
+            if (declared == ScriptAlias && asmdefPath == HotUpdateAsmdefPath)
                 return true;
 
-            if (!EnsureAsmdef(expected))
+            if (!EnsureAsmdef(ScriptAlias))
             {
-                Debug.LogError($"[HotUpdate] Could not rename the hot-update assembly to '{expected}'.");
+                Debug.LogError($"[HotUpdate] Could not rename the hot-update assembly definition to '{ScriptAlias}'.");
+                return false;
+            }
+
+            if (!RegisterHotUpdateAssembly(ScriptAlias))
+            {
+                Debug.LogError($"[HotUpdate] '{ScriptAlias}' could not be registered with HybridCLR after the rename.");
                 return false;
             }
 
             renamed = true;
 
-            string notice = $"[HotUpdate] The scripts changed: the assembly is now '{expected}' " +
-                            $"(was '{declared}'). Unity is recompiling it.";
+            string notice = $"[HotUpdate] The hot-update assembly now compiles as '{ScriptAlias}' (was '{declared}'), " +
+                            "the name the Virtuademy player resolves scene scripts by; the published DLL still carries " +
+                            "this project's own name. A one-time change: Unity is recompiling it.";
 
             // Logged now, and held for the reload the rename is about to trigger: with the
             // Console's Clear on Recompile enabled, this line would otherwise be wiped by the
@@ -345,15 +359,11 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                 Debug.Log($"[Setup] Created folder {HOTUPDATE_FOLDER}");
             }
 
-            // Read once and carried: the name digests the source, so re-reading it between the
-            // steps below would let a file saved mid-setup split them across two identities.
-            string assemblyName = HotUpdateAssemblyName;
-
-            if (!EnsureAsmdef(assemblyName))
+            if (!EnsureAsmdef(ScriptAlias))
                 return GetSetupIssue() ?? "the hot-update assembly definition could not be prepared.";
 
             WarnAboutNestedAsmdefs();
-            RegisterHotUpdateAssembly(assemblyName);
+            RegisterHotUpdateAssembly(ScriptAlias);
 
             // Report on what the build gate will actually check, not on the steps we just ran.
             string issue = GetSetupIssue();
@@ -363,24 +373,19 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                 return issue;
             }
 
-            Debug.Log($"[Setup] Done. Write your scripts in {HOTUPDATE_FOLDER}; " +
-                      $"they compile into '{assemblyName}'.");
+            Debug.Log($"[Setup] Done. Write your scripts in {HOTUPDATE_FOLDER}; they compile into " +
+                      $"'{ScriptAlias}' and are published as '{HotUpdateAssemblyName}'.");
             return null;
         }
 
         /// <summary>
         /// Brings the hot-update assembly definition to its expected state: one asmdef in
-        /// <see cref="HOTUPDATE_FOLDER"/>, named <see cref="HotUpdateAssemblyName"/> both as a file
-        /// and in its "name" field. An asmdef left from an earlier setup is renamed and rewritten
+        /// <see cref="HOTUPDATE_FOLDER"/>, named <see cref="ScriptAlias"/> both as a file and in
+        /// its "name" field. An asmdef left from an earlier setup is renamed and rewritten
         /// in place rather than replaced, so its GUID — and therefore its HybridCLR registration
         /// and any reference the creator added — survives. Returns false when it cannot proceed.
         /// </summary>
-        /// <param name="assemblyName">
-        /// The name to converge on, read once by the caller. Passed rather than re-read: the
-        /// property rescans the source on every access, and this method uses the name four times
-        /// — as a file name, in the rename, in the comparison and in the "name" field — so a file
-        /// saved halfway through could leave the asmdef called one thing and declaring another.
-        /// </param>
+        /// <param name="assemblyName">The name to converge on: <see cref="ScriptAlias"/>.</param>
         static bool EnsureAsmdef(string assemblyName)
         {
             // Only the folder root: an asmdef in a subfolder is a separate assembly the creator
@@ -513,10 +518,9 @@ $@"{{
 }}";
 
         /// <summary>
-        /// Rewrites the asmdef's "name" field to <see cref="HotUpdateAssemblyName"/>, leaving every
+        /// Rewrites the asmdef's "name" field to <paramref name="assemblyName"/>, leaving every
         /// other field untouched. Renaming the file is not enough on its own: the field is what
-        /// Unity compiles the assembly as, so a stale "HotUpdate" there keeps shipping an assembly
-        /// that collides with the one of every other project.
+        /// Unity compiles the assembly as, and so the name the scenes reference.
         /// </summary>
         static void AlignDeclaredAssemblyName(string asmdefPath, string assemblyName)
         {
@@ -569,7 +573,7 @@ $@"{{
             catch { return null; }
         }
 
-        static void RegisterHotUpdateAssembly(string assemblyName)
+        static bool RegisterHotUpdateAssembly(string assemblyName)
         {
             HybridCLRSettings settings = HybridCLRSettings.Instance;
 
@@ -587,7 +591,7 @@ $@"{{
             if (asmdefAsset == null)
             {
                 Debug.LogWarning($"[Setup] Cannot load the asmdef to register at {asmdefPath} yet.");
-                return;
+                return false;
             }
 
             AssemblyDefinitionAsset[] current = settings.hotUpdateAssemblyDefinitions ?? new AssemblyDefinitionAsset[0];
@@ -608,7 +612,7 @@ $@"{{
             if (registered && pruned == 0)
             {
                 Debug.Log("[Setup] asmdef already registered in HybridCLR, skipping.");
-                return;
+                return true;
             }
 
             settings.hotUpdateAssemblyDefinitions = kept;
@@ -618,6 +622,7 @@ $@"{{
                 Debug.Log($"[Setup] Removed {pruned} missing asmdef reference(s) from the Hot Update Assembly Definitions.");
             if (!registered)
                 Debug.Log("[Setup] asmdef registered in the Hot Update Assembly Definitions.");
+            return true;
         }
 
         static void SaveHybridCLRSettings(HybridCLRSettings settings)
@@ -634,9 +639,10 @@ $@"{{
         //  SETUP VALIDATION
         // ============================================================
         /// <summary>
-        /// Checks that the project can compile hot-update code safely: the uniquely named asmdef
-        /// exists, declares that same name, and is registered with HybridCLR. Returns <c>null</c>
-        /// when everything is in place, otherwise the reason to show the user.
+        /// Checks that the project can compile hot-update code safely: the asmdef exists, declares
+        /// <see cref="ScriptAlias"/> (or the fingerprinted name of a project set up before it,
+        /// which the build gate moves to the alias), and is registered with HybridCLR. Returns
+        /// <c>null</c> when everything is in place, otherwise the reason to show the user.
         /// </summary>
         public static string GetSetupIssue()
         {
@@ -659,17 +665,14 @@ $@"{{
                        "Open Virtuademy/Setup/Setup project and configure the interpreter.";
             }
 
-            // Shape, not currency: the name carries a digest of the source, so the one on disk
-            // is stale the moment the creator edits a script. That is a rebuild (handled by the
-            // build gate, which renames and recompiles), not a broken setup. What would be broken
-            // is a name that is not this project's at all — a generic one collides with the
-            // hot-update assembly of any other project once both are loaded in the player.
+            // The alias, or the fingerprinted name a project set up before the alias still
+            // declares: that one is not broken, the build gate moves it to the alias. Anything else
+            // compiles scenes against a name the player cannot resolve.
             string declared = ReadDeclaredAssemblyName(asmdefPath);
-            if (!LooksLikeProjectAssembly(declared))
+            if (declared != ScriptAlias && !LooksLikeProjectAssembly(declared))
             {
-                return $"{asmdefPath} declares assembly name '{declared}', which is not of the " +
-                       $"form '{ProjectAssemblyPrefix}<fingerprint>'. Re-run the interpreter " +
-                       "configuration to align it.";
+                return $"{asmdefPath} declares assembly name '{declared}' instead of '{ScriptAlias}'. " +
+                       "Re-run the interpreter configuration to align it.";
             }
 
             AssemblyDefinitionAsset asmdefAsset =
@@ -686,7 +689,7 @@ $@"{{
             AssemblyDefinitionAsset[] defs = settings?.hotUpdateAssemblyDefinitions;
             if (defs == null || !defs.Any(a => a == asmdefAsset))
             {
-                return $"'{HotUpdateAssemblyName}' is not registered in HybridCLR's Hot Update " +
+                return $"'{declared}' is not registered in HybridCLR's Hot Update " +
                        "Assembly Definitions, so it would be compiled into the player instead of " +
                        "being interpreted. Re-run the interpreter configuration.";
             }
@@ -806,10 +809,17 @@ $@"{{
             => TARGETS.Where(target => !File.Exists(TargetDllPath(target, assemblyName))).ToArray();
 
         /// <summary>
-        /// Compiles the hot-update assembly for every target, or does nothing when the DLLs for
-        /// that name are already there — the name digests the source, so their presence means
-        /// they came from exactly this code.
+        /// Compiles the hot-update assembly for every target and writes each DLL renamed to
+        /// <paramref name="assemblyName"/>, or does nothing when the DLLs for that name are already
+        /// there — the name digests the source, so their presence means they came from exactly this
+        /// code.
         /// </summary>
+        /// <remarks>
+        /// HybridCLR compiles under the name the asmdef declares, <see cref="ScriptAlias"/>, which
+        /// is what the scenes must reference. What ships is the same IL under the unique name: the
+        /// platform keys its record on it, verifies it against the DLL's metadata, and a player can
+        /// hold several of them at once, one per environment, which it cannot do with one name.
+        /// </remarks>
         /// <param name="assemblyName">
         /// Taken as a parameter rather than read from <see cref="HotUpdateAssemblyName"/>, which
         /// rescans the source on every access: the caller has already decided which name this run
@@ -839,15 +849,44 @@ $@"{{
                     continue;
                 }
 
-                string dllPath = TargetDllPath(target, assemblyName);
+                string compiled = TargetDllPath(target, ScriptAlias);
+                if (!File.Exists(compiled))
+                {
+                    Debug.LogWarning($"[Compile] {target} compiled, but no DLL was found at: {compiled}");
+                    continue;
+                }
 
-                if (File.Exists(dllPath))
+                string dllPath = TargetDllPath(target, assemblyName);
+                if (WriteUnderShippedName(compiled, dllPath, assemblyName))
                     Debug.Log($"[Compile] DLL produced for {target}: {Path.GetFullPath(dllPath)}");
-                else
-                    Debug.LogWarning($"[Compile] {target} compiled, but no DLL was found at: {dllPath}");
             }
 
             Debug.Log("[Compile] Compilation cycle completed.");
+        }
+
+        /// <summary>
+        /// Writes <paramref name="compiledPath"/>, compiled under <see cref="ScriptAlias"/>, as
+        /// <paramref name="shippedPath"/> with its assembly and module renamed to
+        /// <paramref name="assemblyName"/>. Only the identity changes: the IL, and so what the
+        /// whitelist judged, is the same.
+        /// </summary>
+        static bool WriteUnderShippedName(string compiledPath, string shippedPath, string assemblyName)
+        {
+            try
+            {
+                using AssemblyDefinition assembly = AssemblyDefinition.ReadAssembly(compiledPath, new ReaderParameters { InMemory = true });
+                assembly.Name.Name = assemblyName;
+                assembly.MainModule.Name = assemblyName + ".dll";
+                assembly.Write(shippedPath);
+                return true;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[Compile] Could not write {compiledPath} as '{assemblyName}': {e.Message}");
+                if (File.Exists(shippedPath))
+                    File.Delete(shippedPath);
+                return false;
+            }
         }
 
 
@@ -996,8 +1035,8 @@ $@"{{
             BundleIsCurrent = false;
             AwaitingRecompile = false;
 
-            // 2b) Judge the scripts BEFORE renaming anything, on the assembly Unity has already
-            //     compiled under whatever name the asmdef currently declares.
+            // 2b) Judge the scripts BEFORE moving the asmdef to the alias, on the assembly Unity has
+            //     already compiled under whatever name the asmdef currently declares.
             //
             //     The whitelist judges types, members and IL and never the assembly name, so this
             //     is the same verdict the renamed build would get — reaching it here spares the
@@ -1008,11 +1047,11 @@ $@"{{
             //     A fail-fast, not a replacement. If Unity has not recompiled yet (auto-refresh
             //     off, or the scripts do not compile at all) this DLL is stale or missing, so a
             //     pass here proves nothing and the checks after the rename stay exactly as they
-            //     were. Only run when a rename is actually coming: with the name already aligned
-            //     this would verify the very file step 6 is about to verify.
+            //     were. Only run when a rename is actually coming: with the asmdef already on the
+            //     alias this would verify the very file step 6 is about to verify.
             string current = HotUpdateDllLocator.ResolveDefaultDllPath(out string currentName);
 
-            if (currentName != expected && !string.IsNullOrEmpty(current) && File.Exists(current))
+            if (currentName != ScriptAlias && !string.IsNullOrEmpty(current) && File.Exists(current))
             {
                 // Verified without logging, then logged only on a refusal: a pass here and a pass
                 // at step 6 are the same verdict on the same code, and announcing it twice per
@@ -1030,13 +1069,20 @@ $@"{{
                 }
             }
 
-            // 3) The name has to carry the fingerprint of the source before anything is compiled
-            //    against it, and an edit since the last publish means it does not yet. Renaming the
-            //    asmdef is a script recompilation and a domain reload, which would tear this task
-            //    down mid-await, so the run ends here — but it ends quietly: the caller parks what
-            //    it was doing and the reload picks it back up, so the creator sees a pause in the
-            //    deploy and one line in the console, nothing to answer and nothing to click again.
-            if (!AlignAssemblyNameToSource(out bool renamed))
+            // 3) The asmdef has to compile as the alias before anything is compiled against it, and a
+            //    project set up before the alias does not yet. Renaming the asmdef is a script
+            //    recompilation and a domain reload, which would tear this task down mid-await, so
+            //    the run ends here — but it ends quietly: the caller parks what it was doing and the
+            //    reload picks it back up, so the creator sees a pause in the deploy and one line in
+            //    the console, nothing to answer and nothing to click again. Once per project.
+            if (expected == ProjectAssemblyPrefix)
+            {
+                Debug.LogError("[HotUpdate] The source fingerprint could not be computed, so the assembly has no name to " +
+                               "be published under. Build blocked.");
+                return false;
+            }
+
+            if (!AlignAsmdefToAlias(out bool renamed))
             {
                 // Already logged: the asmdef could not be renamed.
                 return false;
@@ -1048,8 +1094,9 @@ $@"{{
                 return false;
             }
 
-            // 4) Build the DLL(s) — a no-op when they already exist under this name, which is
-            //    exactly the case where the source has not moved.
+            // 4) Build the DLL(s) under the alias and write them under the unique name — a no-op when
+            //    they already exist under that name, which is exactly the case where the source has
+            //    not moved.
             CompileDll(expected);
 
             BuildTarget[] missing = MissingTargets(expected);

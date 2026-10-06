@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Changed
+- **Scene scripts resolve on the player again: the hot-update assembly compiles as
+  `VirtuademyEnvironmentScripts`.** Unity binds a scene's script by the assembly name in its
+  MonoScript and only accepts names the player listed when it was built, so a scene compiled against
+  `HotUpdate_<productGUID>_<fingerprint>` loaded with every scripted component missing although the
+  DLL loaded fine. The asmdef now always declares the alias, the one name scenes reference; each
+  compiled DLL is written renamed (assembly and module, with Mono.Cecil) to the unique
+  `HotUpdate_<productGUID>_<fingerprint>` it is published, verified and registered under, so a player
+  can still hold several environments' assemblies at once. The asmdef is no longer renamed on every
+  script edit: a project set up before this moves to the alias once, at its next build (one
+  recompilation, the deploy resumes on its own). Needs a player with the matching IL2CPP alias
+  (Virtuademy-Unity `ScriptAlias`); an older player keeps showing the scripts missing.
 - **A scene zip uploaded by hand carries its scripts.** Every addressables build now writes
   `<scene>/environment-dll.json` into each scene zip, naming the interpreted assembly the scenes were
   compiled against (`null` without HybridCLR), and builds the assembly bundle beside them as

@@ -147,7 +147,8 @@ therefore fails the same way a graph would — no special grace.
   the upload and the endpoint. And per ADR 0019 the enforced policy is `policy.json` **plus**
   operator deltas that can loosen it, so no unit test speaks for a given deployment.
 - **`policy.json` allows the bare assembly name `HotUpdate`**, while `HotUpdateDllLocator`
-  documents that Unity compiles the hot-update assembly as `HotUpdate_<productGUID>`. Whether that
+  compiles the hot-update assembly as `VirtuademyEnvironmentScripts` and publishes it renamed to
+  `HotUpdate_<productGUID>_<fingerprint>` (`HotUpdateSetupper`). Whether that
   entry is dead depends on whether the engine matches an assembly's own name or only its
   references — unread so far.
 - **The name is not frozen yet, and two documents disagree.** This assembly takes the name
