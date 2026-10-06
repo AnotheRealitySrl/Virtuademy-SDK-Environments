@@ -3,6 +3,24 @@
 ## Unreleased
 
 ### Changed
+- **`UIToolkitToggleElement` only raises events.** `targetName` and `useDisplay` are gone: what
+  "open" means is up to `onOpen` / `onClose` (typically `panel.SetActive(true/false)`). The new
+  `panel` field is only used to count presses on the open panel's UIDocuments as inside for
+  `UIToolkitToggleGroup`; `openClassName` now goes on the trigger only; `startOpen` opens (raising
+  `onOpen`) on Start. `UIDocumentBinder` no longer requires a UIDocument on its own object.
+- **SkyboxPOI is split into a toggle and a panel document.** The root holds the toggle; `Toggle`
+  renders the icon (`SkyboxPOIToggle.uxml` / `SkyboxPOIToggleVideo.uxml`); `TogglePanel` (inactive)
+  holds the panel document and its binders, moved with their fileIDs so instance overrides follow.
+  `SkyboxPOI.uxml` / `SkyboxPOIVideo.uxml` keep only the panel, with an `icon-spacer` where the icon
+  was.
+- **Video is a binder: `UIToolkitVideoBinder` replaces `WorldSpacePOIVideoButton` and
+  `SkyboxVideoOverlay`** (both removed, with `SkyboxVideoOverlay.prefab` and
+  `SkyboxPOIDirectVideo.uxml`). The binder plays its clip/URL into a named element while bound and
+  stops when disabled, so a video opens and closes with `SetActive`. `UIDocumentVRPlacement` moves a
+  screen-space document to world space in front of the camera in VR. `SkyboxVideoScreen.prefab`
+  combines them with a `UIToolkitButtonBinder` for the X. `SkyboxPOI Video` opens a `Video` child
+  from its "Start video" button; `SkyboxPOI DirectVideo` has the SkyboxPOI structure with the video
+  as `TogglePanel`, its X calling `UIToolkitToggleElement.Close()`.
 - **The POI toggle and group are general UI Toolkit components.** `WorldSpacePOIToggle` is
   `UIToolkitToggleElement` (a trigger element shows/hides a target element) and `WorldSpacePOIGroup`
   is `UIToolkitToggleGroup`; neither is tied to POIs nor to world-space panels. Fields `iconName` /
