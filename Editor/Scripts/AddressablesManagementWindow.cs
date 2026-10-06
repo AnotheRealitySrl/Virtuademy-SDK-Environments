@@ -2421,7 +2421,8 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <summary>
         /// Builds this project's interpreted-assembly bundle beside the scene zips, as
         /// <c>ServerData/&lt;AssemblyName&gt;.zip</c>, and returns the name the scenes are compiled
-        /// against — null when the project has no interpreted scripts (HybridCLR not installed).
+        /// against — null when the project has no interpreted scripts (HybridCLR not installed, or
+        /// installed with no script under the hot-update folder).
         ///
         /// Built on every addressables build, not only on a deploy from this window: the scene zips
         /// and the bundle are what someone uploads by hand and imports from the Backoffice, and
@@ -2446,6 +2447,15 @@ namespace Virtuademy.SDK.Environments.Editor
                 foreach (string stale in Directory.GetFiles(addressables_output_folder, prefix + "*.zip"))
                     File.Delete(stale);
             }
+
+            // HybridCLR configured but no script written: no assembly exists, so the scenes declare
+            // none and the import clears any link a previous build left on their catalog. The same
+            // question the build gate asked, so the two cannot disagree about whether there is code.
+            bool hasScripts = setupperType.GetMethod("ProjectHasInterpretedScripts", BindingFlags.Public | BindingFlags.Static)?
+                .Invoke(null, null) as bool? ?? true;
+
+            if (!hasScripts)
+                return null;
 
             string zipPath = bundleType.GetMethod("Build", BindingFlags.Public | BindingFlags.Static)?
                 .Invoke(null, null) as string;
