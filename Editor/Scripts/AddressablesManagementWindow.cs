@@ -688,6 +688,13 @@ namespace Virtuademy.SDK.Environments.Editor
                         }
                     }
 
+                    // Before the scenes: the archive import resolves the assembly each scene zip
+                    // declares, so the assembly has to be registered when the first scene arrives.
+                    HashSet<string> rejectedAssemblies = await ImportDeclaredAssembliesAsync(
+                        applicationApiUrl, worldId, worldLabel, scenes, uploadLink, useFtp, ftpConfig, progressPrefix);
+
+                    List<string> importedScenes = new();
+
                     for (int s = 0; s < scenes.Count; s++)
                     {
                         string scene = scenes[s];
@@ -695,6 +702,15 @@ namespace Virtuademy.SDK.Environments.Editor
                         if (!File.Exists(zipPath))
                         {
                             LogDeployError($"World \"{worldLabel}\": zip not found for \"{scene}\". Skipping scene.");
+                            continue;
+                        }
+
+                        string declared = ReadDeclaredAssembly(scene, out _);
+                        if (declared != null && rejectedAssemblies.Contains(declared))
+                        {
+                            // Publishing it would hand the world a scene whose scripts were turned down.
+                            LogDeployError($"World \"{worldLabel}\": \"{scene}\" was not published, because its interpreted " +
+                                           "assembly was not accepted (see above).");
                             continue;
                         }
 
@@ -715,13 +731,13 @@ namespace Virtuademy.SDK.Environments.Editor
                         EditorUtility.DisplayProgressBar(progressPrefix, $"Importing {scene} ({s + 1}/{scenes.Count})...", progress);
 
                         bool imported = await ImportSceneToWorld(applicationApiUrl, worldId, scene);
-                        if (!imported)
+                        if (imported)
+                            importedScenes.Add(scene);
+                        else
                             LogDeployError($"World \"{worldLabel}\": import failed for \"{scene}\". Check the console for details.");
                     }
 
-                    // Once per world, after the scenes: the assembly is shared by all of them.
-                    await PublishEnvironmentDllAsync(applicationApiUrl, worldId, scenes,
-                                                     uploadLink, useFtp, ftpConfig, progressPrefix);
+                    await LinkDeclaredAssembliesAsync(applicationApiUrl, worldLabel, worldId, importedScenes);
                 }
             }
             finally
@@ -914,64 +930,53 @@ namespace Virtuademy.SDK.Environments.Editor
             _ = PublishedEnvironmentsIndex.RefreshAsync();
         }
 
-        /// <summary>
-        /// Uploads this project's interpreted assembly and links it to the scenes just
-        /// published. Runs ONCE per world, after the scenes: the assembly belongs to the
-        /// creator project, so every scene of this build shares it.
-        ///
-        /// Reached by reflection like the verifier, so this window stays free of the
-        /// HYBRIDCLR_INSTALLED-gated assembly. No HybridCLR installed means no interpreted
-        /// scripts to publish, which is not an error.
-        /// </summary>
         /// <summary>The setupper lives in the HYBRIDCLR_INSTALLED-gated assembly this window does
         /// not reference, so it is reached by reflection like the verifier is.</summary>
-        private static Type FindHotUpdateSetupperType()
+        private static Type FindHotUpdateSetupperType() => FindEditorType("HotUpdateSetupper");
+
+        private static Type FindEditorType(string name)
             => AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => { try { return a.GetTypes(); } catch { return new Type[0]; } })
-                .FirstOrDefault(t => t.Name == "HotUpdateSetupper");
+                .FirstOrDefault(t => t.Name == name);
 
-        private async Task PublishEnvironmentDllAsync(string applicationApiUrl, int worldId,
-                                                      List<string> scenes, string uploadLink,
-                                                      bool useFtp, FtpUploadConfig ftpConfig, string progressPrefix)
+        /// <summary>
+        /// Uploads and imports the interpreted assemblies the scene zips declare, BEFORE the scenes:
+        /// the platform's archive import resolves the assembly a scene declares and refuses the
+        /// scene when it is not registered. Normally one assembly — the bundle built with the
+        /// scenes, <c>ServerData/&lt;AssemblyName&gt;.zip</c>.
+        ///
+        /// Uploaded on every deploy, even when the scripts have not changed since the last one: the
+        /// import of a name already registered is a no-op on the platform, and the marker that says
+        /// "already published" is per project, not per tenant, so skipping would leave a deploy to a
+        /// second tenant without its scripts.
+        ///
+        /// Returns the assemblies the platform did not accept, so the caller can hold back the
+        /// scenes that need them.
+        /// </summary>
+        private async Task<HashSet<string>> ImportDeclaredAssembliesAsync(string applicationApiUrl, int worldId, string worldLabel,
+                                                                         List<string> scenes, string uploadLink,
+                                                                         bool useFtp, FtpUploadConfig ftpConfig, string progressPrefix)
         {
-            var bundleType = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => { try { return a.GetTypes(); } catch { return new Type[0]; } })
-                .FirstOrDefault(t => t.Name == "EnvironmentDllBundle");
+            HashSet<string> rejected = new(StringComparer.Ordinal);
 
-            if (bundleType == null)
-                return;
+            IEnumerable<string> declared = scenes
+                .Select(scene => ReadDeclaredAssembly(scene, out _))
+                .Where(name => name != null)
+                .Distinct(StringComparer.Ordinal);
 
-            Type setupperType = FindHotUpdateSetupperType();
-
-            string assemblyName = bundleType.GetProperty("AssemblyName", BindingFlags.Public | BindingFlags.Static)?
-                .GetValue(null) as string;
-
-            if (string.IsNullOrEmpty(assemblyName))
+            foreach (string assemblyName in declared)
             {
-                LogDeployError("Interpreted assembly name unavailable. Scenes are published without their scripts.");
-                return;
-            }
-
-            // The verify step decided whether anything changed. When it did not, the bundle on the
-            // platform already matches this project, so building, uploading and importing it again
-            // would produce the same row from different bytes — the compiler restamps the
-            // assemblies on every run, so "identical" is never identical byte for byte.
-            bool alreadyCurrent = setupperType?
-                .GetProperty("BundleIsCurrent", BindingFlags.Public | BindingFlags.Static)?
-                .GetValue(null) as bool? ?? false;
-
-            if (!alreadyCurrent)
-            {
-                string zipPath = bundleType.GetMethod("Build", BindingFlags.Public | BindingFlags.Static)?
-                    .Invoke(null, null) as string;
-
-                if (string.IsNullOrEmpty(zipPath))
+                string zipPath = Path.Combine(addressables_output_folder, assemblyName + ".zip");
+                if (!File.Exists(zipPath))
                 {
-                    LogDeployError("Interpreted assembly bundle could not be built. Scenes are published without their scripts.");
-                    return;
+                    // The build could not produce the bundle and said why. The scenes still go: the
+                    // platform accepts them where this assembly is already registered.
+                    Debug.LogWarning($"[AddressablesManagement] World \"{worldLabel}\": no bundle for '{assemblyName}' in " +
+                                     $"{addressables_output_folder}. The scenes that need it import only if it is already registered.");
+                    continue;
                 }
 
-                EditorUtility.DisplayProgressBar(progressPrefix, "Uploading interpreted assembly...", 1f);
+                EditorUtility.DisplayProgressBar(progressPrefix, "Uploading interpreted assembly...", 0f);
 
                 bool uploaded = useFtp
                     ? await UploadZipViaFtp(zipPath, ftpConfig)
@@ -979,28 +984,50 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (!uploaded)
                 {
-                    LogDeployError($"Upload failed for \"{Path.GetFileName(zipPath)}\". Scenes are published without their scripts.");
-                    return;
+                    LogDeployError($"World \"{worldLabel}\": upload failed for \"{Path.GetFileName(zipPath)}\".");
+                    rejected.Add(assemblyName);
+                    continue;
                 }
 
                 if (!await ImportEnvironmentDll(applicationApiUrl, worldId, Path.GetFileName(zipPath)))
                 {
-                    LogDeployError("The platform rejected the interpreted assembly. Scenes are published without their scripts.");
-                    return;
+                    LogDeployError($"World \"{worldLabel}\": the platform rejected the interpreted assembly '{assemblyName}'.");
+                    rejected.Add(assemblyName);
+                    continue;
                 }
 
                 // Only now: a marker written before the import would remember a failed publish as
-                // done, and the next build would skip it.
-                setupperType?.GetMethod("MarkBundlePublished", BindingFlags.Public | BindingFlags.Static)?
+                // done, and the next build would skip its compile and verification.
+                FindHotUpdateSetupperType()?
+                    .GetMethod("MarkBundlePublished", BindingFlags.Public | BindingFlags.Static)?
                     .Invoke(null, null);
             }
 
-            // Always, published or skipped: a scene added against unchanged scripts still needs to
-            // be pointed at the assembly.
+            return rejected;
+        }
+
+        /// <summary>
+        /// Points each imported scene's catalog at the assembly it declares, or clears the link for
+        /// a scene built without scripts. A platform that reads the declaration has already done
+        /// this during the archive import, and repeating it changes nothing; one that predates it
+        /// does not, and this is the only call that links its scenes.
+        /// </summary>
+        private async Task LinkDeclaredAssembliesAsync(string applicationApiUrl, string worldLabel, int worldId, List<string> scenes)
+        {
             foreach (string scene in scenes)
             {
-                if (!await LinkEnvironmentDll(applicationApiUrl, worldId, scene, assemblyName))
-                    LogDeployError($"Could not link the interpreted assembly to \"{scene}\".");
+                string assemblyName = ReadDeclaredAssembly(scene, out bool declares);
+                if (!declares)
+                {
+                    Debug.LogWarning($"[AddressablesManagement] World \"{worldLabel}\": \"{scene}\" was built before the " +
+                                     "scene zips declared their interpreted assembly, so its script link was left as it was. " +
+                                     "Build the scenes again.");
+                    continue;
+                }
+
+                // An empty body clears the link.
+                if (!await LinkEnvironmentDll(applicationApiUrl, worldId, scene, assemblyName ?? string.Empty))
+                    LogDeployError($"World \"{worldLabel}\": could not link the interpreted assembly to \"{scene}\".");
             }
         }
 
@@ -2320,7 +2347,7 @@ namespace Virtuademy.SDK.Environments.Editor
             if (buildResult == EBuildError.None)
             {
                 Debug.Log("[AddressablesManagement] Build successful for all platforms.");
-                ZipBuiltScenes();
+                ZipBuiltScenes(PrepareInterpretedAssemblyBundle());
             }
             else
             {
@@ -2391,9 +2418,108 @@ namespace Virtuademy.SDK.Environments.Editor
             return EBuildError.None;
         }
 
-        private void ZipBuiltScenes()
+        /// <summary>
+        /// Builds this project's interpreted-assembly bundle beside the scene zips, as
+        /// <c>ServerData/&lt;AssemblyName&gt;.zip</c>, and returns the name the scenes are compiled
+        /// against — null when the project has no interpreted scripts (HybridCLR not installed, or
+        /// installed with no script under the hot-update folder).
+        ///
+        /// Built on every addressables build, not only on a deploy from this window: the scene zips
+        /// and the bundle are what someone uploads by hand and imports from the Backoffice, and
+        /// the import needs the bundle beside the scenes to register their scripts.
+        /// </summary>
+        private static string PrepareInterpretedAssemblyBundle()
+        {
+            Type setupperType = FindHotUpdateSetupperType();
+            Type bundleType = FindEditorType("EnvironmentDllBundle");
+
+            if (setupperType == null || bundleType == null)
+                return null;
+
+            // Bundles of earlier builds go: a stale one beside the new scene zips is the wrong file
+            // to upload, and nothing else would ever remove it. The project prefix keeps this to
+            // assemblies this project produced.
+            string prefix = setupperType.GetProperty("ProjectAssemblyPrefix", BindingFlags.Public | BindingFlags.Static)?
+                .GetValue(null) as string;
+
+            if (!string.IsNullOrEmpty(prefix) && Directory.Exists(addressables_output_folder))
+            {
+                foreach (string stale in Directory.GetFiles(addressables_output_folder, prefix + "*.zip"))
+                    File.Delete(stale);
+            }
+
+            // HybridCLR configured but no script written: no assembly exists, so the scenes declare
+            // none and the import clears any link a previous build left on their catalog. The same
+            // question the build gate asked, so the two cannot disagree about whether there is code.
+            bool hasScripts = setupperType.GetMethod("ProjectHasInterpretedScripts", BindingFlags.Public | BindingFlags.Static)?
+                .Invoke(null, null) as bool? ?? true;
+
+            if (!hasScripts)
+                return null;
+
+            string zipPath = bundleType.GetMethod("Build", BindingFlags.Public | BindingFlags.Static)?
+                .Invoke(null, null) as string;
+
+            // The name comes from the file Build wrote, not from a second read of the assembly-name
+            // property: that rescans the source on every access, and a script saved in between would
+            // let the declaration name one build and the bundle carry another.
+            if (!string.IsNullOrEmpty(zipPath))
+                return Path.GetFileNameWithoutExtension(zipPath);
+
+            string assemblyName = bundleType.GetProperty("AssemblyName", BindingFlags.Public | BindingFlags.Static)?
+                .GetValue(null) as string;
+
+            // The scenes still need the assembly, so they still declare it; the import will accept
+            // them only where it is already registered.
+            Debug.LogWarning($"[AddressablesManagement] The interpreted-assembly bundle could not be built (see above). " +
+                             $"The scene zips declare '{assemblyName}', and an import accepts them only where that " +
+                             "assembly is already registered.");
+
+            return string.IsNullOrEmpty(assemblyName) ? null : assemblyName;
+        }
+
+        /// <summary>
+        /// Written into every scene folder before it is zipped, so the archive itself says which
+        /// interpreted assembly its scenes were compiled against. The platform's archive import
+        /// reads it: a name links the catalog to that assembly, null clears the link.
+        /// </summary>
+        private const string EnvironmentDllDeclarationFile = "environment-dll.json";
+
+        [Serializable]
+        private class EnvironmentDllDeclaration
+        {
+            public string assemblyName;
+        }
+
+        /// <summary>
+        /// The assembly a built scene declares. <paramref name="declares"/> is false when the
+        /// folder carries no declaration — a build made before this window wrote one.
+        /// </summary>
+        private static string ReadDeclaredAssembly(string scene, out bool declares)
+        {
+            declares = false;
+
+            string path = Path.Combine(addressables_output_folder, scene, EnvironmentDllDeclarationFile);
+            if (!File.Exists(path))
+                return null;
+
+            try
+            {
+                EnvironmentDllDeclaration declaration = JsonConvert.DeserializeObject<EnvironmentDllDeclaration>(File.ReadAllText(path));
+                declares = declaration != null;
+                return string.IsNullOrEmpty(declaration?.assemblyName) ? null : declaration.assemblyName;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[AddressablesManagement] Unreadable {path}: {ex.Message}. Build the scenes again.");
+                return null;
+            }
+        }
+
+        private void ZipBuiltScenes(string assemblyName)
         {
             List<string> builtScenes = GetBuiltSceneNames();
+            string declaration = JsonConvert.SerializeObject(new EnvironmentDllDeclaration { assemblyName = assemblyName });
 
             foreach (string scene in builtScenes)
             {
@@ -2402,6 +2528,8 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (!Directory.Exists(fullBuildPath))
                     throw new DirectoryNotFoundException($"Build folder not found: {fullBuildPath}");
+
+                File.WriteAllText(Path.Combine(fullBuildPath, EnvironmentDllDeclarationFile), declaration);
 
                 // Remove existing zip with the same name
                 if (File.Exists(fullZipPath))

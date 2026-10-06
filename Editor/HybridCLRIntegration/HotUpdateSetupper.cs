@@ -862,8 +862,10 @@ $@"{{
 
         /// <summary>
         /// True when the last <see cref="CompileVerifyAsync"/> found the published bundle already
-        /// current, so the caller can skip building, uploading and importing it. Meaningful only
-        /// within the run that set it — this is the verdict of that check, not stored state.
+        /// current, which is why it skipped compiling and verifying. The bundle is still built from
+        /// the DLLs on disk and uploaded with the scenes: the marker is per project, not per tenant.
+        /// Meaningful only within the run that set it — this is the verdict of that check, not
+        /// stored state.
         /// </summary>
         public static bool BundleIsCurrent { get; private set; }
 
@@ -917,12 +919,42 @@ $@"{{
         //  BUILD + VERIFY — used by the Addressables build gate
         // ============================================================
         /// <summary>
+        /// Whether the project has any interpreted script to compile: a <c>.cs</c> file anywhere
+        /// under the hot-update folder, the same files the assembly fingerprint digests.
+        ///
+        /// Without one there is no assembly at all — Unity compiles no DLL for an asmdef with no
+        /// sources — so there is nothing to verify, nothing to bundle and nothing for the scenes
+        /// to declare. The publisher asks this too, so the gate and the bundle agree on the answer.
+        /// </summary>
+        public static bool ProjectHasInterpretedScripts()
+            => Directory.Exists(HOTUPDATE_FOLDER)
+               && Directory.EnumerateFiles(HOTUPDATE_FOLDER, "*.cs", SearchOption.AllDirectories).Any();
+
+        /// <summary>
         /// Builds the hot-update DLL, then runs the LOCAL whitelist check and the AUTHORITATIVE
         /// SERVER check. Returns true only if BOTH pass; otherwise logs the reason and returns
-        /// false so the caller can block the addressables build (fail-closed).
+        /// false so the caller can block the addressables build (fail-closed). A project with no
+        /// interpreted scripts passes straight through: there is no code to let in.
         /// </summary>
         public static async Task<bool> CompileVerifyAsync()
         {
+            BundleIsCurrent = false;
+            AwaitingRecompile = false;
+
+            // Before the setup check: a project that interprets nothing does not need the
+            // interpreter set up either. Without this, an empty hot-update folder compiled no DLL
+            // and the gate below refused the build with "No DLL was produced", blaming missing
+            // build-support modules — so a creator who had HybridCLR configured but no scripts
+            // could not build their scenes at all. Nothing is renamed here: there is no assembly
+            // to name.
+            if (!ProjectHasInterpretedScripts())
+            {
+                pendingFingerprint = null;
+                Debug.Log($"[HotUpdate] No interpreted scripts under {HOTUPDATE_FOLDER}: nothing to compile or " +
+                          "verify. The scenes are built without an interpreted assembly.");
+                return true;
+            }
+
             // 0) The project has to be set up, and set up with a project-unique assembly name: a
             //    generically named assembly produces a world that shadows — or is shadowed by —
             //    any other world loaded in the same player session.
@@ -943,9 +975,9 @@ $@"{{
                 return false;
             }
 
-            // 2) Nothing to rebuild? Then nothing to verify or republish either. The scenes still
-            //    get linked to the assembly afterwards — a new scene against unchanged scripts is
-            //    exactly the case that must not be skipped.
+            // 2) Nothing to rebuild? Then nothing to verify either. The bundle is still built from
+            //    the DLLs on disk and the scenes still declare it — a new scene against unchanged
+            //    scripts is exactly the case that must not be skipped.
             //
             //    Read once and carried through the steps below: the property rescans the source on
             //    every access, and this run must not straddle two identities.
@@ -957,7 +989,7 @@ $@"{{
                 BundleIsCurrent = true;
                 Debug.Log($"[HotUpdate] '{expected}' is unchanged since the last publish " +
                           "(scripts, assembly definition, build inputs and whitelist all match). Skipping " +
-                          "compile, verification and upload; the scenes are still linked to it.");
+                          "compile and verification; the bundle is still built and declared by the scenes.");
                 return true;
             }
 
