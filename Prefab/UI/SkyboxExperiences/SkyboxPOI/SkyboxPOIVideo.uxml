@@ -12,8 +12,6 @@
                 <Virtuademy.LocalizedComponents.LocalizedLabel text="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum" picking-mode="Ignore" name="Description" class="poi-body" style="font-size: 14px; height: 261px; margin-top: 0; padding-top: 0; width: 252px; letter-spacing: -3px; word-spacing: 0; -unity-paragraph-spacing: -3px;"/>
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:Button name="icon" text="" class="poi-icon">
-            <ui:VisualElement name="dot" picking-mode="Ignore" class="poi-dot poi-dot--play"/>
-        </ui:Button>
+        <ui:VisualElement name="icon-spacer" picking-mode="Ignore" class="poi-icon-spacer"/>
     </ui:VisualElement>
 </ui:UXML>

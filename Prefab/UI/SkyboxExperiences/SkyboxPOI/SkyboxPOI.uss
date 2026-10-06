@@ -144,3 +144,11 @@
     background-size: 200% 200%;
     border-radius: 0;
 }
+
+/* Keeps the panel where it was when the icon shared its document: the icon now lives in its own
+   document (SkyboxPOIToggle.uxml) at the same spot, so the panel reserves the icon's height. */
+.poi-icon-spacer {
+    width: 54px;
+    height: 54px;
+    flex-shrink: 0;
+}

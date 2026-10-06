@@ -24,7 +24,6 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// tree is rebuilt by anything else.</item>
     /// </list>
     /// </summary>
-    [RequireComponent(typeof(UIDocument))]
     public abstract class UIDocumentBinder : MonoBehaviour, IVisualTreeRebindable
     {
         [SerializeField, Tooltip("UIDocument that renders the panel. If empty, the first UIDocument on " +

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 using UnityEngine;
 using UnityEngine.Events;
@@ -8,23 +9,25 @@ using UnityEngine.UIElements;
 namespace Virtuademy.SDK.Environments.Utilities
 {
     /// <summary>
-    /// Open/closed toggle for an element of a UI Toolkit document: clicking the <c>trigger</c> element
-    /// shows the <c>target</c> element, clicking it again hides it. The trigger itself stays visible the
-    /// whole time; only the target is shown/hidden. Works with any UIDocument, world-space or
-    /// screen-space — e.g. a point-of-interest icon that opens its info panel, a "?" that opens a hint,
-    /// a header that expands a section.
+    /// Open/closed toggle driven by a UI Toolkit element: clicking the <c>trigger</c> element (in the
+    /// <c>document</c>, e.g. a point-of-interest icon) flips the state and raises <c>onOpen</c> /
+    /// <c>onClose</c>. What "open" means is entirely up to those events — typically
+    /// <c>panel.SetActive(true)</c> / <c>panel.SetActive(false)</c> on a child GameObject that holds the
+    /// panel's own UIDocument. Works with any UIDocument, world-space or screen-space.
     ///
     /// The trigger name may be left empty: the toggle is then driven only through <see cref="Open"/>,
     /// <see cref="Close"/>, <see cref="Toggle"/> and <see cref="SetOpen"/> (from a UnityEvent — e.g. a
     /// <see cref="UIToolkitButtonBinder"/> entry — a Visual Scripting graph or code).
     ///
-    /// The state is applied in two optional ways: the target's <c>display</c> (<c>useDisplay</c>), and
-    /// a USS class (<c>openClassName</c>) put on both the target and the trigger while open, so USS can
-    /// style the active trigger or animate the target (turn <c>useDisplay</c> off and let the class
-    /// drive opacity / scale transitions). Hover feedback stays purely in USS
-    /// (e.g. <c>.poi-icon:hover { scale: 1.1 1.1; }</c>). Click is delivered by Unity's native UI
-    /// Toolkit picking (the same path <see cref="UIToolkitButtonBinder"/> documents), so it works on
-    /// VR (XR ray), desktop (mouse) and mobile (tap).
+    /// The optional <c>panel</c> reference is only used to tell presses on the open panel from presses
+    /// elsewhere (<see cref="PressedInside"/>): every UIDocument under it counts as "inside". A USS class
+    /// (<c>openClassName</c>) can be put on the trigger while open, to style the active trigger. Hover
+    /// feedback stays purely in USS (e.g. <c>.poi-icon:hover { scale: 1.1 1.1; }</c>). Click is
+    /// delivered by Unity's native UI Toolkit picking (the same path <see cref="UIToolkitButtonBinder"/>
+    /// documents), so it works on VR (XR ray), desktop (mouse) and mobile (tap).
+    ///
+    /// The toggle starts closed and raises no event at start, unless <c>startOpen</c> is set: then it
+    /// opens (raising <c>onOpen</c>) on Start. Author the panel inactive so the closed state matches.
     ///
     /// Click-outside-to-close and mutual exclusion are intentionally NOT handled here:
     /// <see cref="UIToolkitToggleGroup"/> does them, using <see cref="Opened"/> and
@@ -34,102 +37,116 @@ namespace Virtuademy.SDK.Environments.Utilities
     /// <c>OnEnable</c>) and re-binds itself if the tree is rebuilt at runtime (e.g. by
     /// <see cref="WorldSpaceUIDocumentRebuilder"/>), preserving the open/closed state.
     /// </summary>
-    [RequireComponent(typeof(UIDocument))]
     public class UIToolkitToggleElement : UIDocumentBinder
     {
         [SerializeField, FormerlySerializedAs("iconName"), Tooltip("Name of the clickable element in " +
-            "the UXML that toggles the target (a Button, or any pickable element). Leave empty to drive " +
-            "the toggle only from code / UnityEvents.")]
+            "the UXML that toggles (a Button, or any pickable element). Leave empty to drive the toggle " +
+            "only from code / UnityEvents.")]
         private string triggerName = "trigger";
 
-        [SerializeField, FormerlySerializedAs("panelName"), Tooltip("Name of the element in the UXML " +
-            "to show/hide.")]
-        private string targetName = "target";
+        [SerializeField, Tooltip("The panel this toggle opens (shown/hidden by onOpen / onClose). Presses " +
+            "on any UIDocument under it count as inside, so a UIToolkitToggleGroup does not close it on " +
+            "a click on the panel. Optional.")]
+        private GameObject panel;
 
-        [SerializeField, Tooltip("If true, the target starts open.")]
+        [SerializeField, Tooltip("If true, the toggle opens on Start (raising onOpen).")]
         private bool startOpen = false;
 
-        [SerializeField, Tooltip("If true, the target's 'display' is set to flex when open and none " +
-            "when closed. Turn it off to express the state only through the open class (e.g. to " +
-            "animate it in USS).")]
-        private bool useDisplay = true;
-
-        [SerializeField, Tooltip("USS class added to the target and the trigger while open (e.g. " +
-            "'is-open'). Leave empty for none.")]
+        [SerializeField, Tooltip("USS class added to the trigger while open (e.g. 'is-open'). Leave " +
+            "empty for none.")]
         private string openClassName = "";
 
-        [SerializeField, Tooltip("Invoked when the target opens.")]
+        [SerializeField, Tooltip("Invoked when the toggle opens, e.g. panel.SetActive(true).")]
         private UnityEvent onOpen = new();
 
-        [SerializeField, Tooltip("Invoked when the target closes.")]
+        [SerializeField, Tooltip("Invoked when the toggle closes, e.g. panel.SetActive(false).")]
         private UnityEvent onClose = new();
 
+        private readonly List<UIDocument> panelDocuments = new();
+        private readonly List<VisualElement> watchedPanelRoots = new();
         private Button triggerButton;
         private VisualElement triggerElement;
-        private VisualElement target;
         private bool isOpen;
 
-        /// <summary>Whether the target is currently open.</summary>
+        /// <summary>Whether the toggle is currently open.</summary>
         public bool IsOpen => isOpen;
 
+        /// <summary>The panel this toggle opens, if set.</summary>
+        public GameObject Panel => panel;
+
         /// <summary>
-        /// Raised (with this toggle) whenever the target opens. Code-side counterpart of
-        /// <c>onOpen</c>, used by <see cref="UIToolkitToggleGroup"/> to close the other toggles.
+        /// Raised (with this toggle) whenever it opens. Code-side counterpart of <c>onOpen</c>, used by
+        /// <see cref="UIToolkitToggleGroup"/> to close the other toggles.
         /// </summary>
         public event Action<UIToolkitToggleElement> Opened;
 
-        /// <summary>Raised (with this toggle) whenever the target closes. Counterpart of <c>onClose</c>.</summary>
+        /// <summary>Raised (with this toggle) whenever it closes. Counterpart of <c>onClose</c>.</summary>
         public event Action<UIToolkitToggleElement> Closed;
 
         /// <summary>
-        /// Raised (with this toggle) when a pointer goes down on the trigger or on the target — mouse,
-        /// touch or XR ray alike, since it comes from the same UI Toolkit picking as the clicks. Used by
-        /// <see cref="UIToolkitToggleGroup"/> to tell presses on a toggle from presses outside every
-        /// toggle.
+        /// Raised (with this toggle) when a pointer goes down on the trigger or on the open panel —
+        /// mouse, touch or XR ray alike, since it comes from the same UI Toolkit picking as the clicks.
+        /// Used by <see cref="UIToolkitToggleGroup"/> to tell presses on a toggle from presses outside
+        /// every toggle.
         /// </summary>
         public event Action<UIToolkitToggleElement> PressedInside;
 
-        protected override void OnEnable()
+        private void Start()
         {
-            isOpen = startOpen;
-            base.OnEnable();
+            if (startOpen)
+            {
+                SetOpen(true);
+            }
         }
 
-        /// <summary>Opens the target.</summary>
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            UnwatchPanel();
+        }
+
+        private void LateUpdate()
+        {
+            // The panel's UIDocuments build (and rebuild) their trees whenever the panel is activated,
+            // so look for new roots while it is open. Few documents, and only for the open toggle.
+            if (isOpen && panel != null && panel.activeInHierarchy)
+            {
+                WatchPanel();
+            }
+        }
+
+        /// <summary>Opens the toggle.</summary>
         public void Open() => SetOpen(true);
 
-        /// <summary>Closes the target.</summary>
+        /// <summary>Closes the toggle.</summary>
         public void Close() => SetOpen(false);
 
-        /// <summary>Toggles the target between open and closed.</summary>
+        /// <summary>Toggles between open and closed.</summary>
         public void Toggle() => SetOpen(!isOpen);
 
-        /// <summary>Opens (true) or closes (false) the target. UnityEvent&lt;bool&gt;-friendly.</summary>
+        /// <summary>Opens (true) or closes (false) the toggle. UnityEvent&lt;bool&gt;-friendly.</summary>
         public void SetOpen(bool open)
         {
             isOpen = open;
-            ApplyState();
+            ApplyTriggerClass();
             if (open)
             {
                 onOpen?.Invoke();
+                WatchPanel();
                 Opened?.Invoke(this);
             }
             else
             {
+                UnwatchPanel();
                 onClose?.Invoke();
                 Closed?.Invoke(this);
             }
         }
 
-        private void ApplyState()
+        private void ApplyTriggerClass()
         {
-            if (target != null && useDisplay)
-            {
-                target.style.display = isOpen ? DisplayStyle.Flex : DisplayStyle.None;
-            }
             if (!string.IsNullOrEmpty(openClassName))
             {
-                target?.EnableInClassList(openClassName, isOpen);
                 triggerElement?.EnableInClassList(openClassName, isOpen);
             }
         }
@@ -137,39 +154,35 @@ namespace Virtuademy.SDK.Environments.Utilities
         // The open/closed state in isOpen survives a rebuild of the tree and is re-applied here.
         protected override bool BindTo(VisualElement root)
         {
-            bool hasTrigger = !string.IsNullOrEmpty(triggerName);
-            triggerElement = hasTrigger ? root.Q<VisualElement>(triggerName) : null;
-            target = root.Q<VisualElement>(targetName);
-            if (target == null || (hasTrigger && triggerElement == null))
+            if (string.IsNullOrEmpty(triggerName))
             {
-                // Tree exists but the elements are not in yet (or a name is wrong); retry.
-                triggerElement = null;
-                target = null;
+                // No trigger: driven only from code / UnityEvents.
+                return true;
+            }
+            triggerElement = root.Q<VisualElement>(triggerName);
+            if (triggerElement == null)
+            {
+                // Tree exists but the element is not in yet (or the name is wrong); retry.
                 return false;
             }
 
-            // Apply the current open/closed state to the freshly found elements, then wire the trigger.
-            ApplyState();
+            ApplyTriggerClass();
 
-            if (triggerElement != null)
+            triggerButton = triggerElement as Button;
+            if (triggerButton != null)
             {
-                triggerButton = triggerElement as Button;
-                if (triggerButton != null)
-                {
-                    triggerButton.clicked += Toggle;
-                }
-                else
-                {
-                    triggerElement.RegisterCallback<PointerDownEvent>(OnTriggerPointerDown);
-                }
-
-                // Trickle-down: seen before any child (a Button) can stop the event's propagation.
-                triggerElement.RegisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
+                triggerButton.clicked += Toggle;
             }
-            target.RegisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
+            else
+            {
+                triggerElement.RegisterCallback<PointerDownEvent>(OnTriggerPointerDown);
+            }
+
+            // Trickle-down: seen before any child (a Button) can stop the event's propagation.
+            triggerElement.RegisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
 
             // Re-bind automatically if the tree gets rebuilt (the elements detach from the panel).
-            WatchForRebuild(triggerElement ?? target);
+            WatchForRebuild(triggerElement);
             return true;
         }
 
@@ -185,9 +198,35 @@ namespace Virtuademy.SDK.Environments.Utilities
                 triggerElement.UnregisterCallback<PointerDownEvent>(OnTriggerPointerDown);
             }
             triggerElement?.UnregisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
-            target?.UnregisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
             triggerElement = null;
-            target = null;
+        }
+
+        private void WatchPanel()
+        {
+            if (panel == null)
+            {
+                return;
+            }
+            panel.GetComponentsInChildren(true, panelDocuments);
+            foreach (UIDocument panelDocument in panelDocuments)
+            {
+                VisualElement root = panelDocument.rootVisualElement;
+                if (root != null && !watchedPanelRoots.Contains(root))
+                {
+                    // Trickle-down on the root sees every press on the panel's pickable elements.
+                    root.RegisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
+                    watchedPanelRoots.Add(root);
+                }
+            }
+        }
+
+        private void UnwatchPanel()
+        {
+            foreach (VisualElement root in watchedPanelRoots)
+            {
+                root.UnregisterCallback<PointerDownEvent>(OnPointerDownInside, TrickleDown.TrickleDown);
+            }
+            watchedPanelRoots.Clear();
         }
 
         private void OnTriggerPointerDown(PointerDownEvent _) => Toggle();
