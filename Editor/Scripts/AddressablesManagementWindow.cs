@@ -632,6 +632,8 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             int totalWorlds = worldIds.Count;
+            int errorsBefore = deployErrorCount;
+            int published = 0;
 
             try
             {
@@ -723,6 +725,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     }
 
                     await LinkDeclaredAssembliesAsync(applicationApiUrl, worldLabel, worldId, importedScenes);
+                    published += importedScenes.Count;
                 }
             }
             finally
@@ -730,7 +733,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 EditorUtility.ClearProgressBar();
             }
 
-            Debug.Log("[AddressablesManagement] All world deploys completed.");
+            ReportDeployOutcome("World deploy", errorsBefore, published, totalWorlds * scenes.Count);
             _ = PublishedEnvironmentsIndex.RefreshAsync();
         }
 
@@ -836,6 +839,9 @@ namespace Virtuademy.SDK.Environments.Editor
                 return;
             }
 
+            int tenantErrorsBefore = deployErrorCount;
+            int tenantPublished = 0;
+
             try
             {
                 EditorUtility.DisplayProgressBar("Deploy to Tenant", "Getting upload link...", 0f);
@@ -895,7 +901,9 @@ namespace Virtuademy.SDK.Environments.Editor
                     EditorUtility.DisplayProgressBar("Deploy to Tenant", $"Importing {scene} ({s + 1}/{scenes.Count})...", progress);
 
                     bool imported = await ImportSceneToTenant(applicationApiUrl, scene);
-                    if (!imported)
+                    if (imported)
+                        tenantPublished++;
+                    else
                         LogDeployError($"Tenant: import failed for \"{scene}\". Check the console for details.");
                 }
             }
@@ -904,7 +912,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 EditorUtility.ClearProgressBar();
             }
 
-            Debug.Log("[AddressablesManagement] Tenant deploy completed.");
+            ReportDeployOutcome("Tenant deploy", tenantErrorsBefore, tenantPublished, scenes.Count);
             _ = PublishedEnvironmentsIndex.RefreshAsync();
         }
 
@@ -967,9 +975,10 @@ namespace Virtuademy.SDK.Environments.Editor
                     continue;
                 }
 
-                if (!await ImportEnvironmentDll(applicationApiUrl, worldId, Path.GetFileName(zipPath)))
+                (bool imported, string reason) = await ImportEnvironmentDll(applicationApiUrl, worldId, Path.GetFileName(zipPath));
+                if (!imported)
                 {
-                    LogDeployError($"World \"{worldLabel}\": the platform rejected the interpreted assembly '{assemblyName}'.");
+                    LogDeployError($"World \"{worldLabel}\": the platform rejected the interpreted assembly '{assemblyName}': {reason}");
                     rejected.Add(assemblyName);
                     continue;
                 }
@@ -1255,7 +1264,11 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
 
-        public static async Task<bool> ImportEnvironmentDll(string applicationApiUrl, int worldId, string zipName)
+        /// <summary>
+        /// Imports the uploaded assembly bundle. On failure, <c>Reason</c> says why in one line, for
+        /// the deploy panel; the full response still goes to the Console.
+        /// </summary>
+        public static async Task<(bool Ok, string Reason)> ImportEnvironmentDll(string applicationApiUrl, int worldId, string zipName)
         {
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environment-dll/import?api-version=2";
 
@@ -1269,7 +1282,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (response == null)
                 {
                     Debug.LogError("[AddressablesManagement] Could not import the environment DLL: no valid session.");
-                    return false;
+                    return (false, "no valid session.");
                 }
 
                 if (!response.IsSuccessStatusCode)
@@ -1281,16 +1294,53 @@ namespace Virtuademy.SDK.Environments.Editor
                     string body = await response.Content.ReadAsStringAsync();
 
                     Debug.LogError($"[AddressablesManagement] Environment DLL import failed: {response.StatusCode} - {body}");
-                    return false;
+                    return (false, DescribeDllImportFailure((int)response.StatusCode, body));
                 }
 
-                return true;
+                return (true, null);
             }
             catch (Exception ex)
             {
                 Debug.LogError($"[AddressablesManagement] Error importing the environment DLL: {ex.Message}");
-                return false;
+                return (false, ex.Message);
             }
+        }
+
+        /// <summary>
+        /// One line for the deploy panel out of the import's error body: the violations of a 422,
+        /// each distinct one once with the platforms that raised it, or the detail and code of a
+        /// ProblemDetails. Falls back to the status code when the body is neither.
+        /// </summary>
+        private static string DescribeDllImportFailure(int statusCode, string body)
+        {
+            try
+            {
+                Newtonsoft.Json.Linq.JObject json = Newtonsoft.Json.Linq.JObject.Parse(body);
+
+                if (json["violations"] is Newtonsoft.Json.Linq.JArray violations && violations.Count > 0)
+                {
+                    IEnumerable<string> distinct = violations
+                        .GroupBy(v => $"{(string)v["kind"]}: {(string)v["detail"]}")
+                        .Select(g =>
+                        {
+                            string[] platforms = g.Select(v => (string)v["platform"]).Where(x => !string.IsNullOrEmpty(x)).Distinct().ToArray();
+                            return platforms.Length > 0 ? $"{g.Key} ({string.Join(", ", platforms)})" : g.Key;
+                        });
+
+                    return string.Join("; ", distinct);
+                }
+
+                string detail = (string)json["detail"] ?? (string)json["title"];
+                string code = (string)json["code"];
+                if (!string.IsNullOrEmpty(detail))
+                    return string.IsNullOrEmpty(code) ? detail : $"{detail} [{code}]";
+            }
+            catch (Newtonsoft.Json.JsonException)
+            {
+                // Not JSON: the status code is all there is to say.
+            }
+
+            return $"HTTP {statusCode} (details in the Console).";
         }
 
         public static async Task<bool> LinkEnvironmentDll(string applicationApiUrl, int worldId,
@@ -2043,6 +2093,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private void LogDeployError(string message)
         {
             Debug.LogError(message);
+            deployErrorCount++;
 
             if (deployErrorsScrollView == null) return;
 
@@ -2050,6 +2101,32 @@ namespace Virtuademy.SDK.Environments.Editor
             entry.style.marginBottom = 2;
             deployErrorsScrollView.Add(entry);
             deployErrorsContainer.style.display = DisplayStyle.Flex;
+        }
+
+        /// <summary>
+        /// Errors logged through <see cref="LogDeployError"/> since the window opened. A deploy reads
+        /// it before and after, so its last line can say whether anything went wrong.
+        /// </summary>
+        private int deployErrorCount;
+
+        /// <summary>
+        /// The last line of a deploy: a plain completion only when nothing went wrong, otherwise how
+        /// many problems there were and what got published, in the Console and in a dialog — the
+        /// panel lists the problems, but a creator who looked away needs to be told to look.
+        /// </summary>
+        private void ReportDeployOutcome(string what, int errorsBefore, int published, int expected)
+        {
+            int problems = deployErrorCount - errorsBefore;
+            if (problems == 0)
+            {
+                Debug.Log($"[AddressablesManagement] {what} completed: {published} scene import(s).");
+                return;
+            }
+
+            string summary = $"{what} finished with {problems} problem(s): {published} of {expected} scene import(s) " +
+                             "went through. The problems are listed in the Addressables window and in the Console.";
+            Debug.LogWarning("[AddressablesManagement] " + summary);
+            EditorUtility.DisplayDialog($"{what} finished with problems", summary, "OK");
         }
 
         private void ClearDeployErrors()

@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Changed
+- **A deploy that went wrong says so at the end.** Build & Deploy closed every run with "All world
+  deploys completed", also when the platform had refused the interpreted assembly and every scene
+  had been held back. It now ends with how many problems there were and how many scene imports
+  went through, in the Console and in a dialog; only a clean run says it completed. The refusal of
+  the assembly is listed in the window with its reason (each distinct violation once, with the
+  platforms that raised it, or the platform's message and error code), where it used to say only
+  that the assembly was rejected. The tenant deploy ends the same way.
 - **Scene scripts resolve on the player: every project's scripts compile as
   `VirtuademyEnvironmentScripts`.** Unity binds a scene's script by the assembly name in its
   MonoScript and only accepts names the player listed when it was built, so a scene compiled against
