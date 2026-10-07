@@ -119,6 +119,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         // UI references
         private Label loginStatusLabel;
+        private IVisualElementScheduledItem sessionExpiryRefresh;
         private VisualElement deploySection;
         private ScrollView worldsList;
         private Label worldsLoadingLabel;
@@ -164,6 +165,7 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             SaveAsset(sceneConfigurations);
             EditorLoginState.OnLoginStateChanged -= OnLoginStateChanged;
+            EditorLoginState.OnTokenChanged -= OnTokenChanged;
             PublishedEnvironmentsIndex.Changed -= OnPublishedIndexChanged;
         }
 
@@ -201,6 +203,7 @@ namespace Virtuademy.SDK.Environments.Editor
             SetupLoginAwareUI();
 
             EditorLoginState.OnLoginStateChanged += OnLoginStateChanged;
+            EditorLoginState.OnTokenChanged += OnTokenChanged;
         }
 
         #region Login-aware UI
@@ -305,10 +308,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 // An expired token is not a broken state — the next operation renews it — but the
                 // user should know a login prompt may appear before their deploy starts.
-                bool tokenValid = EditorLoginState.IsTokenValid;
-                string sessionPart = tokenValid
-                    ? $" (session until {EditorSessionManager.DescribeExpiry()})"
-                    : " - session expired, will be renewed on the next operation";
+                string sessionPart = EditorSessionManager.DescribeSession(out bool tokenValid);
 
                 loginStatusLabel.text = $"Logged in: {tenantLabel} {envLabel}{userPart}{rolePart}{sessionPart}";
                 loginStatusLabel.style.color = tokenValid
@@ -341,6 +341,33 @@ namespace Virtuademy.SDK.Environments.Editor
                     RebuildSceneList();
                 }
             }
+
+            ScheduleSessionExpiryRefresh();
+        }
+
+        // A renewal or a server rejection changes only the token: re-render the label, never the
+        // worlds — this runs inside the API call that renewed it.
+        private void OnTokenChanged() => RefreshLoginState(reloadWorlds: false);
+
+        /// <summary>
+        /// The label goes stale on its own when the token expires while the window sits idle:
+        /// re-render it once, right after that moment. One run per token, re-armed on every
+        /// render, so a renewal moves it and a logout drops it.
+        /// </summary>
+        private void ScheduleSessionExpiryRefresh()
+        {
+            sessionExpiryRefresh?.Pause();
+            sessionExpiryRefresh = null;
+
+            DateTime? usableUntil = EditorLoginState.TokenUsableUntilUtc;
+            if (!EditorLoginState.IsTokenValid || usableUntil == null)
+                return;
+
+            // One second past the moment, so IsTokenValid has already flipped when it runs.
+            long delayMs = (long)Math.Max(0, (usableUntil.Value - DateTime.UtcNow).TotalMilliseconds) + 1000;
+            sessionExpiryRefresh = loginStatusLabel.schedule
+                .Execute(() => RefreshLoginState(reloadWorlds: false))
+                .StartingIn(delayMs);
         }
 
         private async void LoadWorlds()
