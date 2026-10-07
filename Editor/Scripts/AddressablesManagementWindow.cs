@@ -217,7 +217,7 @@ namespace Virtuademy.SDK.Environments.Editor
             openTenantSelectionButton = root.Q<Button>("open-tenant-selection-button");
             openTenantSelectionButton.clicked += () =>
             {
-                EditorApplication.ExecuteMenuItem("Virtuademy/Show available tenants");
+                EditorApplication.ExecuteMenuItem("Virtuademy/Available Tenants");
             };
 
             // Through the session manager, so the Azure refresh token goes away too: clearing

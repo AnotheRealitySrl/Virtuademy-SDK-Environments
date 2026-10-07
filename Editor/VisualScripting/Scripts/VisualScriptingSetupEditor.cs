@@ -33,7 +33,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
             }
         }
 
-        [MenuItem("Virtuademy/Setup/Visual Scripting nodes")]
+        [MenuItem("Virtuademy/Update VS Library")]
         public static void Setup()
         {
             if (!VSUsageUtility.isVisualScriptingUsed)

@@ -7,7 +7,7 @@ publish tooling. Package id `com.anotherealitysrl.virtuademy-sdk-environments`.
 
 ## How to install
 
-Use the setup window of `Virtuademy-SDK-Environments-Setup` (`Virtuademy/Setup/Setup project`):
+Use the setup window of `Virtuademy-SDK-Environments-Setup` (`Virtuademy/Setup project`):
 it reads the platform's package registry and installs this package together with its
 dependencies at the versions a platform release was published with.
 

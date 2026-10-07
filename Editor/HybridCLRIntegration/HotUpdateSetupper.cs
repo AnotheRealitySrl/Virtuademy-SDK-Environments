@@ -96,7 +96,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         const string GITHUB_IL2CPP_PLUS = "https://github.com/focus-creative-games/il2cpp_plus";
 
         /// <summary>
-        /// Session flag raised by the setup window (Virtuademy/Setup/Setup project) before it installs HybridCLR, so
+        /// Session flag raised by the setup window (Virtuademy/Setup project) before it installs HybridCLR, so
         /// that <see cref="OnReloadAfterInstall"/> can finish the job on the domain reload that
         /// follows the package import. Must stay in sync with the window's own copy of the key.
         /// </summary>
@@ -241,7 +241,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             {
                 ClearPendingSetup();
                 Debug.LogError($"[Setup] HybridCLR is installed but the configuration did not complete after {attempt} attempts: " +
-                               $"{issue} Press \"Install interpreter\" in Virtuademy/Setup/Setup project to retry.");
+                               $"{issue} Press \"Install interpreter\" in Virtuademy/Setup project to retry.");
                 return;
             }
 
@@ -596,7 +596,7 @@ $@"{{
                 }
 
                 return $"the hot-update assembly definition is missing ({HOTUPDATE_FOLDER}). " +
-                       "Open Virtuademy/Setup/Setup project and configure the interpreter.";
+                       "Open Virtuademy/Setup project and configure the interpreter.";
             }
 
             // Any other name compiles the scenes against an assembly the player cannot resolve.
