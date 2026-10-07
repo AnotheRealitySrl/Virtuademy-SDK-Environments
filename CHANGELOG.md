@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- **`InputSettingsMono` is back within a creator's reach**, in
+  `Virtuademy.Environments.ScriptingApi.Placeholders` with its data class `InputSettings`. It lived
+  in the application framework (`Virtuademy-SystemCore`), which creator projects stopped installing
+  in 2026-09, so a world could no longer declare its starting input settings. The script keeps its
+  GUID, so scenes that already carry the component keep it and its values.
+
 ### Changed
 - **A deploy that went wrong says so at the end.** Build & Deploy closed every run with "All world
   deploys completed", also when the platform had refused the interpreted assembly and every scene
