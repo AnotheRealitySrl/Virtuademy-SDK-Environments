@@ -99,6 +99,12 @@
   "Published in" line.
 
 ### Fixed
+- **The package's GLB models import in a creator project.** `ChatbotAvatarFemale.glb`,
+  `ChatbotAvatarMale.glb` and the Scene Changer's `portal.glb` are imported by glTFast's
+  `GltfImporter`, but the package never declared `com.unity.cloud.gltfast`: they only worked in
+  Virtuademy-Unity, whose own manifest carries it. In a creator project the three files showed up
+  as plain files and the two chatbot avatar prefabs, which nest them, lost their model. The package
+  now depends on `com.unity.cloud.gltfast` 6.16.0, the version the application ships.
 - **The interpreter setup drops missing asmdefs from HybridCLR's Hot Update Assembly Definitions.**
   The list only ever grew: an asmdef deleted or replaced — a hot-update folder removed and set up
   again — stayed registered as a missing reference beside the one in use. `RegisterHotUpdateAssembly`

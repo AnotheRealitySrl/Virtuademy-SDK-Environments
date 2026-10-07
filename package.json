@@ -41,6 +41,7 @@
     "com.anotherealitysrl.virtuademy-sdk-core": "0.3.0",
     "com.anotherealitysrl.spacs-tasks": "3.0.0",
     "com.unity.addressables": "2.2.2",
+    "com.unity.cloud.gltfast": "6.16.0",
     "com.unity.inputsystem": "1.6.1",
     "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.ugui": "2.0.0",
