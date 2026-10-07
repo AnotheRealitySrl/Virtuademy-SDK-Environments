@@ -27,11 +27,28 @@ ones carry no platform and can be used on their own.
 
 | Assembly | Holds |
 |---|---|
-| `Virtuademy.SDK.Environments` | all runtime code |
+| `Virtuademy.SDK.Environments` | the runtime code an interpreted script must not reach: Visual Scripting nodes, the task, dialog and analytics adapters, the catalog variables |
 | `Virtuademy.SDK.Environments.Editor` | editor code, publish tooling and editor authentication |
 | `Virtuademy.SDK.Environments.HybridCLREditor` | the HybridCLR integration (`defineConstraints: [HYBRIDCLR_INSTALLED]`) |
 | `Virtuademy.SDK.Environments.I2Loc`, `.I2Loc.Editor` | the optional I2 Localization bridge |
-| `Virtuademy.Environments.ScriptingApi` | the interpreted-script facade, the one first-party assembly the server-side whitelist admits by name |
+| `Virtuademy.Environments.ScriptingApi` | the interpreted-script facade and the placeholders, the part of this package the server-side whitelist admits by name |
+
+## Folders
+
+| Folder | Holds |
+|---|---|
+| `Runtime/` | the `Virtuademy.SDK.Environments` assembly, one folder per module: `SkyboxExperiences/` holds the components of the skybox experiences' world-space UI, `UIKit/UIToolkit/` the UI Toolkit helpers any world-space panel reuses (binders, rebuilder, localized text) |
+| `ScriptingApi/` | the `Virtuademy.Environments.ScriptingApi` assembly: the facade at its root, the interaction, spawner and chatbot contracts, and `Placeholders/<Module>/` with each placeholder's scripts. `Placeholders/Utilities/` holds the bases every placeholder derives from |
+| `Prefabs/<Module>/` | each placeholder's prefabs and what they are built from (models, materials, sprites), one folder per module of `ScriptingApi/Placeholders/`. A `Legacy/` subfolder keeps the copies nothing in the package references, which published environments may still use |
+| `Prefabs/SkyboxExperiences/` | the skybox experiences' world-space UI: the 360 buttons, the POI panels, the video overlay, their styles and graphics |
+| `Common/` | fonts, audio and the UI prefabs several modules share, among them the generic world-space panels `WorldSpaceButtonPanel` and `ButtonChoicePanel` |
+| `Prefab/` | the hand reference prefabs `SpawnableObjectPlaceholder` loads by path in the editor |
+| `Editor/` | the editor assemblies, mirroring the `Runtime/` modules (`Editor/UIKit/UIToolkit/` for the binders' inspectors) |
+
+The placeholders sit outside `Runtime/` to keep paths short: inside a creator project's
+`Library/PackageCache/com.anotherealitysrl.virtuademy-sdk-environments@<hash>/`, Windows leaves
+about 96 characters for a path within the package before it reaches the 260-character limit that
+Unity, Visual Studio and most editors still enforce.
 
 The update routines under `BreakingChangeSolvers/Editor` sit outside every assembly definition, so
 they compile into the creator project's own editor assembly. `Virtuademy/Update routines/v2026.5 ->

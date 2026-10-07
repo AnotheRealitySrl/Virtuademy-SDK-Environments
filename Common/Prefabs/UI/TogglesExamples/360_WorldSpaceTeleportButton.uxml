@@ -1,0 +1,21 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+<<<<<<<< HEAD:Prefabs/SkyboxExperiences/360_WorldSpaceTeleportButton.uxml
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/360_WorldSpaceTeleportButton.uss?fileID=7433441132597879392&amp;guid=e3f29ed5be5a4dd7848f8c5dbbe63776&amp;type=3#360_WorldSpaceTeleportButton"/>
+========
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/TogglesExamples/360_WorldSpaceTeleportButton.uss?fileID=7433441132597879392&amp;guid=e3f29ed5be5a4dd7848f8c5dbbe63776&amp;type=3#360_WorldSpaceTeleportButton"/>
+>>>>>>>> origin/feature/SkyboxPOIVideo:Prefabs/TogglesExamples/360_WorldSpaceTeleportButton.uxml
+    <ui:VisualElement name="root" picking-mode="Ignore" class="tp-root">
+        <ui:Button name="button" class="tp-button">
+            <ui:VisualElement name="ring" picking-mode="Ignore" class="tp-ring" style="display: flex;"/>
+            <ui:VisualElement name="discSlot" picking-mode="Ignore" class="tp-slot" style="display: flex;">
+                <ui:VisualElement name="disc" picking-mode="Ignore" class="tp-disc" style="display: flex;"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="arrowWhiteSlot" picking-mode="Ignore" class="tp-slot">
+                <ui:VisualElement name="arrowWhite" picking-mode="Ignore" class="tp-arrow tp-arrow-white"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="arrowBlueSlot" picking-mode="Ignore" class="tp-slot">
+                <ui:VisualElement name="arrowBlue" picking-mode="Ignore" class="tp-arrow tp-arrow-blue"/>
+            </ui:VisualElement>
+        </ui:Button>
+    </ui:VisualElement>
+</ui:UXML>

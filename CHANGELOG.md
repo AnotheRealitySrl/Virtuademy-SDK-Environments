@@ -46,6 +46,76 @@
   all six, on a new asmdef and on an existing one (additive: nothing the creator added is removed).
   Since the asmdef takes part in the assembly fingerprint, the first publish after the setup renames
   the assembly once.
+- **The placeholders get short paths, one folder per module.** In a creator project under
+  `C:\Users\<user>\UnityProjects\<Org>\<Project>`, 225 files of this package went past Windows'
+  260-character path limit inside `Library/PackageCache`, and Unity, Visual Studio and Notepad++
+  could not open them. The `Virtuademy.Environments.ScriptingApi` assembly folder moves from
+  `Runtime/ScriptingApi` to `ScriptingApi/`, beside `Runtime/`; each placeholder's scripts sit in
+  `ScriptingApi/Placeholders/<Module>/` (`POI`, `Quiz`, `Chatbot`…) instead of the
+  `Scripts/ScriptPlaceholders/<X Script Placeholder>` and `Scripts/Internal/SDK_*` folders; their
+  prefabs, models, materials and sprites move to `Prefabs/<Module>/`; fonts, audio and the shared UI
+  prefabs to `Common/`. `PlaceholderBases` is gone: its bases are in `Placeholders/Utilities`, the
+  spawnable object in `Placeholders/SpawnableObject`, floor and spawn point in
+  `Placeholders/Fundamentals`. Unreferenced duplicates stay, under `Prefabs/<Module>/Legacy/`.
+  Every file keeps its `.meta`, so GUIDs, prefab and scene references, the assembly, its name and
+  every namespace are unchanged: nothing a creator project or a published environment records
+  moves. The longest placeholder path is 91 characters, against 139 before.
+- **The skybox experiences' world-space UI follows the same rule, and is now generic UI.** Its
+  generic panels `WorldSpaceButtonPanel` and the menu panel (`MenuPanel/ButtonChoicePanel`), their
+  panel settings and `ButtonTheme.tss` live in `Common/Prefabs/UI/`, beside the toggle and video
+  examples (`Common/Prefabs/UI/TogglesExamples/`, with the graphics they use under `Graphics/`, and
+  `Common/Prefabs/UI/VideoOverlay/`). `Runtime/Utilities` is gone: the UI Toolkit components — the
+  binders, the toggle and its group, the video binder, the rebuilder — are in
+  `Runtime/UIKit/UIToolkit/`, beside `LocalizedUITypes`, and their inspectors in
+  `Editor/UIKit/UIToolkit/`. Same assembly, same namespace, same GUIDs. `Prefab/` keeps only the
+  hand reference prefabs.
+- Seventeen empty folders left over from the 9.0.0 merge are removed.
+- **The analytics ControlManager/Informative-Item prefabs and graphs get short paths.** The folders `Runtime/Analytics/Prefabs/ControlManager_Informative_Item` and `Runtime/Analytics/Graphs/ControlManager_InformativeItem` become `.../ControlManager`, and the ` Variant` suffix Unity appends to prefab-variant file names is dropped across the package (26 prefabs). The longest analytics path is 93 characters, against 115 before.
+- **The Visual Scripting scripts get short folders.** `Runtime/VisualScripting` and `Editor/VisualScripting` become `Runtime/VS` and `Editor/VS`; the `Nodes/` level is removed so `Unit/` and `EventUnit/` sit directly under `VS/Scripts/`; `VisualScriptingInteraction` becomes `VSInteraction` and `SyncedVariable` becomes `SyncVar`. The longest VS path drops from 106 to 73 characters. Same assembly, same namespaces (set in each asmdef's `rootNamespace`), same GUIDs — the Visual Scripting node database is regenerated locally (it is gitignored).
+- **The toggle and video UI are generic examples under `Common/Prefabs/UI/TogglesExamples`.** Prefabs:
+  `Toggles/SimpleToggle` (was SkyboxPOI), `Toggles/ToggleWithVideo` (SkyboxPOI Video),
+  `Toggles/ToggleWithOverlayVideo` (SkyboxPOI DirectVideo), `VideoOverlay/VideoOverlay`
+  (SkyboxVideoScreen); `MenuPanel/ButtonChoicePanel` (in `Common/Prefabs/UI/`) and the 360 buttons moved alongside. UXML/USS:
+  `TogglePanel`, `TogglePanelWithVideo`, `ToggleButton`, `ToggleButtonVideo`, `Toggle.uss`,
+  `TogglePanelWithVideo.uss`, `VideoOverlay.uxml/.uss`, `VideoOverlayScreenPanelSettings`; USS classes
+  `poi-*` are `toggle-*`. Same GUIDs, so scenes and prefabs keep their references; element names
+  (`icon`, `panel`, `media`, `Title`, `Description`, `video-button`, `close-button`…) are unchanged.
+- **`UIToolkitToggleElement` only raises events.** `targetName` and `useDisplay` are gone: what
+  "open" means is up to `onOpen` / `onClose` (typically `panel.SetActive(true/false)`). The new
+  `panel` field is only used to count presses on the open panel's UIDocuments as inside for
+  `UIToolkitToggleGroup`; `openClassName` now goes on the trigger only; `startOpen` opens (raising
+  `onOpen`) on Start. `UIDocumentBinder` no longer requires a UIDocument on its own object.
+- **SkyboxPOI is split into a toggle and a panel document.** The root holds the toggle; `Toggle`
+  renders the icon (`SkyboxPOIToggle.uxml` / `SkyboxPOIToggleVideo.uxml`); `TogglePanel` (inactive)
+  holds the panel document and its binders, moved with their fileIDs so instance overrides follow.
+  `SkyboxPOI.uxml` / `SkyboxPOIVideo.uxml` keep only the panel, with an `icon-spacer` where the icon
+  was.
+- **Video is a binder: `UIToolkitVideoBinder` replaces `WorldSpacePOIVideoButton` and
+  `SkyboxVideoOverlay`** (both removed, with `SkyboxVideoOverlay.prefab` and
+  `SkyboxPOIDirectVideo.uxml`). The binder plays its clip/URL into a named element while bound and
+  stops when disabled, so a video opens and closes with `SetActive`. `UIDocumentVRPlacement` moves a
+  screen-space document to world space in front of the camera in VR. `SkyboxVideoScreen.prefab`
+  combines them with a `UIToolkitButtonBinder` for the X. `SkyboxPOI Video` opens a `Video` child
+  from its "Start video" button; `SkyboxPOI DirectVideo` has the SkyboxPOI structure with the video
+  as `TogglePanel`, its X calling `UIToolkitToggleElement.Close()`.
+- **The POI toggle and group are general UI Toolkit components.** `WorldSpacePOIToggle` is
+  `UIToolkitToggleElement` (a trigger element shows/hides a target element) and `WorldSpacePOIGroup`
+  is `UIToolkitToggleGroup`; neither is tied to POIs nor to world-space panels. Fields `iconName` /
+  `panelName` are `triggerName` / `targetName`, and the group's `pois` is `toggles`
+  (`[FormerlySerializedAs]` on all three, same script GUIDs, so prefabs keep working). New options:
+  an empty trigger name (the toggle is driven only from code / UnityEvents), `useDisplay`,
+  `openClassName` (a USS class on target and trigger while open), `SetOpen(bool)`, a `Closed` event,
+  and the group's `exclusive` flag (off: several toggles may stay open, the group only closes them
+  on an outside tap). No `[RenamedFrom]`: the two were never released and no graph names them.
+- **The UI Toolkit binders share one base, `UIDocumentBinder`.** The document lookup, the lazy
+  bind retried for up to 120 frames, `Rebind()` and the detach watch that re-binds after a rebuild
+  were copied in every binder; `WorldSpaceButtonBinder`, `WorldSpacePanelImageBinder`,
+  `WorldSpacePanelImageCarousel`, `LocalizedUIBinder`, `WorldSpacePOIVideoButton` and
+  `UIToolkitToggleElement` now inherit them and only implement `BindTo(root)` /
+  `UnbindFromTree()`. The `document` field keeps its name, so scenes and prefabs are untouched.
+  `WorldSpacePanelImageBinder.Apply()` is now `Rebind()`: on a disabled component it waits for
+  OnEnable instead of writing the images right away. `SpaceLineHeightBinder` keeps its own cycle
+  (it also binds in Edit Mode).
 - **The graph, task and dialog engines are `SPACS-Graphs`, `SPACS-Tasks` and `SPACS-Dialogs`**
   (ids `com.anotherealitysrl.spacs-{graphs,tasks,dialogs}` 3.0.0, were
   `virtuademy-sdk-{graphs,tasks,dialogs}`), and this package's dependencies follow. The
