@@ -1,21 +1,11 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-<<<<<<<< HEAD:Prefabs/SkyboxExperiences/SkyboxPOI/SkyboxPOIVideo.uxml
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/SkyboxPOI/SkyboxPOI.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#SkyboxPOI"/>
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/SkyboxPOI/SkyboxPOIVideo.uss?fileID=7433441132597879392&amp;guid=83a67b800387a7548b6d9734e4637d9d&amp;type=3#SkyboxPOIVideo"/>
-    <ui:VisualElement name="root" picking-mode="Ignore" class="poi-root">
-        <ui:VisualElement name="panel" class="poi-panel" style="display: flex;">
-            <ui:VisualElement name="media-column" picking-mode="Ignore" class="poi-media-column">
-                <ui:VisualElement name="media" picking-mode="Ignore" class="poi-media" style="width: 240px;"/>
-                <Virtuademy.LocalizedComponents.LocalizedButton name="video-button" text="Start video" class="poi-video-button"/>
-========
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/TogglesExamples/Toggles/Toggle.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#Toggle"/>
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/TogglesExamples/Toggles/TogglePanelWithVideo.uss?fileID=7433441132597879392&amp;guid=83a67b800387a7548b6d9734e4637d9d&amp;type=3#TogglePanelWithVideo"/>
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Prefabs/UI/TogglesExamples/Toggles/Toggle.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#Toggle"/>
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Prefabs/UI/TogglesExamples/Toggles/TogglePanelWithVideo.uss?fileID=7433441132597879392&amp;guid=83a67b800387a7548b6d9734e4637d9d&amp;type=3#TogglePanelWithVideo"/>
     <ui:VisualElement name="root" picking-mode="Ignore" class="toggle-root">
         <ui:VisualElement name="panel" class="toggle-panel" style="display: flex;">
             <ui:VisualElement name="media-column" picking-mode="Ignore" class="toggle-media-column">
                 <ui:VisualElement name="media" picking-mode="Ignore" class="toggle-media" style="width: 240px;"/>
                 <Virtuademy.LocalizedComponents.LocalizedButton name="video-button" text="Start video" class="toggle-video-button"/>
->>>>>>>> origin/feature/SkyboxPOIVideo:Prefabs/TogglesExamples/Toggles/TogglePanelWithVideo.uxml
             </ui:VisualElement>
             <ui:VisualElement name="text" picking-mode="Ignore" class="toggle-text">
                 <Virtuademy.LocalizedComponents.LocalizedLabel text="Lorem ipsum dolor sit amet consectetur  " picking-mode="Ignore" name="Title" class="toggle-title" style="padding-top: 0; padding-bottom: 0; margin-bottom: 0; margin-top: 0; font-size: 22px; max-height: 60px;"/>

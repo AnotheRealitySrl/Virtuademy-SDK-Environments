@@ -28,13 +28,8 @@
     color: rgb(255, 255, 255);
     font-size: 18px;
     -unity-text-align: middle-center;
-<<<<<<<< HEAD:Prefabs/SkyboxExperiences/SkyboxPOI/SkyboxPOIVideo.uss
-    /* Poppins Bold (.ttf, environments), like the POI title. */
-    -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
-========
     /* Poppins Bold (.ttf, environments), like the panel title. */
-    -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Runtime/ScriptingApi/Placeholders/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
->>>>>>>> origin/feature/SkyboxPOIVideo:Prefabs/TogglesExamples/Toggles/TogglePanelWithVideo.uss
+    -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
     transition-property: background-color;
     transition-duration: 0.12s;
 }

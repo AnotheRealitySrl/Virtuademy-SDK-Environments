@@ -1,19 +1,10 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
-<<<<<<<< HEAD:Prefabs/SkyboxExperiences/SkyboxPOI/SkyboxPOI.uxml
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefabs/SkyboxExperiences/SkyboxPOI/SkyboxPOI.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#SkyboxPOI"/>
-    <ui:VisualElement name="root" picking-mode="Ignore" class="poi-root">
-        <ui:VisualElement name="panel" class="poi-panel" style="display: flex; width: 650px; max-width: 650px;">
-            <ui:VisualElement name="media" picking-mode="Ignore" class="poi-media">
-                <ui:Button name="media-prev" text="‹" class="poi-media-arrow poi-media-arrow--prev"/>
-                <ui:Button name="media-next" text="›" class="poi-media-arrow poi-media-arrow--next"/>
-========
-    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Prefab/UI/TogglesExamples/Toggles/Toggle.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#Toggle"/>
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Prefabs/UI/TogglesExamples/Toggles/Toggle.uss?fileID=7433441132597879392&amp;guid=1cef23fe95634e8a934816f8da9903d7&amp;type=3#Toggle"/>
     <ui:VisualElement name="root" picking-mode="Ignore" class="toggle-root">
         <ui:VisualElement name="panel" class="toggle-panel" style="display: flex; width: 650px; max-width: 650px;">
             <ui:VisualElement name="media" picking-mode="Ignore" class="toggle-media">
                 <ui:Button name="media-prev" text="‹" class="toggle-media-arrow toggle-media-arrow--prev"/>
                 <ui:Button name="media-next" text="›" class="toggle-media-arrow toggle-media-arrow--next"/>
->>>>>>>> origin/feature/SkyboxPOIVideo:Prefabs/TogglesExamples/Toggles/TogglePanel.uxml
             </ui:VisualElement>
             <ui:VisualElement name="text" picking-mode="Ignore" class="toggle-text">
                 <Virtuademy.LocalizedComponents.LocalizedLabel text="Lorem ipsum dolor sit amet consectetur  " picking-mode="Ignore" name="Title" class="toggle-title"/>
