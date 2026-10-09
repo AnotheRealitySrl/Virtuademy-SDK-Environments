@@ -46,7 +46,10 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
     /// Recommended flow for a creator project:
     ///   1. Commit / back up the project (the rewrite touches many files).
     ///   2. Update the SDK packages to their v2026.6 versions.
-    ///   3. Run this routine, review the file list, Apply.
+    ///   3. Run this routine, review the file list, Apply. Save nothing between 2 and 3: a scene or
+    ///      prefab saved there is written with its graphs' unresolved nodes and cannot be recovered.
+    ///      <see cref="VirtuademyUpdateSaveGuard"/> refuses those saves, and Apply closes the open
+    ///      scenes without saving them.
     ///   4. Let Unity recompile and reimport. The scenes, prefabs and assets the routine changed are
     ///      then re-saved by <see cref="VirtuademyUpdateResave"/> without being opened; files it
     ///      did not change are left alone. Only the files it reports need a manual check and save.
@@ -433,6 +436,108 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         private static Regex Identifier(string typeName)
             => new(@"(?<![A-Za-z0-9_])" + Regex.Escape(typeName) + @"(?![A-Za-z0-9_])", RegexOptions.Compiled);
 
+        /// <summary>
+        /// An assembly-qualified name of one of our types: <c>Full.Type.Name, AssemblyName, Version=…</c>.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The rules above rename namespaces, and an assembly-qualified name carries the namespace
+        /// twice: once in the type, once in the assembly, which for the old packages was spelled the
+        /// same way. Both get rewritten, but the assembly lands on a name that only looks right —
+        /// the old placeholders assembly becomes <c>Virtuademy.Environments.ScriptingApi.Placeholders</c>,
+        /// while the placeholders live in <c>Virtuademy.Environments.ScriptingApi</c>.
+        /// </para>
+        /// <para>
+        /// It matters because Visual Scripting resolves a typed variable (a graph, object or scene
+        /// variable declared with one of our types) through <c>Type.GetType</c> on exactly this string,
+        /// which honours the assembly: with the wrong one the variable comes back as
+        /// <c>Unknown</c> (found on 2026-10-09). Units are unaffected — their type is stored by full
+        /// name alone.
+        /// </para>
+        /// <para>
+        /// So the assembly is not derived from a table but read off the type itself, once the other
+        /// rules have given it its final name: <see cref="FixAssemblyQualifiedNames"/> looks the full
+        /// name up among the loaded Virtuademy and SPACS assemblies and writes down the one that
+        /// declares it. The routine runs with the updated packages loaded, so that is where the type
+        /// is. A name that resolves to nothing loaded is left as it is.
+        /// </para>
+        /// <para>
+        /// The separators are matched as any whitespace and kept as found: Unity folds a long YAML
+        /// value at its spaces, and in a prefab the line break often falls right after the type's comma.
+        /// </para>
+        /// </remarks>
+        private static readonly Regex AssemblyQualifiedName = new(
+            @"(?<![A-Za-z0-9_.+`])(?<type>(?:Virtuademy|SPACS)\.[A-Za-z0-9_.+]+)(?<separator>,\s+)(?<asm>[A-Za-z0-9_.\-]+)(?=,\s+Version=)",
+            RegexOptions.Compiled);
+
+        private static Dictionary<string, string> ourTypeAssemblies;
+
+        /// <summary>Full type name → name of the assembly that declares it, for our own assemblies.</summary>
+        private static Dictionary<string, string> OurTypeAssemblies
+        {
+            get
+            {
+                if (ourTypeAssemblies != null)
+                {
+                    return ourTypeAssemblies;
+                }
+
+                ourTypeAssemblies = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (System.Reflection.Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    string name = assembly.GetName().Name;
+                    if (!name.StartsWith(NewBrand + ".", StringComparison.Ordinal) && !name.StartsWith("SPACS.", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    Type[] types;
+                    try
+                    {
+                        types = assembly.GetTypes();
+                    }
+                    catch (System.Reflection.ReflectionTypeLoadException e)
+                    {
+                        types = e.Types.Where(t => t != null).ToArray();
+                    }
+
+                    foreach (Type type in types)
+                    {
+                        if (type.FullName != null && !ourTypeAssemblies.ContainsKey(type.FullName))
+                        {
+                            ourTypeAssemblies.Add(type.FullName, name);
+                        }
+                    }
+                }
+
+                return ourTypeAssemblies;
+            }
+        }
+
+        /// <summary>
+        /// Points every assembly-qualified name of our types at the assembly that declares the type.
+        /// See <see cref="AssemblyQualifiedName"/>. Idempotent: a name already right is not a hit.
+        /// </summary>
+        private static string FixAssemblyQualifiedNames(string text, out int hits)
+        {
+            int count = 0;
+            string result = AssemblyQualifiedName.Replace(text, match =>
+            {
+                string type = match.Groups["type"].Value;
+                if (!OurTypeAssemblies.TryGetValue(type, out string assembly)
+                    || assembly == match.Groups["asm"].Value)
+                {
+                    return match.Value;
+                }
+
+                count++;
+                return type + match.Groups["separator"].Value + assembly;
+            });
+
+            hits = count;
+            return result;
+        }
+
         private static readonly string[] TextExtensions =
         {
             ".cs", ".asmdef", ".asmref", ".json", ".uxml", ".uss", ".tss",
@@ -737,18 +842,32 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             // A scene open while its file is rewritten under it comes back as a "modified externally"
             // prompt, and a later save of it would write the old content back over the rewrite. Close
             // it first; the re-save opens it again when it is done.
+            //
+            // Closed WITHOUT saving, never through the usual "save modified scenes?" prompt. An open
+            // scene was deserialized by the updated packages under its old type names, so its graphs
+            // hold MissingType units with renumbered JSON ids; saving it writes that out, and no rewrite
+            // brings the graph back ("Object definition has not been encountered for object with id=N"
+            // on every later open — reproduced on 2026-10-09). Its unsaved changes are lost instead, and
+            // the creator is told so before anything happens.
             HashSet<string> toRewrite = new(
                 selected.Select(e => e.Path).Concat(migratePages ? poiPageEntries.Select(e => e.Path) : Enumerable.Empty<string>()),
                 StringComparer.OrdinalIgnoreCase);
-            List<string> openScenes = Enumerable.Range(0, SceneManager.sceneCount)
+            List<Scene> openSceneList = Enumerable.Range(0, SceneManager.sceneCount)
                 .Select(SceneManager.GetSceneAt)
                 .Where(s => !string.IsNullOrEmpty(s.path))
-                .Select(s => s.path)
                 .ToList();
+            List<string> openScenes = openSceneList.Select(s => s.path).ToList();
             List<string> reopenScenes = new();
             if (openScenes.Any(toRewrite.Contains))
             {
-                if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                List<string> dirty = openSceneList.Where(s => s.isDirty).Select(s => s.path).ToList();
+                if (dirty.Count > 0 && !EditorUtility.DisplayDialog(
+                        WindowTitle,
+                        "These open scenes have unsaved changes:\n\n  " + string.Join("\n  ", dirty) +
+                        "\n\nThey are closed WITHOUT saving. Saved now, before the update, their Visual Scripting " +
+                        "graphs would be written with the nodes the updated packages cannot resolve yet, and could " +
+                        "not be recovered. Their unsaved changes are lost.",
+                        "Discard changes and apply", "Cancel"))
                 {
                     return;
                 }
@@ -986,7 +1105,56 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             text = SupplementUtilitiesUsing(text, out int supplemented);
             hits += supplemented;
 
+            FixAssemblyQualifiedNames(text, out int requalified);
+            hits += requalified;
+
             return hits;
+        }
+
+        /// <summary>
+        /// True when the file at <paramref name="path"/> is a text-serialized scene, prefab or asset
+        /// whose Visual Scripting data still names something this routine renames. That data is the
+        /// <c>_json</c> field of a machine, a graph asset or a Variables component; other matches in
+        /// the file (a label, a narrative text) do not count.
+        /// </summary>
+        /// <remarks>Used by <see cref="VirtuademyUpdateSaveGuard"/>, which refuses to save such a file.</remarks>
+        internal static bool HasUnmigratedGraphData(string path)
+        {
+            if (string.IsNullOrEmpty(path)
+                || !YamlExtensions.Contains(Path.GetExtension(path).ToLowerInvariant())
+                || !File.Exists(path))
+            {
+                return false;
+            }
+
+            string text = ReadTextOrNull(path);
+            return text != null && GraphJsonValues(text).Any(json => CountHits(json) > 0);
+        }
+
+        private const string JsonKey = "_json: '";
+
+        /// <summary>
+        /// The <c>_json</c> values of a YAML file, as written. Unity writes them as single-quoted
+        /// scalars and folds a long one over several lines at its spaces (a prefab's graph, typically),
+        /// so a value is read up to its closing quote rather than to the end of its line; a quote
+        /// inside it is doubled.
+        /// </summary>
+        private static IEnumerable<string> GraphJsonValues(string text)
+        {
+            for (int start = text.IndexOf(JsonKey, StringComparison.Ordinal);
+                 start >= 0;
+                 start = text.IndexOf(JsonKey, start, StringComparison.Ordinal))
+            {
+                start += JsonKey.Length;
+                int end = start;
+                while (end < text.Length && (text[end] != '\'' || (end + 1 < text.Length && text[end + 1] == '\'')))
+                {
+                    end += text[end] == '\'' ? 2 : 1;
+                }
+
+                yield return text.Substring(start, end - start);
+                start = end;
+            }
         }
 
         private static string Rewrite(string text)
@@ -1010,6 +1178,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             }
 
             text = SupplementUtilitiesUsing(text, out _);
+            text = FixAssemblyQualifiedNames(text, out _);
 
             return text;
         }
