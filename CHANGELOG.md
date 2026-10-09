@@ -176,6 +176,24 @@
   "Published in" line.
 
 ### Fixed
+- **The v2026.5 -> v2026.6 update no longer lets a graph be saved broken.** Between updating the
+  packages and applying the routine, a scene or prefab is opened by an editor that no longer knows
+  its node types: Visual Scripting swaps them for `MissingType` and renumbers the graph's JSON ids.
+  One save in that window was enough to make every graph with SDK nodes unreadable for good
+  ("Object definition has not been encountered for object with id=N"), and the routine itself
+  offered that save, through the usual "save modified scenes?" prompt before rewriting the open
+  scenes. Apply now closes them without saving, after saying which unsaved changes are lost, and a
+  new `VirtuademyUpdateSaveGuard` refuses any save (Ctrl+S, prompts, Prefab Mode, other tools) of a
+  file whose Visual Scripting data still carries the old names, until the routine has rewritten it.
+  A creator whose graphs already broke this way restores the files from before the update and runs
+  the routine on them without opening them first.
+- **Typed Visual Scripting variables keep their type through the rename.** A graph, object or scene
+  variable declared with an SDK type stores the type's assembly-qualified name, and the namespace
+  rules rewrote its assembly to a name that does not exist (the placeholders' old assembly became
+  `Virtuademy.Environments.ScriptingApi.Placeholders`; they live in
+  `Virtuademy.Environments.ScriptingApi`), so the variable came back as `Unknown`. The routine now
+  writes down the assembly that declares the type, also when Unity has folded the name over two
+  lines.
 - **The package's GLB models import in a creator project.** `ChatbotAvatarFemale.glb`,
   `ChatbotAvatarMale.glb` and the Scene Changer's `portal.glb` are imported by glTFast's
   `GltfImporter`, but the package never declared `com.unity.cloud.gltfast`: they only worked in
