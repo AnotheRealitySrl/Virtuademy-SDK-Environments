@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Added
+- **The interpreter is reinstalled when HybridCLR changes version** (minor bump).
+  - `HotUpdateSetupper.Setup` used to keep any interpreter it found in the project's local IL2CPP
+    copy (`HybridCLRData/LocalIl2CppData-*`). HybridCLR only checks that the folder exists, so after
+    the HybridCLR package moved to another version the copy kept the old libil2cpp. That happens
+    on a Virtuademy update, or on the repair of a project that had pulled another HybridCLR.
+  - The setup now compares the installed libil2cpp version with the package's and reinstalls on a
+    mismatch.
+  - `GetInterpreterVersionIssue` reports the mismatch, which the setup window uses to offer Fix.
+  - It is not part of `GetSetupIssue`, so the publish gate is unchanged: the published DLL is
+    compiled without the local IL2CPP.
 - **`InputSettingsMono` is back within a creator's reach**, in
   `Virtuademy.Environments.ScriptingApi.Placeholders` with its data class `InputSettings`. It lived
   in the application framework (`Virtuademy-SystemCore`), which creator projects stopped installing

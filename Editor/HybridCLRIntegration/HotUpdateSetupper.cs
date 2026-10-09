@@ -228,7 +228,9 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             int attempt = SessionState.GetInt(PENDING_SETUP_ATTEMPTS_KEY, 0) + 1;
             SessionState.SetInt(PENDING_SETUP_ATTEMPTS_KEY, attempt);
 
-            string issue = RunSetup();
+            // RunSetup reports what the publish gate checks; a reinstall for another HybridCLR
+            // version that did not go through is not part of that, and must not read as done.
+            string issue = RunSetup() ?? GetInterpreterVersionIssue();
 
             if (issue == null)
             {
@@ -645,6 +647,37 @@ $@"{{
         /// <summary>True when <see cref="GetSetupIssue"/> finds nothing to complain about.</summary>
         public static bool IsHotUpdateReady() => GetSetupIssue() == null;
 
+        /// <summary>
+        /// Why the interpreter installed in the project's local IL2CPP copy
+        /// (<c>HybridCLRData/LocalIl2CppData-*</c>) is not the one the HybridCLR package expects, or
+        /// <c>null</c> when it is, or when none is installed (<see cref="GetSetupIssue"/> reports
+        /// that case). HybridCLR only checks that the folder exists, so after the package moves to
+        /// another version the copy keeps the old libil2cpp and nothing notices.
+        /// <see cref="Setup"/> reinstalls it.
+        ///
+        /// Kept out of <see cref="GetSetupIssue"/> on purpose: that method is also the publish
+        /// gate, and the hot-update DLL an environment publishes is compiled by
+        /// <c>PlayerBuildInterface.CompilePlayerScripts</c>, without the local IL2CPP. The setup
+        /// window asks for this separately, by reflection, to offer its Fix button.
+        /// </summary>
+        public static string GetInterpreterVersionIssue()
+        {
+            InstallerController installer;
+            try { installer = new InstallerController(); } catch { return null; }
+
+            if (!installer.HasInstalledHybridCLR() || InstalledVersionMatches(installer))
+                return null;
+
+            return $"the interpreter in the project's local IL2CPP copy is libil2cpp v{installer.InstalledLibil2cppVersion ?? "unknown"}, " +
+                   $"but the HybridCLR package is v{installer.PackageVersion}. Re-run the interpreter configuration " +
+                   "to reinstall it.";
+        }
+
+        // Trimmed: a version file copied or edited by hand can carry a line ending, and a mismatch
+        // means a reinstall on every setup.
+        static bool InstalledVersionMatches(InstallerController installer)
+            => installer.InstalledLibil2cppVersion?.Trim() == installer.PackageVersion?.Trim();
+
         // ============================================================
         //  INTERPRETER INSTALL
         // ============================================================
@@ -669,9 +702,18 @@ $@"{{
 
             if (installer.HasInstalledHybridCLR())
             {
-                Debug.Log("[Setup] HybridCLR interpreter already installed (libil2cpp " +
-                          $"v{installer.InstalledLibil2cppVersion ?? "unknown"}).");
-                return true;
+                if (InstalledVersionMatches(installer))
+                {
+                    Debug.Log("[Setup] HybridCLR interpreter already installed (libil2cpp " +
+                              $"v{installer.InstalledLibil2cppVersion ?? "unknown"}).");
+                    return true;
+                }
+
+                // The package moved to another version (a Virtuademy update, or a repair of a
+                // project that had pulled another HybridCLR) while the local IL2CPP kept the
+                // libil2cpp it was installed with. HybridCLR only checks that the folder exists.
+                Debug.Log($"[Setup] The local IL2CPP has libil2cpp v{installer.InstalledLibil2cppVersion ?? "unknown"}, " +
+                          $"the HybridCLR package is v{installer.PackageVersion}: reinstalling the interpreter.");
             }
 
             if (installer.GetCompatibleType() == InstallerController.CompatibleType.Incompatible)
