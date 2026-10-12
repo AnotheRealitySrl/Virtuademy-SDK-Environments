@@ -3,6 +3,25 @@
 ## Unreleased
 
 ### Added
+- **The update routine resolves project assets that share their GUID with a package asset**
+  (minor bump). It is step 3 of `v2026.5 -> v2026.6`, and the folder step becomes step 4.
+  - **Where the collisions come from.** Creator projects imported template assets with their
+    `.meta` files: fonts, a click sound, UI prefabs, utility graphs. Some of them later moved into
+    this package with the same GUIDs. Unity then logs "GUID [...] for asset 'Assets/...' conflicts
+    with 'Packages/...' — Assigning a new guid".
+  - **What Unity does with them.** The new GUID goes to the project's copy, and only in memory.
+    The project's references silently resolve to the package's asset, and every scene saved
+    afterwards writes a GUID that no other machine knows. Seen on Reflectis-EducationContent:
+    six assets, with three references already saved under such a GUID.
+  - **What the step does.** For each collision it either keeps the project's copy under a
+    permanent new GUID and rewrites the references to it (`.meta`, scenes, prefabs, assets,
+    materials, UXML/USS and the rest under `Assets/` and `ProjectSettings/`), or deletes the copy
+    in favour of the package's.
+  - **Defaults.** It keeps the copy when the two differ and uses the package's when they are
+    identical. The new GUID is the one Unity assigned in memory, so references saved on this
+    machine since the conflict stay valid.
+  - **Detection.** It reads our packages' `.meta` files directly. For other packages it relies
+    on the AssetDatabase reporting a different GUID.
 - **The interpreter is reinstalled when HybridCLR changes version** (minor bump).
   - `HotUpdateSetupper.Setup` used to keep any interpreter it found in the project's local IL2CPP
     copy (`HybridCLRData/LocalIl2CppData-*`). HybridCLR only checks that the folder exists, so after

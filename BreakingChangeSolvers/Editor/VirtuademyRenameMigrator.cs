@@ -16,7 +16,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 {
     /// <summary>
     /// The v2026.5 -> v2026.6 update routine for a creator project, and the only menu entry it
-    /// needs: one window, one Apply, all three steps the release asks for.
+    /// needs: one window, one Apply, all four steps the release asks for.
     ///
     /// Step 1 is project-wide migration for the two renames the packages have been through:
     /// the Reflectis -> Virtuademy brand rename, and the authoring package becoming
@@ -29,7 +29,15 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
     /// and every POI in a world published from the project comes up empty. It runs right after the
     /// rename rewrite and re-reads each file, so the two passes can touch the same scene.
     ///
-    /// Step 3 is <see cref="VirtuademyFolderMigrator"/>, which gathers what the SDK generates into
+    /// Step 3 is <see cref="VirtuademyGuidCollisionMigrator"/>, which resolves the project assets
+    /// that share their GUID with an asset of an installed package — template assets imported with
+    /// their .meta that later moved into the SDK. Unity gives the project's copy a new GUID in
+    /// memory only, so its references silently switch to the package's asset and every later save
+    /// writes a GUID no other machine knows. Each collision is fixed for good, keeping the project's
+    /// copy under a permanent new GUID or deleting it in favour of the package's copy. It runs after
+    /// the two rewrites and re-reads every file, like the page pass.
+    ///
+    /// Step 4 is <see cref="VirtuademyFolderMigrator"/>, which gathers what the SDK generates into
     /// the single Assets/Virtuademy folder. It runs after the rewrite, because the rewrite works
     /// from the paths the scan recorded and a folder move would invalidate them. Nothing breaks if
     /// it is skipped — both settings assets are found by type wherever they sit — so it is a
@@ -599,6 +607,8 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         private bool hasLegacyFolders;
         private List<VirtuademyPOIPageMigrator.Entry> poiPageEntries = new();
         private bool migratePOIPages = true;
+        private List<VirtuademyGuidCollisionMigrator.Entry> guidEntries = new();
+        private bool resolveGuidCollisions = true;
         private bool wasResavePending;
 
         [MenuItem(MenuPath)]
@@ -708,7 +718,66 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             }
 
             EditorGUILayout.Space(8);
-            EditorGUILayout.LabelField("3. Generated folders", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("3. Assets that share a GUID with a package", EditorStyles.boldLabel);
+
+            if (guidEntries.Count > 0)
+            {
+                resolveGuidCollisions = EditorGUILayout.ToggleLeft(
+                    $"Resolve {guidEntries.Count} GUID collision(s) (required)",
+                    resolveGuidCollisions);
+                EditorGUILayout.LabelField(
+                    "Unity gives these project assets a new GUID in memory only: their references now point at the " +
+                    "package's asset, and every save writes a GUID no other machine knows. Keep the project's copy " +
+                    "(new permanent GUID, references follow it) or use the package's copy (the project's is deleted).",
+                    EditorStyles.wordWrappedMiniLabel);
+
+                using (new EditorGUI.DisabledScope(!resolveGuidCollisions))
+                {
+                    foreach (VirtuademyGuidCollisionMigrator.Entry entry in guidEntries)
+                    {
+                        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                        {
+                            using (new EditorGUILayout.HorizontalScope())
+                            {
+                                EditorGUILayout.LabelField(entry.Path, EditorStyles.boldLabel);
+                                using (new EditorGUI.DisabledScope(entry.IsFolder))
+                                {
+                                    entry.Resolution = (VirtuademyGuidCollisionMigrator.Resolution)EditorGUILayout.EnumPopup(
+                                        entry.IsFolder ? VirtuademyGuidCollisionMigrator.Resolution.KeepProjectCopy : entry.Resolution,
+                                        GUILayout.Width(150));
+                                }
+                                if (GUILayout.Button("Ping", GUILayout.Width(44)))
+                                {
+                                    UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(entry.Path);
+                                    if (asset != null)
+                                    {
+                                        EditorGUIUtility.PingObject(asset);
+                                    }
+                                }
+                            }
+                            EditorGUILayout.LabelField(
+                                $"Same GUID as {entry.PackagePath} — " +
+                                (entry.IsFolder ? "folder" : entry.Identical ? "identical content" : "DIFFERENT content") +
+                                $", referenced by {entry.ReferencingFiles.Count} file(s)",
+                                EditorStyles.miniLabel);
+                            if (!entry.Identical && !entry.IsFolder
+                                && entry.Resolution == VirtuademyGuidCollisionMigrator.Resolution.UsePackageCopy)
+                            {
+                                EditorGUILayout.LabelField(
+                                    "The two differ: the references will get the package's version, and overrides on objects it does not have are lost.",
+                                    EditorStyles.wordWrappedMiniLabel);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("No project asset shares its GUID with a package. Nothing to resolve.", MessageType.Info);
+            }
+
+            EditorGUILayout.Space(8);
+            EditorGUILayout.LabelField("4. Generated folders", EditorStyles.boldLabel);
 
             if (hasLegacyFolders)
             {
@@ -728,9 +797,10 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
             bool renameWork = selectedCount > 0;
             bool pageWork = poiPageEntries.Count > 0 && migratePOIPages;
+            bool guidWork = guidEntries.Count > 0 && resolveGuidCollisions;
             bool folderWork = hasLegacyFolders && consolidateFolders;
 
-            if (!renameWork && !pageWork && !folderWork)
+            if (!renameWork && !pageWork && !guidWork && !folderWork)
             {
                 EditorGUILayout.HelpBox("Nothing selected to apply.", MessageType.Info);
                 EditorGUILayout.Space(4);
@@ -751,6 +821,10 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             {
                 steps.Add($"POI pages in {poiPageEntries.Count} file(s)");
             }
+            if (guidWork)
+            {
+                steps.Add($"{guidEntries.Count} GUID collision(s)");
+            }
             if (folderWork)
             {
                 steps.Add("folder consolidation");
@@ -758,7 +832,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
             if (GUILayout.Button($"Apply update ({string.Join(" + ", steps)})", GUILayout.Height(30)))
             {
-                Apply(renameWork, pageWork, folderWork);
+                Apply(renameWork, pageWork, guidWork, folderWork);
             }
 
             EditorGUILayout.Space(4);
@@ -845,12 +919,13 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             }
 
             poiPageEntries = VirtuademyPOIPageMigrator.Scan();
+            guidEntries = VirtuademyGuidCollisionMigrator.Scan();
             hasLegacyFolders = VirtuademyFolderMigrator.HasLegacyFolders();
             hasScanned = true;
             Repaint();
         }
 
-        private void Apply(bool rewriteFiles, bool migratePages, bool consolidate)
+        private void Apply(bool rewriteFiles, bool migratePages, bool resolveGuids, bool consolidate)
         {
             List<Entry> selected = rewriteFiles
                 ? entries.Where(e => e.Selected).ToList()
@@ -864,6 +939,12 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             if (migratePages)
             {
                 steps.Add($"replace the POI page marker in {poiPageEntries.Count} file(s)");
+            }
+            if (resolveGuids)
+            {
+                int keep = guidEntries.Count(e => e.IsFolder || e.Resolution == VirtuademyGuidCollisionMigrator.Resolution.KeepProjectCopy);
+                steps.Add($"resolve {guidEntries.Count} GUID collision(s) ({keep} kept under a new GUID, " +
+                          $"{guidEntries.Count - keep} deleted in favour of the package's copy)");
             }
             if (consolidate)
             {
@@ -892,7 +973,9 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             // on every later open — reproduced on 2026-10-09). Its unsaved changes are lost instead, and
             // the creator is told so before anything happens.
             HashSet<string> toRewrite = new(
-                selected.Select(e => e.Path).Concat(migratePages ? poiPageEntries.Select(e => e.Path) : Enumerable.Empty<string>()),
+                selected.Select(e => e.Path)
+                    .Concat(migratePages ? poiPageEntries.Select(e => e.Path) : Enumerable.Empty<string>())
+                    .Concat(resolveGuids ? guidEntries.SelectMany(e => e.ReferencingFiles) : Enumerable.Empty<string>()),
                 StringComparer.OrdinalIgnoreCase);
             List<Scene> openSceneList = Enumerable.Range(0, SceneManager.sceneCount)
                 .Select(SceneManager.GetSceneAt)
@@ -917,7 +1000,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             }
 
-            int changedFiles = 0, failed = 0, changedPages = 0, failedPages = 0;
+            int changedFiles = 0, failed = 0, changedPages = 0, failedPages = 0, resolvedGuids = 0, failedGuids = 0;
             List<string> changedPaths = new();
             bool lockUnpinned = false;
             HashSet<string> rewrittenDependencies = new(StringComparer.Ordinal);
@@ -963,6 +1046,14 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 {
                     EditorUtility.DisplayProgressBar(WindowTitle, "POI page markers", 1f);
                     changedPages = VirtuademyPOIPageMigrator.Apply(poiPageEntries, out failedPages, changedPaths);
+                }
+
+                // After both rewrites, and before the refresh: it deletes and re-GUIDs files, which
+                // the refresh then imports, and it re-reads every file it rewrites.
+                if (resolveGuids)
+                {
+                    EditorUtility.DisplayProgressBar(WindowTitle, "GUID collisions", 1f);
+                    resolvedGuids = VirtuademyGuidCollisionMigrator.Apply(guidEntries, out failedGuids, changedPaths);
                 }
 
                 // Only the git packages whose manifest entry this run rewrote: deleting the whole lock
@@ -1029,6 +1120,12 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                           (failedPages > 0 ? $", {failedPages} failed" : string.Empty);
             }
 
+            if (resolveGuids)
+            {
+                report += $"\nGUID collisions resolved: {resolvedGuids}" +
+                          (failedGuids > 0 ? $", {failedGuids} failed" : string.Empty);
+            }
+
             if (consolidate)
             {
                 report += $"\nMoved into Assets/Virtuademy: {folders.Moved} asset(s), " +
@@ -1039,7 +1136,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             EditorUtility.DisplayDialog(
                 WindowTitle,
                 report +
-                (failed > 0 || failedPages > 0 || folders.Refused > 0 ? "\n\nSee the Console for details." : string.Empty) +
+                (failed > 0 || failedPages > 0 || failedGuids > 0 || folders.Refused > 0 ? "\n\nSee the Console for details." : string.Empty) +
                 (toResave.Count > 0
                     ? $"\n\nUnity will now recompile. Afterwards the {toResave.Count} scene(s), prefab(s) and asset(s) " +
                       "changed by the update are re-saved automatically, without opening them; you will get a report. " +
