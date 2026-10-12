@@ -20,14 +20,16 @@
   GUID, so scenes that already carry the component keep it and its values.
 
 ### Changed
-- **The update routine moves the avatars package to its new name, Virtuademy-Avatars** (minor bump).
-  - That package (`Reflectis-CreatorKit-Worlds-Avatars`) is not in the registry; creators add it
-    by hand as a git dependency. The brand rules alone sent its manifest key and URL to a
-    `Virtuademy-CreatorKit-Worlds-Avatars` that does not exist, and its namespace into
-    `Virtuademy.SDK.Environments`.
-  - Four entries at the head of the Environments table now take id, repository and namespace to
-    `virtuademy-avatars`, `Virtuademy-Avatars` and `Virtuademy.Avatars`, and put right a
-    project that already ran the routine without them.
+- **The update routine rewrites only the manifest entries of packages the registry has listed**
+  (minor bump).
+  - The brand rules ran over the whole `Packages/manifest.json`, so a package of ours that creators
+    add by hand and no registry entry lists (`Reflectis-CreatorKit-Worlds-Avatars`,
+    `Reflectis-SDK-RPMAvatars`) had its key and URL turned into a `Virtuademy-*` repository that
+    does not exist, and the project stopped resolving.
+  - The manifest now goes through the rules one entry at a time, and only for the ids a registry
+    entry has ever listed, including the develop channel's intermediate names, plus the
+    installer's. Every other entry is left exactly as it is. Scripts, scenes, prefabs and assets are
+    rewritten as before.
 - **The update routine unpins only the packages it renames** (minor bump).
   - It removed from `packages-lock.json` every git package with one of our prefixes, so a package of
     ours the routine had not changed (one a creator added by hand, at no ref) was re-resolved to

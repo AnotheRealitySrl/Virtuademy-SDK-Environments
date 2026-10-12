@@ -158,18 +158,47 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         private static readonly string OldSetupPackage = "Virtuademy-Creator" + "Kit-Worlds-Setup";
         private static readonly string OldSetupId = "virtuademy-creator" + "kit-worlds-setup";
 
-        // The avatars package was never merged into the authoring package and is not in the
-        // registry: creators add it by hand, as a git dependency. Its name is Virtuademy-Avatars
-        // since 2026-10 (package id, repository, assemblies). Without its own entries the brand rules alone turn its
-        // manifest key and URL into a Virtuademy-CreatorKit-Worlds-Avatars that exists nowhere,
-        // and OldWorlds would carry its namespace into the authoring package's.
-        private static readonly string OldAvatars = "Virtuademy.Creator" + "Kit.Worlds.Avatars";
-        private static readonly string OldAvatarsPackage = "Virtuademy-Creator" + "Kit-Worlds-Avatars";
-        private static readonly string OldAvatarsId = "virtuademy-creator" + "kit-worlds-avatars";
+        // The manifest entries this routine may rewrite: every id a registry entry has ever listed
+        // (the release history of contracts/PackageRegistry.json and the develop channel's names along
+        // the way) and the installer's. The rules above also match ids they have no business with —
+        // the brand rule turns any reflectis-* key and Reflectis-* URL into a virtuademy-* one — and
+        // creators add packages of ours by hand that the registry never listed (Reflectis-SDK-RPMAvatars,
+        // the avatars package). Rewritten, those point at repositories that do not exist and the
+        // project stops resolving, so an entry whose id is not here is left exactly as it is.
+        // Built rather than spelled out, for the same reason the tokens above are split.
+        private static readonly HashSet<string> RegistryPackageIds = BuildRegistryPackageIds();
 
-        // Where an earlier version of this routine sent the avatars namespace, through OldWorlds.
-        // Listed so a project that already ran it is put right on the next run.
-        private static readonly string MisroutedAvatars = "Virtuademy.SDK.Environments.Ava" + "tars";
+        private static HashSet<string> BuildRegistryPackageIds()
+        {
+            const string scope = "com.anotherealitysrl.";
+            string oldBrand = OldBrand.ToLowerInvariant();
+            string newBrand = NewBrand.ToLowerInvariant();
+            HashSet<string> ids = new(StringComparer.Ordinal);
+
+            foreach (string brand in new[] { oldBrand, newBrand })
+            {
+                foreach (string module in new[] { "core", "placeholders", "visualscripting", "tasks", "analytics", "dialogs", "setup" })
+                {
+                    ids.Add(scope + brand + "-creator" + "kit-worlds-" + module);
+                }
+                foreach (string package in new[] { "core", "dialogs", "graphs", "tasks", "tenantconfiguration" })
+                {
+                    ids.Add(scope + brand + "-sdk-" + package);
+                }
+            }
+
+            ids.Add(scope + oldBrand + "-sdk-" + oldBrand + "api");
+            foreach (string package in new[] { "interface", "platformapi", "environments", "environments-setup" })
+            {
+                ids.Add(scope + newBrand + "-sdk-" + package);
+            }
+            foreach (string package in new[] { "utility", "graphs", "tasks", "dialogs" })
+            {
+                ids.Add(scope + "spacs-" + package);
+            }
+
+            return ids;
+        }
 
         private static readonly string OldGraphsPackage = "Virtuademy-SDK-Gra" + "phs";
         private static readonly string OldTasksPackage = "Virtuademy-SDK-Ta" + "sks";
@@ -198,12 +227,6 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
         private static readonly (string oldValue, string newValue)[] EnvironmentsMap =
         {
-            // First, because OldWorlds is a prefix of OldAvatars.
-            (OldAvatars, "Virtuademy.Avatars"),
-            (OldAvatarsPackage, "Virtuademy-Avatars"),
-            (OldAvatarsId, "virtuademy-avatars"),
-            (MisroutedAvatars, "Virtuademy.Avatars"),
-
             (OldWorlds + ".CoreHybridCLREditor", "Virtuademy.SDK.Environments.HybridCLREditor"),
             (OldWorlds + ".CoreEditor", "Virtuademy.SDK.Environments.Editor"),
             (OldWorlds + ".Core", "Virtuademy.SDK.Environments"),
@@ -809,7 +832,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                         continue;
                     }
 
-                    int hits = CountHits(text);
+                    int hits = IsManifest(path) ? ManifestHits(text) : CountHits(text);
                     if (hits > 0)
                     {
                         entries.Add(new Entry { Path = path.Replace('\\', '/'), Hits = hits });
@@ -914,7 +937,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                             continue;
                         }
 
-                        string rewritten = Rewrite(text);
+                        string rewritten = IsManifest(entry.Path) ? RewriteManifest(text) : Rewrite(text);
                         if (!string.Equals(rewritten, text, StringComparison.Ordinal))
                         {
                             File.WriteAllText(entry.Path, rewritten, new UTF8Encoding(HasUtf8Bom(entry.Path)));
@@ -1185,6 +1208,24 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             }
         }
 
+        private static bool IsManifest(string path)
+            => path.Replace('\\', '/') == VirtuademyPackageLock.ManifestPath;
+
+        /// <summary>The manifest, with only the entries of <see cref="RegistryPackageIds"/> rewritten.</summary>
+        private static string RewriteManifest(string text)
+            => VirtuademyPackageLock.RewriteDependencies(text, RegistryPackageIds.Contains, Rewrite);
+
+        private static int ManifestHits(string text)
+        {
+            int hits = 0;
+            VirtuademyPackageLock.RewriteDependencies(text, RegistryPackageIds.Contains, entry =>
+            {
+                hits += CountHits(entry);
+                return entry;
+            });
+            return hits;
+        }
+
         private static string Rewrite(string text)
         {
             foreach ((string oldValue, string newValue) in LiteralMap)
@@ -1310,6 +1351,29 @@ namespace Virtuademy.BreakingChangeSolvers
 
         private static bool IsOurs(string id)
             => OurPrefixes.Any(prefix => id.StartsWith(prefix, StringComparison.Ordinal));
+
+        /// <summary>
+        /// <paramref name="manifest"/> with <paramref name="rewrite"/> applied to the text of each
+        /// dependency entry (key and value) whose id passes <paramref name="include"/>; every other byte
+        /// is kept. Returned unchanged when the dependencies cannot be read.
+        /// </summary>
+        public static string RewriteDependencies(string manifest, Func<string, bool> include, Func<string, string> rewrite)
+        {
+            if (!TryGetDependencies(manifest, out _, out _, out List<Member> members))
+            {
+                return manifest;
+            }
+
+            StringBuilder builder = new(manifest);
+            // From the end, so each replacement leaves the offsets of the earlier entries valid.
+            foreach (Member member in members.Where(m => include(m.Key)).OrderByDescending(m => m.Start))
+            {
+                int length = member.End - member.Start;
+                string rewritten = rewrite(manifest.Substring(member.Start, length));
+                builder.Remove(member.Start, length).Insert(member.Start, rewritten);
+            }
+            return builder.ToString();
+        }
 
         /// <summary>
         /// The dependency ids the routine's rewrite of the manifest touched: every key of
