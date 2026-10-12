@@ -158,6 +158,19 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         private static readonly string OldSetupPackage = "Virtuademy-Creator" + "Kit-Worlds-Setup";
         private static readonly string OldSetupId = "virtuademy-creator" + "kit-worlds-setup";
 
+        // The avatars package was never merged into the authoring package and is not in the
+        // registry: creators add it by hand, as a git dependency. Its name is Virtuademy-Avatars
+        // since 2026-10 (package id, repository, assemblies). Without its own entries the brand rules alone turn its
+        // manifest key and URL into a Virtuademy-CreatorKit-Worlds-Avatars that exists nowhere,
+        // and OldWorlds would carry its namespace into the authoring package's.
+        private static readonly string OldAvatars = "Virtuademy.Creator" + "Kit.Worlds.Avatars";
+        private static readonly string OldAvatarsPackage = "Virtuademy-Creator" + "Kit-Worlds-Avatars";
+        private static readonly string OldAvatarsId = "virtuademy-creator" + "kit-worlds-avatars";
+
+        // Where an earlier version of this routine sent the avatars namespace, through OldWorlds.
+        // Listed so a project that already ran it is put right on the next run.
+        private static readonly string MisroutedAvatars = "Virtuademy.SDK.Environments.Ava" + "tars";
+
         private static readonly string OldGraphsPackage = "Virtuademy-SDK-Gra" + "phs";
         private static readonly string OldTasksPackage = "Virtuademy-SDK-Ta" + "sks";
         private static readonly string OldDialogsPackage = "Virtuademy-SDK-Dia" + "logs";
@@ -185,6 +198,12 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
         private static readonly (string oldValue, string newValue)[] EnvironmentsMap =
         {
+            // First, because OldWorlds is a prefix of OldAvatars.
+            (OldAvatars, "Virtuademy.Avatars"),
+            (OldAvatarsPackage, "Virtuademy-Avatars"),
+            (OldAvatarsId, "virtuademy-avatars"),
+            (MisroutedAvatars, "Virtuademy.Avatars"),
+
             (OldWorlds + ".CoreHybridCLREditor", "Virtuademy.SDK.Environments.HybridCLREditor"),
             (OldWorlds + ".CoreEditor", "Virtuademy.SDK.Environments.Editor"),
             (OldWorlds + ".Core", "Virtuademy.SDK.Environments"),
@@ -640,7 +659,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
                 EditorGUILayout.Space(4);
                 unpinLockFile = EditorGUILayout.ToggleLeft(
-                    "Unpin this project's Virtuademy git packages in Packages/packages-lock.json so UPM re-resolves the renamed ids (recommended). Other packages keep their pinned versions",
+                    "Unpin the git packages this update renames in Packages/packages-lock.json so UPM re-resolves them (recommended). Other packages keep their pinned versions",
                     unpinLockFile);
             }
 
@@ -878,6 +897,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             int changedFiles = 0, failed = 0, changedPages = 0, failedPages = 0;
             List<string> changedPaths = new();
             bool lockUnpinned = false;
+            HashSet<string> rewrittenDependencies = new(StringComparer.Ordinal);
 
             try
             {
@@ -900,6 +920,11 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                             File.WriteAllText(entry.Path, rewritten, new UTF8Encoding(HasUtf8Bom(entry.Path)));
                             changedFiles++;
                             changedPaths.Add(entry.Path);
+
+                            if (entry.Path == VirtuademyPackageLock.ManifestPath)
+                            {
+                                rewrittenDependencies = VirtuademyPackageLock.RewrittenDependencies(text, rewritten);
+                            }
                         }
                     }
                     catch (Exception e)
@@ -917,14 +942,16 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                     changedPages = VirtuademyPOIPageMigrator.Apply(poiPageEntries, out failedPages, changedPaths);
                 }
 
-                // Only our own git packages: deleting the whole lock also unpinned every third-party
-                // git dependency, and one with no #ref then resolved to whatever its default branch
-                // is today (see VirtuademyPackageLock).
-                if (rewriteFiles && unpinLockFile)
+                // Only the git packages whose manifest entry this run rewrote: deleting the whole lock
+                // also unpinned every third-party git dependency, and one with no #ref then resolved
+                // to whatever its default branch is today (see VirtuademyPackageLock).
+                if (rewriteFiles && unpinLockFile && rewrittenDependencies.Count > 0)
                 {
-                    List<string> unpinned = VirtuademyPackageLock.UnpinOurGitPackages();
-                    lockUnpinned = unpinned.Count > 0;
-                    if (lockUnpinned)
+                    List<string> unpinned = VirtuademyPackageLock.UnpinGitPackages(rewrittenDependencies);
+                    // Resolve and wait whenever the manifest changed, not only when an entry left the
+                    // lock: a renamed package's new id was never in it.
+                    lockUnpinned = true;
+                    if (unpinned.Count > 0)
                     {
                         Debug.Log($"[{WindowTitle}] Unpinned {unpinned.Count} git package(s) in {VirtuademyPackageLock.LockPath} " +
                                   "so UPM resolves them again; every other entry keeps its pinned version:\n  " +
@@ -955,7 +982,8 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 .ToList();
             bool codeChanged = changedPaths.Any(p =>
                 CodeExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()));
-            VirtuademyUpdateResave.Schedule(toResave, reopenScenes, lockUnpinned, codeChanged);
+            VirtuademyUpdateResave.Schedule(toResave, reopenScenes,
+                lockUnpinned ? rewrittenDependencies.ToList() : new List<string>(), codeChanged);
 
             // After the rewrite, never before: the rewrite writes to the paths the scan recorded,
             // and moving a folder out from under it would send those writes to files that moved.
@@ -1239,8 +1267,8 @@ namespace Virtuademy.BreakingChangeSolvers
     // Here rather than in the migrator's namespace: VirtuademyUpdateResave, which lives in this
     // one, reads it too, and the migrator already imports it.
     /// <summary>
-    /// What the v2026.5 -> v2026.6 routine does to <c>Packages/packages-lock.json</c>: it unpins this
-    /// project's own git packages and leaves every other entry as it is.
+    /// What the v2026.5 -> v2026.6 routine does to <c>Packages/packages-lock.json</c>: it unpins the
+    /// git packages whose manifest entry it rewrote and leaves every other entry as it is.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -1253,9 +1281,12 @@ namespace Virtuademy.BreakingChangeSolvers
     /// <c>Packages/src</c>, and UPM stopped with "Repository does not contain a package manifest".
     /// </para>
     /// <para>
-    /// So only the entries whose id carries one of our prefixes and whose source is git are removed —
-    /// the same rule the setup window's re-resolve button applies. A registry or embedded package of
-    /// ours is not pinned by commit and is left alone.
+    /// So only git entries are removed, and only for the ids the rewrite of the manifest touched: the
+    /// old and new id of a renamed package, and any entry whose URL changed. Until 2026-10-12 it was
+    /// every git entry with one of our prefixes, which also re-resolved packages of ours that the
+    /// routine had not changed — one a creator added by hand, at no ref, moved to its default
+    /// branch's latest commit. A registry or embedded package is not pinned by commit and is left
+    /// alone.
     /// </para>
     /// <para>
     /// The file is edited as text through a small scanner rather than a JSON library: these scripts
@@ -1281,11 +1312,49 @@ namespace Virtuademy.BreakingChangeSolvers
             => OurPrefixes.Any(prefix => id.StartsWith(prefix, StringComparison.Ordinal));
 
         /// <summary>
-        /// Removes this project's own git packages from the lock file. Returns the ids removed; an
-        /// empty list when there was nothing to unpin, no lock file, or a lock this scanner cannot
-        /// read (in which case the file is left untouched and a warning says so).
+        /// The dependency ids the routine's rewrite of the manifest touched: every key of
+        /// <paramref name="before"/> whose entry is gone or has another value in
+        /// <paramref name="after"/>, and every key of <paramref name="after"/> that is new or has
+        /// another value. A renamed package therefore contributes both its old and its new id. Empty
+        /// when either text cannot be read.
         /// </summary>
-        public static List<string> UnpinOurGitPackages()
+        public static HashSet<string> RewrittenDependencies(string before, string after)
+        {
+            HashSet<string> changed = new(StringComparer.Ordinal);
+            if (!TryGetDependencies(before, out _, out _, out List<Member> oldMembers)
+                || !TryGetDependencies(after, out _, out _, out List<Member> newMembers))
+            {
+                return changed;
+            }
+
+            Dictionary<string, string> oldValues = oldMembers.ToDictionary(m => m.Key, m => RawValue(before, m), StringComparer.Ordinal);
+            Dictionary<string, string> newValues = newMembers.ToDictionary(m => m.Key, m => RawValue(after, m), StringComparer.Ordinal);
+
+            foreach (KeyValuePair<string, string> old in oldValues)
+            {
+                if (!newValues.TryGetValue(old.Key, out string value) || value != old.Value)
+                {
+                    changed.Add(old.Key);
+                }
+            }
+            foreach (KeyValuePair<string, string> current in newValues)
+            {
+                if (!oldValues.TryGetValue(current.Key, out string value) || value != current.Value)
+                {
+                    changed.Add(current.Key);
+                }
+            }
+
+            return changed;
+        }
+
+        /// <summary>
+        /// Removes from the lock file the git entries of the packages in <paramref name="ids"/>.
+        /// Returns the ids removed; an empty list when there was nothing to unpin, no lock file, or a
+        /// lock this scanner cannot read (in which case the file is left untouched and a warning says
+        /// so).
+        /// </summary>
+        public static List<string> UnpinGitPackages(ISet<string> ids)
         {
             List<string> removed = new();
             if (!File.Exists(LockPath))
@@ -1304,7 +1373,7 @@ namespace Virtuademy.BreakingChangeSolvers
             List<Member> kept = new();
             foreach (Member member in members)
             {
-                if (IsOurs(member.Key) && IsGitEntry(text, member))
+                if (ids.Contains(member.Key) && IsGitEntry(text, member))
                 {
                     removed.Add(member.Key);
                 }
@@ -1339,12 +1408,16 @@ namespace Virtuademy.BreakingChangeSolvers
         }
 
         /// <summary>
-        /// True once UPM has resolved again after <see cref="UnpinOurGitPackages"/>: the lock file
-        /// exists and carries an entry for every git package of ours the manifest names. The manifest
-        /// is the right yardstick because the unpinned entries come back exactly for the packages it
-        /// still lists, while a package the routine renamed away never does.
+        /// True once UPM has resolved again after <see cref="UnpinGitPackages"/>: the lock file
+        /// exists and carries an entry for every package in <paramref name="unpinned"/> that the
+        /// manifest still names as a git dependency. The manifest is the right yardstick because the
+        /// unpinned entries come back exactly for the packages it still lists, while a package the
+        /// routine renamed away never does. Packages that were not unpinned are not waited for: one
+        /// that does not resolve has nothing to do with the routine and would hold the re-save
+        /// forever. An empty <paramref name="unpinned"/> (a pending file from before the ids were
+        /// recorded) waits for every git package of ours, as that version did.
         /// </summary>
-        public static bool OurGitPackagesResolved()
+        public static bool GitPackagesResolved(IReadOnlyCollection<string> unpinned)
         {
             if (!File.Exists(LockPath))
             {
@@ -1366,7 +1439,8 @@ namespace Virtuademy.BreakingChangeSolvers
 
             HashSet<string> lockedIds = new(locked.Select(m => m.Key), StringComparer.Ordinal);
             return declared
-                .Where(m => IsOurs(m.Key) && IsGitReference(StringValue(manifestText, m)))
+                .Where(m => (unpinned.Count > 0 ? unpinned.Contains(m.Key) : IsOurs(m.Key))
+                            && IsGitReference(StringValue(manifestText, m)))
                 .All(m => lockedIds.Contains(m.Key));
         }
 
@@ -1527,6 +1601,9 @@ namespace Virtuademy.BreakingChangeSolvers
                 .FirstOrDefault(m => m.Value.Key == "source");
             return source != null && StringValue(text, source.Value) == "git";
         }
+
+        private static string RawValue(string text, Member member)
+            => text.Substring(member.ValueStart, member.End - member.ValueStart);
 
         private static string StringValue(string text, Member member)
             => text[member.ValueStart] == '"'

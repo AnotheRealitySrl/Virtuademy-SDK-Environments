@@ -37,8 +37,8 @@ namespace Virtuademy.BreakingChangeSolvers
     /// (those always recompile, and until they do the old domain is the wrong one to save from);</item>
     /// <item>otherwise in the current domain, once the editor has been idle for a few seconds;</item>
     /// <item>in both cases only once the Package Manager has resolved again, if the routine unpinned
-    /// packages in <c>Packages/packages-lock.json</c> — every git package of ours the manifest names
-    /// is back in the lock (<see cref="VirtuademyPackageLock.OurGitPackagesResolved"/>) — and never
+    /// packages in <c>Packages/packages-lock.json</c> — every unpinned package the manifest still
+    /// names is back in the lock (<see cref="VirtuademyPackageLock.GitPackagesResolved"/>) — and never
     /// while compilation has failed — it then waits for the next successful compilation.</item>
     /// </list>
     /// <para>
@@ -67,6 +67,10 @@ namespace Virtuademy.BreakingChangeSolvers
             public List<string> Guids = new();
             public List<string> ReopenSceneGuids = new();
             public bool WaitForLockFile;
+
+            // The ids the routine unpinned. Empty in a pending file written before they were
+            // recorded, which then waits for every git package of ours, as it did.
+            public List<string> UnpinnedIds = new();
         }
 
         /// <summary>True in the domain that ran the rewrite when the rewrite needs a recompile
@@ -98,10 +102,10 @@ namespace Virtuademy.BreakingChangeSolvers
         /// </summary>
         /// <param name="paths">The scenes, prefabs and assets the rewrite changed.</param>
         /// <param name="reopenScenes">Scenes to open again once the re-save is done.</param>
-        /// <param name="waitForLockFile">Packages were unpinned in the lock: wait until UPM has resolved them again.</param>
+        /// <param name="unpinned">The packages whose manifest entry the routine rewrote: wait until UPM has resolved them again.</param>
         /// <param name="waitForReload">The rewrite changed code: wait for the next domain.</param>
         public static void Schedule(IEnumerable<string> paths, IEnumerable<string> reopenScenes,
-                                    bool waitForLockFile, bool waitForReload)
+                                    IReadOnlyCollection<string> unpinned, bool waitForReload)
         {
             Pending pending = Load() ?? new Pending();
 
@@ -109,7 +113,8 @@ namespace Virtuademy.BreakingChangeSolvers
             pending.ReopenSceneGuids = pending.ReopenSceneGuids.Count > 0
                 ? pending.ReopenSceneGuids
                 : ToGuids(reopenScenes).ToList();
-            pending.WaitForLockFile |= waitForLockFile;
+            pending.WaitForLockFile |= unpinned.Count > 0;
+            pending.UnpinnedIds = pending.UnpinnedIds.Concat(unpinned).Distinct().ToList();
 
             if (pending.Guids.Count == 0 && pending.ReopenSceneGuids.Count == 0)
             {
@@ -155,7 +160,7 @@ namespace Virtuademy.BreakingChangeSolvers
             double now = EditorApplication.timeSinceStartup;
             // Also covers a pending file written by the previous version of the routine, which deleted
             // the lock: a missing lock is not resolved yet.
-            bool lockReady = !pending.WaitForLockFile || VirtuademyPackageLock.OurGitPackagesResolved();
+            bool lockReady = !pending.WaitForLockFile || VirtuademyPackageLock.GitPackagesResolved(pending.UnpinnedIds);
             bool busy = EditorApplication.isCompiling || EditorApplication.isUpdating
                         || EditorApplication.isPlayingOrWillChangePlaymode;
 

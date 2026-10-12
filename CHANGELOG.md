@@ -20,6 +20,23 @@
   GUID, so scenes that already carry the component keep it and its values.
 
 ### Changed
+- **The update routine moves the avatars package to its new name, Virtuademy-Avatars** (minor bump).
+  - That package (`Reflectis-CreatorKit-Worlds-Avatars`) is not in the registry; creators add it
+    by hand as a git dependency. The brand rules alone sent its manifest key and URL to a
+    `Virtuademy-CreatorKit-Worlds-Avatars` that does not exist, and its namespace into
+    `Virtuademy.SDK.Environments`.
+  - Four entries at the head of the Environments table now take id, repository and namespace to
+    `virtuademy-avatars`, `Virtuademy-Avatars` and `Virtuademy.Avatars`, and put right a
+    project that already ran the routine without them.
+- **The update routine unpins only the packages it renames** (minor bump).
+  - It removed from `packages-lock.json` every git package with one of our prefixes, so a package of
+    ours the routine had not changed (one a creator added by hand, at no ref) was re-resolved to
+    its default branch's latest commit.
+  - It now unpins only the git entries whose manifest entry it rewrote (old and new id of a renamed
+    package, or a changed URL). The re-save waits for those packages only, so one that does not
+    resolve for unrelated reasons no longer holds it.
+  - A project that already ran the routine finds nothing to rewrite and is not unpinned again;
+    "Re-resolve packages" in the setup window is still there for that.
 - **A deploy that went wrong says so at the end.** Build & Deploy closed every run with "All world
   deploys completed", also when the platform had refused the interpreted assembly and every scene
   had been held back. It now ends with how many problems there were and how many scene imports
