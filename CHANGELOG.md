@@ -1,46 +1,156 @@
 # Release notes
 
-## Unreleased
-
-### Added
-- **The update routine resolves project assets that share their GUID with a package asset**
-  (minor bump). It is step 3 of `v2026.5 -> v2026.6`, and the folder step becomes step 4.
-  - **Where the collisions come from.** Creator projects imported template assets with their
-    `.meta` files: fonts, a click sound, UI prefabs, utility graphs. Some of them later moved into
-    this package with the same GUIDs. Unity then logs "GUID [...] for asset 'Assets/...' conflicts
-    with 'Packages/...' — Assigning a new guid".
-  - **What Unity does with them.** The new GUID goes to the project's copy, and only in memory.
-    The project's references silently resolve to the package's asset, and every scene saved
-    afterwards writes a GUID that no other machine knows. Seen on Reflectis-EducationContent:
-    six assets, with three references already saved under such a GUID.
-  - **What the step does.** For each collision it either keeps the project's copy under a
-    permanent new GUID and rewrites the references to it (`.meta`, scenes, prefabs, assets,
-    materials, UXML/USS and the rest under `Assets/` and `ProjectSettings/`), or deletes the copy
-    in favour of the package's.
-  - **Defaults.** It keeps the copy when the two differ and uses the package's when they are
-    identical. The new GUID is the one Unity assigned in memory, so references saved on this
-    machine since the conflict stay valid.
-  - **Detection.** It reads our packages' `.meta` files directly. For other packages it relies
-    on the AssetDatabase reporting a different GUID.
-- **The interpreter is reinstalled when HybridCLR changes version** (minor bump).
-  - `HotUpdateSetupper.Setup` used to keep any interpreter it found in the project's local IL2CPP
-    copy (`HybridCLRData/LocalIl2CppData-*`). HybridCLR only checks that the folder exists, so after
-    the HybridCLR package moved to another version the copy kept the old libil2cpp. That happens
-    on a Virtuademy update, or on the repair of a project that had pulled another HybridCLR.
-  - The setup now compares the installed libil2cpp version with the package's and reinstalls on a
-    mismatch.
-  - `GetInterpreterVersionIssue` reports the mismatch, which the setup window uses to offer Fix.
-  - It is not part of `GetSetupIssue`, so the publish gate is unchanged: the published DLL is
-    compiled without the local IL2CPP.
-- **`InputSettingsMono` is back within a creator's reach**, in
-  `Virtuademy.Environments.ScriptingApi.Placeholders` with its data class `InputSettings`. It lived
-  in the application framework (`Virtuademy-SystemCore`), which creator projects stopped installing
-  in 2026-09, so a world could no longer declare its starting input settings. The script keeps its
-  GUID, so scenes that already carry the component keep it and its values.
+## v10.0.0
 
 ### Changed
-- **The update routine rewrites only the manifest entries of packages the registry has listed**
-  (minor bump).
+- **The last nine types named after the old brand are renamed, and the nodes stop saying it.**
+  `TaskReflectis`, `TaskSystemReflectis`, `TaskReflectisStepSetter`, the four task adapters
+  (`Animator`/`Grab`/`Timer`/`TriggerTaskReflectis`), `TaskSystemReflectisEditor` and
+  `ReflectisChatbotPlaceholder` become their `Virtuademy` spellings (`TaskVirtuademy`,
+  `TaskSystemVirtuademy`, `VirtuademyChatbotPlaceholder`, …); the prefab
+  `ReflectisChatBotPlaceholder` follows. The 2026-08 brand rename had kept class names on purpose,
+  as wire symbols: a published bundle records a component by class and assembly, and a graph
+  records a type by its full name. Both are true, and both are why the rename lands **now** — every
+  published world already has to be rebuilt at the cutover for the assembly rename, so the class
+  rename rides the same rebuild and costs nothing extra; done later it would force a second one.
+
+  Script GUIDs are preserved (file rename, same `.meta`), so scenes and prefabs need nothing. Each
+  runtime type carries `[RenamedFrom]` with its previous full name, so a graph that still records
+  it deserializes; the rename migrator gained the nine names as whole-identifier rules for the
+  creator's own C# and for text the attribute cannot reach.
+
+  Every Visual Scripting node title, surtitle and category drops the old brand:
+  `Virtuademy\Flow`, `Virtuademy\Get`, `Virtuademy\Expose`, `Virtuademy\Create`,
+  `Events\Virtuademy`, `Virtuademy Scene: On Load`, and so on. Categories and titles are
+  metadata, not identity — a graph references the unit type — so nothing breaks, but the fuzzy
+  finder needs **Regenerate Nodes** once. The `<remarks>` on the scripting-API interfaces that
+  quote node names follow.
+
+  `DialogPanelSpawner.useReflectisNickname` / `useReflectisAvatar` become `useVirtuademyNickname`
+  / `useVirtuademyAvatar` — **without** `[FormerlySerializedAs]` or `[RenamedFrom]`, by choice.
+  Both flags are serialized in a creator's scenes and prefabs and reachable from a graph by member
+  name, and the rename migrator carries them: it rewrites the YAML key and the graph member in one
+  pass, after which the worlds are rebuilt. A published bundle that skipped the pass reads the two
+  flags as `false`; it is rebuilt at the cutover regardless.
+
+  **The scripting defines follow.** `REFLECTIS_CREATOR_KIT_WORLDS_{PLACEHOLDERS,TASKS,
+  VISUAL_SCRIPTING,DIALOGS,ANALYTICS}` are `VIRTUADEMY_ENVIRONMENTS_*`, and the platform
+  selectors `REFLECTIS_{DESKTOP,MOBILE,VR}` read by `CheckPlatformUnit` are `VIRTUADEMY_*`. The
+  five `[InitializeOnLoad]` registrars that add the module symbols to PlayerSettings now retire
+  the old symbol first, so a project updating the package is left with the new set and no
+  stragglers. The rename migrator rewrites all eight as whole identifiers, for the `#if` lines
+  of a creator's own scripts. A creator project that referenced the old symbols by hand needs
+  either the migrator pass or a manual edit; nothing else in a world depends on them.
+- **The rename migrator no longer takes `JwtToken` away.** Its `Virtuademy.SDK.Core.Utilities ->
+  SPACS.Utilities` rule assumed that namespace had emptied except for an editor drawer; it had not —
+  `JwtToken` and `HmacCredential` still live there, in Virtuademy-SDK-Core — so a plain rewrite of
+  `using Virtuademy.SDK.Core.Utilities;` broke every file that names them (CS0246, found running
+  the tool on the application on 2026-09-21). The rule now skips those two types and never touches
+  a `using` line; instead, a file importing the old namespace gets `using SPACS.Utilities;` added
+  beside it, once, so the moved utilities resolve and what stayed keeps resolving.
+- **One update routine for the release, named after it.** The two entries a creator had to find
+  and run in the right order — `Package rename migration` and `Consolidate the Virtuademy folder`
+  — are a single menu item, `Virtuademy/Update routines/v2026.5 -> v2026.6`, matching how every
+  other release's migration is named. One window, two sections, one Apply: the text rewrite runs
+  first and the folder consolidation after it, which is the order that works and not one a
+  creator should have had to know. Each half is still skippable — the file list keeps its
+  per-file checkboxes, the consolidation is a toggle — and either section reports that the
+  project is already migrated rather than disappearing, so a project that needs only one of the
+  two still reaches the button. `VirtuademyFolderMigrator` lost its `[MenuItem]` and is driven by
+  the window.
+- **The update routine re-saves what it changed, so the creator does not have to.** The last manual
+  step — open every world scene and save it, so the migrated data is written back the way Unity
+  writes it — is gone. The routine records the scenes, prefabs and assets it rewrote, by GUID so the
+  folder consolidation cannot lose them, and `VirtuademyUpdateResave` re-serializes exactly those,
+  with `AssetDatabase.ForceReserializeAssets` and no scene opened. Files the routine did not change
+  are not touched. It waits for the moment a save is safe: the next domain reload when scripts or
+  assembly definitions were rewritten, the package lock written again when it was deleted, no
+  compile errors. Each file is reimported first and re-saved alone, and put back byte for byte when
+  its re-serialization logs an error, gains a Visual Scripting `MissingType` or loses graph content;
+  those are listed in the Console for a manual check. Scenes open in the editor are closed before
+  the rewrite and reopened after the re-save.
+- **A catalog no longer depends on a C# type name.** The `RemoteLoadPath` the publish window
+  writes is now `{Catalog.BaseUrl}/{Catalog.WorldId}/…`: two runtime
+  variables owned by the new `Virtuademy.CatalogVariables`, which the application fills through
+  `AddressablesRuntimeProperties.SetPropertyValue` before each catalog loads. The names have dots
+  for readability but no class answers to them, on purpose — the previous template named
+  `Virtuademy.AddressablesVariables` (and `Reflectis.AddressablesVariables` before the brand
+  rename), and every move of that identifier broke every world published before it.
+
+  Both old types stay, `[Obsolete]` and getter-only: Addressables reaches them by reflection
+  exactly when a legacy catalog loads, and their getters record the hit in
+  `Virtuademy.LegacyCatalogProbe`. The application reads the probe after the load and reports a
+  `LegacyAddressablesCatalog` diagnostic naming the world; the load itself is unchanged. Worlds
+  published with this version record the new names; worlds published earlier keep loading and
+  are listed by the diagnostic until rebuilt. The two compat types are retired once that list is
+  empty.
+- **Splines sample: the units answer to their former bare names, and `Expose SplineAnimate` exposes
+  what it says.** The seven units once lived in the global namespace; a graph saved against that
+  spelling records `"$type":"SetSplineAnimateContainerUnit"` and, after the move into
+  `Virtuademy.SDK.Environments.VisualScripting.Splines`, deserialized as `MissingType` — logged as an
+  error, which fails a player build. Each unit carries `[RenamedFrom]` with its bare name, so those
+  graphs come back on load. `ExposeSplineAnimateUnit` also registered its `IsPlaying` port under
+  the key `Duration` and never created `Duration` at all: the node showed a "Duration" port that
+  returned a bool. Both ports exist now and return what their name says. The sample still assumes
+  `com.unity.splines` is installed in the project that imports it; the package does not declare it,
+  because the module is optional.
+- **The analytics graphs name the analytics types where they are.** `ExperienceVerbManager`,
+  `SendMultiAnswerQuizData` and `ControlManager_Informative` still recorded `EExperienceOutcome` and
+  `EExperienceScoringType` under `Virtuademy.SDK.ApiData`; the seventeen analytics types left that
+  namespace for `Virtuademy.ScriptingApi` on 2026-09-14, so those enum values deserialized as
+  strings (`fsReflectedConverter expected Object but got String in "Pass"`). Rewritten, and the
+  rename migrator carries the seventeen moves as whole-identifier rules for creator graphs.
+- **The client models left for the application; the package speaks in views.**
+  `IVirtuademyFramework` hands back `UserView`, `SessionView`, `ExperienceView` and
+  `EnvironmentView` from `Virtuademy.ScriptingApi` instead of the `CM*` types, and the nodes that
+  expose them follow. The models themselves — with the members an authored world never reads —
+  now live beside their siblings in the application, so a creator's project no longer carries
+  the platform's notion of a user account.
+
+  `CreateLeaderboardRecord` takes `(string, float)` rather than a client model: the node already
+  had both as ports and built the model only to pass it on.
+
+  The rename migrator gained five entries, on the **full type names**. The namespace is
+  deliberately absent from that table — it still exists, on the application side — so only the
+  five moved names are rewritten. Member names are untouched, which is what lets a rewritten
+  graph resolve its members without a second rule. A graph that reached past this surface — a
+  user's preferences, a session's permissions, an environment's catalogue — has no view to land
+  on and must be re-authored; there is nothing to migrate it to.
+- Removes a dead `using NUnit.Framework;` from `SpawnableObjectListReference`, which pulled the
+  test framework into a package creators install and was used by nothing in the file.
+
+- **The scripting entry point is `VirtuademyEnvironments`, not `World`.** Two things ruled the
+  old name out: "Worlds" is leaving the application name — the concept survives on the wire,
+  where `WorldDTO` keeps it, but it stops being the word a creator reads on every line — and the
+  name carried nothing that said which platform it belonged to.
+
+  Plain `Virtuademy` was the first choice and is ruled out by the compiler, not by taste. Every
+  SDK namespace is rooted at `Virtuademy`, so in `Virtuademy.Player` the namespace wins over the
+  type and the line fails with CS0234 — in a creator script in the global namespace exactly as
+  much as inside the SDK. Reaching it would take
+  `global::Virtuademy.Environments.ScriptingApi.Virtuademy.Player`.
+
+  This is a breaking change for authored scripts, taken now because nothing can break: the facade
+  is two days old and no script has ever reached publication, because the deployed whitelist still
+  named the pre-rename assembly and the deploy path refused every one of them. There is **no
+  migrator entry**, deliberately — `World` is far too common a token to rewrite in a creator
+  project by substitution (three unrelated `World.` call sites in the application prove it), and
+  there is nothing out there to migrate.
+
+  The assembly and the namespace are unchanged, so `policy.json` and the operator overrides need
+  no edit: the whitelist is keyed on those, never on a type name.
+- **`Virtuademy.SDK.PlatformApi` is `Virtuademy.SDK.ApiData`.** The old name said where the types
+  came from — a package that no longer exists under that name — rather than what they are. Three
+  analytics graphs shipped in this package name two of those types in their serialized `$type`
+  values and were rewritten with them, so they resolve rather than deserialize as `MissingType`.
+- The rename migrator gained the two entries that carry a creator project across that rename. The
+  assembly entry runs before the namespace entry, because the namespace is a prefix of the
+  assembly name and the shorter rule would otherwise consume it.
+- **The package is `Virtuademy-SDK-Environments`.** Business ruled out the name "Creator Kit" and this package was the last place it was a wire symbol rather than prose. The id is `com.anotherealitysrl.virtuademy-sdk-environments`, and the three assemblies are `Virtuademy.SDK.Environments`, `Virtuademy.SDK.Environments.Editor` and `Virtuademy.SDK.Environments.HybridCLREditor`.
+- Every namespace under the old `Virtuademy.CreatorKit.Worlds` prefix moved to `Virtuademy.SDK.Environments`, by one substitution rule. The `.Core.` segment the merge left behind is gone with it: `...Worlds.Core.ClientModels` is now `...Environments.ClientModels`, and the three namespace pairs the merge had left duplicated (`Placeholders`, the package root, `Editor`) are single namespaces again. That merge was verified collision-free first — no two types of the same name met.
+- `Virtuademy.Environments.ScriptingApi` keeps its name. It is the one assembly `policy.json` whitelists by name, that file is deployed, and a published script records it.
+- The rename migrator handles both hops in one pass now, and its menu entry is `Package rename migration`. A creator project on the old brand is carried through the brand rename and then this one; a project already on the new brand is caught directly.
+- **The update routine rewrites only the manifest entries of packages the registry has listed.**
   - The brand rules ran over the whole `Packages/manifest.json`, so a package of ours that creators
     add by hand and no registry entry lists (`Reflectis-CreatorKit-Worlds-Avatars`,
     `Reflectis-SDK-RPMAvatars`) had its key and URL turned into a `Virtuademy-*` repository that
@@ -49,7 +159,7 @@
     entry has ever listed, including the develop channel's intermediate names, plus the
     installer's. Every other entry is left exactly as it is. Scripts, scenes, prefabs and assets are
     rewritten as before.
-- **The update routine unpins only the packages it renames** (minor bump).
+- **The update routine unpins only the packages it renames.**
   - It removed from `packages-lock.json` every git package with one of our prefixes, so a package of
     ours the routine had not changed (one a creator added by hand, at no ref) was re-resolved to
     its default branch's latest commit.
@@ -209,7 +319,51 @@
   in orange, and the ones that arrive as new environments, in green. It follows "Include in build"
   as you tick.
 
+### Breaking
+- **Every published world must be rebuilt.** A built Addressable bundle records each component by assembly, namespace and class, and all three changed.
+- **Every Visual Scripting graph must be migrated**, in a creator's project and in this repo. A graph records each unit as namespace plus type — no assembly — so the namespace change is the one that reaches graphs. Run `Virtuademy Worlds/Creator Kit update routines/Package rename migration`, then `Regenerate Nodes`. **Expect deserialization errors on the first open afterwards, and do not save until they stop**: while a worker cannot resolve a renamed unit yet, Visual Scripting substitutes `MissingType` and that renumbers the JSON `$id`s, which surfaces as "Object definition has not been encountered for object with id=N". Most clear by themselves once the assemblies load — the log then says the missing type "was found" — but some are cached in the asset's imported artifact and survive a reopen: those need a **Reimport** on the asset, then a look at the graph to confirm the units are real nodes, and only then a save — **on every affected asset**, since each caches its own import artifact and the errors surface a few at a time. Saving before that check is the one way to make the loss permanent. Verified on this repo: 55 graph-bearing assets, every `$ref` still preceded by its `$id` after the rename, and no compile error.
+- Every `using Virtuademy.CreatorKit.Worlds…` in a creator's own scripts breaks, and so does any asmdef that names one of the three assemblies as a string rather than a GUID. The migrator rewrites both.
+- A project that depends on `com.anotherealitysrl.virtuademy-creatorkit-worlds-core` in its `manifest.json` no longer resolves it. Existing registry releases are unaffected: each pins the git repo at a tag, and that tag still carries the old id.
+- Five namespaces the package declares are **not** renamed and are not part of this change: `Virtuademy.SDK.Core`, `...Core.ApplicationManagement`, `...Core.ChatBot`, `...Core.Networking` and `...Core.NetworkingSystem`. Those five types moved here from SDK-Core keeping their original namespaces so consumers' `using` directives kept working, and renaming them now would break the very thing they exist to preserve.
+- **`ManipulablePlaceholder.GizmosEnabled` is now `GizmosDisabled`**, with the serialized field and the inspector row inverted to match. The default for a fresh placeholder is unchanged; a placeholder authored before this carries the old boolean under the old name, so its value is lost on reimport and reads as "gizmos shown". Re-check the box on any placeholder that had gizmos turned off.
+
 ### Added
+- **The TMP component under a POI placeholder is the source of truth for its text.** The inspector fields already pushed their value into the TMP on edit; selecting a placeholder now pulls the TMP text back into the serialized field, so the inspector shows what is actually displayed, and the runtime getters read the TMP with the serialized field as fallback. A creator who typed straight into the TMP no longer sees the text reverted.
+- **The update routine resolves project assets that share their GUID with a package asset.**
+  It is step 3 of `v2026.5 -> v2026.6`, and the folder step becomes step 4.
+  - **Where the collisions come from.** Creator projects imported template assets with their
+    `.meta` files: fonts, a click sound, UI prefabs, utility graphs. Some of them later moved into
+    this package with the same GUIDs. Unity then logs "GUID [...] for asset 'Assets/...' conflicts
+    with 'Packages/...' — Assigning a new guid".
+  - **What Unity does with them.** The new GUID goes to the project's copy, and only in memory.
+    The project's references silently resolve to the package's asset, and every scene saved
+    afterwards writes a GUID that no other machine knows. Seen on Reflectis-EducationContent:
+    six assets, with three references already saved under such a GUID.
+  - **What the step does.** For each collision it either keeps the project's copy under a
+    permanent new GUID and rewrites the references to it (`.meta`, scenes, prefabs, assets,
+    materials, UXML/USS and the rest under `Assets/` and `ProjectSettings/`), or deletes the copy
+    in favour of the package's.
+  - **Defaults.** It keeps the copy when the two differ and uses the package's when they are
+    identical. The new GUID is the one Unity assigned in memory, so references saved on this
+    machine since the conflict stay valid.
+  - **Detection.** It reads our packages' `.meta` files directly. For other packages it relies
+    on the AssetDatabase reporting a different GUID.
+- **The interpreter is reinstalled when HybridCLR changes version.**
+  - `HotUpdateSetupper.Setup` used to keep any interpreter it found in the project's local IL2CPP
+    copy (`HybridCLRData/LocalIl2CppData-*`). HybridCLR only checks that the folder exists, so after
+    the HybridCLR package moved to another version the copy kept the old libil2cpp. That happens
+    on a Virtuademy update, or on the repair of a project that had pulled another HybridCLR.
+  - The setup now compares the installed libil2cpp version with the package's and reinstalls on a
+    mismatch.
+  - `GetInterpreterVersionIssue` reports the mismatch, which the setup window uses to offer Fix.
+  - It is not part of `GetSetupIssue`, so the publish gate is unchanged: the published DLL is
+    compiled without the local IL2CPP.
+- **`InputSettingsMono` is back within a creator's reach**, in
+  `Virtuademy.Environments.ScriptingApi.Placeholders` with its data class `InputSettings`. It lived
+  in the application framework (`Virtuademy-SystemCore`), which creator projects stopped installing
+  in 2026-09, so a world could no longer declare its starting input settings. The script keeps its
+  GUID, so scenes that already carry the component keep it and its values.
+
 - **Each scene of the Addressables management window says where it is already published.** Under
   every entry of the scene list: "Published in Showroom, Academy", "Published at tenant level",
   "Not published yet" — with catalog, status and last update in the tooltip. The window reads it
@@ -224,6 +378,20 @@
   "Published in" line.
 
 ### Fixed
+- **POIs published from a creator project are no longer empty.** A POI finds its pages by a marker
+  under its "Pages" container, and the marker was the framework's `GenericHookComponent` (id
+  `POIPage`). Once the authoring packages stopped installing the framework, that component was a
+  missing script in every creator project, so a world published from one carried no marker, the
+  POI found no page, and its panel came up empty. Pages are now marked with the new
+  `POIPagePlaceholder`, and `POIBase` uses it. The two other hooks the package placed —
+  `PanTransform` on the POI and on the Mirror, `TeleportTarget` on the Mirror — were never read by
+  anything and are removed. **The v2026.5 -> v2026.6 update routine gained a step for it**, "POI
+  page markers": it swaps the old marker for the new one in every scene and prefab of the project
+  (pages duplicated under "Pages", unpacked POIs, copies of the prefab), keeping each component's
+  fileID, and removes the other dead hooks when the framework is not installed. Worlds with POIs
+  must be republished after the routine runs; the platform also reads the old marker, and falls
+  back to the container's direct children, so worlds already published keep working meanwhile.
+- **`PanForcer` now fires on mobile.** The graph's platform switch had `OutputTriggerWebGL` and `OutputTriggerVR` wired and `OutputTriggerMobile` dangling, so a forced pan did nothing on a phone or tablet. Mobile joins the WebGL branch.
 - **The v2026.5 -> v2026.6 update no longer lets a graph be saved broken.** Between updating the
   packages and applying the routine, a scene or prefab is opened by an editor that no longer knows
   its node types: Visual Scripting swaps them for `MissingType` and renumbers the graph's JSON ids.
@@ -300,185 +468,6 @@
   their source prefab, read-only package prefabs are skipped. The progress bar is cancelable, a
   failing asset is reported at the end instead of stopping the routine, and unsaved scenes are
   offered for saving before it starts.
-
-## v10.0.0
-
-### Changed
-- **The last nine types named after the old brand are renamed, and the nodes stop saying it.**
-  `TaskReflectis`, `TaskSystemReflectis`, `TaskReflectisStepSetter`, the four task adapters
-  (`Animator`/`Grab`/`Timer`/`TriggerTaskReflectis`), `TaskSystemReflectisEditor` and
-  `ReflectisChatbotPlaceholder` become their `Virtuademy` spellings (`TaskVirtuademy`,
-  `TaskSystemVirtuademy`, `VirtuademyChatbotPlaceholder`, …); the prefab
-  `ReflectisChatBotPlaceholder` follows. The 2026-08 brand rename had kept class names on purpose,
-  as wire symbols: a published bundle records a component by class and assembly, and a graph
-  records a type by its full name. Both are true, and both are why the rename lands **now** — every
-  published world already has to be rebuilt at the cutover for the assembly rename, so the class
-  rename rides the same rebuild and costs nothing extra; done later it would force a second one.
-
-  Script GUIDs are preserved (file rename, same `.meta`), so scenes and prefabs need nothing. Each
-  runtime type carries `[RenamedFrom]` with its previous full name, so a graph that still records
-  it deserializes; the rename migrator gained the nine names as whole-identifier rules for the
-  creator's own C# and for text the attribute cannot reach.
-
-  Every Visual Scripting node title, surtitle and category drops the old brand:
-  `Virtuademy\Flow`, `Virtuademy\Get`, `Virtuademy\Expose`, `Virtuademy\Create`,
-  `Events\Virtuademy`, `Virtuademy Scene: On Load`, and so on. Categories and titles are
-  metadata, not identity — a graph references the unit type — so nothing breaks, but the fuzzy
-  finder needs **Regenerate Nodes** once. The `<remarks>` on the scripting-API interfaces that
-  quote node names follow.
-
-  `DialogPanelSpawner.useReflectisNickname` / `useReflectisAvatar` become `useVirtuademyNickname`
-  / `useVirtuademyAvatar` — **without** `[FormerlySerializedAs]` or `[RenamedFrom]`, by choice.
-  Both flags are serialized in a creator's scenes and prefabs and reachable from a graph by member
-  name, and the rename migrator carries them: it rewrites the YAML key and the graph member in one
-  pass, after which the worlds are rebuilt. A published bundle that skipped the pass reads the two
-  flags as `false`; it is rebuilt at the cutover regardless.
-
-  **The scripting defines follow.** `REFLECTIS_CREATOR_KIT_WORLDS_{PLACEHOLDERS,TASKS,
-  VISUAL_SCRIPTING,DIALOGS,ANALYTICS}` are `VIRTUADEMY_ENVIRONMENTS_*`, and the platform
-  selectors `REFLECTIS_{DESKTOP,MOBILE,VR}` read by `CheckPlatformUnit` are `VIRTUADEMY_*`. The
-  five `[InitializeOnLoad]` registrars that add the module symbols to PlayerSettings now retire
-  the old symbol first, so a project updating the package is left with the new set and no
-  stragglers. The rename migrator rewrites all eight as whole identifiers, for the `#if` lines
-  of a creator's own scripts. A creator project that referenced the old symbols by hand needs
-  either the migrator pass or a manual edit; nothing else in a world depends on them.
-- **The rename migrator no longer takes `JwtToken` away.** Its `Virtuademy.SDK.Core.Utilities ->
-  SPACS.Utilities` rule assumed that namespace had emptied except for an editor drawer; it had not —
-  `JwtToken` and `HmacCredential` still live there, in Virtuademy-SDK-Core — so a plain rewrite of
-  `using Virtuademy.SDK.Core.Utilities;` broke every file that names them (CS0246, found running
-  the tool on the application on 2026-09-21). The rule now skips those two types and never touches
-  a `using` line; instead, a file importing the old namespace gets `using SPACS.Utilities;` added
-  beside it, once, so the moved utilities resolve and what stayed keeps resolving.
-- **One update routine for the release, named after it.** The two entries a creator had to find
-  and run in the right order — `Package rename migration` and `Consolidate the Virtuademy folder`
-  — are a single menu item, `Virtuademy/Update routines/v2026.5 -> v2026.6`, matching how every
-  other release's migration is named. One window, two sections, one Apply: the text rewrite runs
-  first and the folder consolidation after it, which is the order that works and not one a
-  creator should have had to know. Each half is still skippable — the file list keeps its
-  per-file checkboxes, the consolidation is a toggle — and either section reports that the
-  project is already migrated rather than disappearing, so a project that needs only one of the
-  two still reaches the button. `VirtuademyFolderMigrator` lost its `[MenuItem]` and is driven by
-  the window.
-- **The update routine re-saves what it changed, so the creator does not have to.** The last manual
-  step — open every world scene and save it, so the migrated data is written back the way Unity
-  writes it — is gone. The routine records the scenes, prefabs and assets it rewrote, by GUID so the
-  folder consolidation cannot lose them, and `VirtuademyUpdateResave` re-serializes exactly those,
-  with `AssetDatabase.ForceReserializeAssets` and no scene opened. Files the routine did not change
-  are not touched. It waits for the moment a save is safe: the next domain reload when scripts or
-  assembly definitions were rewritten, the package lock written again when it was deleted, no
-  compile errors. Each file is reimported first and re-saved alone, and put back byte for byte when
-  its re-serialization logs an error, gains a Visual Scripting `MissingType` or loses graph content;
-  those are listed in the Console for a manual check. Scenes open in the editor are closed before
-  the rewrite and reopened after the re-save.
-- **A catalog no longer depends on a C# type name.** The `RemoteLoadPath` the publish window
-  writes is now `{Catalog.BaseUrl}/{Catalog.WorldId}/…`: two runtime
-  variables owned by the new `Virtuademy.CatalogVariables`, which the application fills through
-  `AddressablesRuntimeProperties.SetPropertyValue` before each catalog loads. The names have dots
-  for readability but no class answers to them, on purpose — the previous template named
-  `Virtuademy.AddressablesVariables` (and `Reflectis.AddressablesVariables` before the brand
-  rename), and every move of that identifier broke every world published before it.
-
-  Both old types stay, `[Obsolete]` and getter-only: Addressables reaches them by reflection
-  exactly when a legacy catalog loads, and their getters record the hit in
-  `Virtuademy.LegacyCatalogProbe`. The application reads the probe after the load and reports a
-  `LegacyAddressablesCatalog` diagnostic naming the world; the load itself is unchanged. Worlds
-  published with this version record the new names; worlds published earlier keep loading and
-  are listed by the diagnostic until rebuilt. The two compat types are retired once that list is
-  empty.
-- **Splines sample: the units answer to their former bare names, and `Expose SplineAnimate` exposes
-  what it says.** The seven units once lived in the global namespace; a graph saved against that
-  spelling records `"$type":"SetSplineAnimateContainerUnit"` and, after the move into
-  `Virtuademy.SDK.Environments.VisualScripting.Splines`, deserialized as `MissingType` — logged as an
-  error, which fails a player build. Each unit carries `[RenamedFrom]` with its bare name, so those
-  graphs come back on load. `ExposeSplineAnimateUnit` also registered its `IsPlaying` port under
-  the key `Duration` and never created `Duration` at all: the node showed a "Duration" port that
-  returned a bool. Both ports exist now and return what their name says. The sample still assumes
-  `com.unity.splines` is installed in the project that imports it; the package does not declare it,
-  because the module is optional.
-- **The analytics graphs name the analytics types where they are.** `ExperienceVerbManager`,
-  `SendMultiAnswerQuizData` and `ControlManager_Informative` still recorded `EExperienceOutcome` and
-  `EExperienceScoringType` under `Virtuademy.SDK.ApiData`; the seventeen analytics types left that
-  namespace for `Virtuademy.ScriptingApi` on 2026-09-14, so those enum values deserialized as
-  strings (`fsReflectedConverter expected Object but got String in "Pass"`). Rewritten, and the
-  rename migrator carries the seventeen moves as whole-identifier rules for creator graphs.
-- **The client models left for the application; the package speaks in views.**
-  `IVirtuademyFramework` hands back `UserView`, `SessionView`, `ExperienceView` and
-  `EnvironmentView` from `Virtuademy.ScriptingApi` instead of the `CM*` types, and the nodes that
-  expose them follow. The models themselves — with the members an authored world never reads —
-  now live beside their siblings in the application, so a creator's project no longer carries
-  the platform's notion of a user account.
-
-  `CreateLeaderboardRecord` takes `(string, float)` rather than a client model: the node already
-  had both as ports and built the model only to pass it on.
-
-  The rename migrator gained five entries, on the **full type names**. The namespace is
-  deliberately absent from that table — it still exists, on the application side — so only the
-  five moved names are rewritten. Member names are untouched, which is what lets a rewritten
-  graph resolve its members without a second rule. A graph that reached past this surface — a
-  user's preferences, a session's permissions, an environment's catalogue — has no view to land
-  on and must be re-authored; there is nothing to migrate it to.
-- Removes a dead `using NUnit.Framework;` from `SpawnableObjectListReference`, which pulled the
-  test framework into a package creators install and was used by nothing in the file.
-
-### Changed
-- **The scripting entry point is `VirtuademyEnvironments`, not `World`.** Two things ruled the
-  old name out: "Worlds" is leaving the application name — the concept survives on the wire,
-  where `WorldDTO` keeps it, but it stops being the word a creator reads on every line — and the
-  name carried nothing that said which platform it belonged to.
-
-  Plain `Virtuademy` was the first choice and is ruled out by the compiler, not by taste. Every
-  SDK namespace is rooted at `Virtuademy`, so in `Virtuademy.Player` the namespace wins over the
-  type and the line fails with CS0234 — in a creator script in the global namespace exactly as
-  much as inside the SDK. Reaching it would take
-  `global::Virtuademy.Environments.ScriptingApi.Virtuademy.Player`.
-
-  This is a breaking change for authored scripts, taken now because nothing can break: the facade
-  is two days old and no script has ever reached publication, because the deployed whitelist still
-  named the pre-rename assembly and the deploy path refused every one of them. There is **no
-  migrator entry**, deliberately — `World` is far too common a token to rewrite in a creator
-  project by substitution (three unrelated `World.` call sites in the application prove it), and
-  there is nothing out there to migrate.
-
-  The assembly and the namespace are unchanged, so `policy.json` and the operator overrides need
-  no edit: the whitelist is keyed on those, never on a type name.
-- **`Virtuademy.SDK.PlatformApi` is `Virtuademy.SDK.ApiData`.** The old name said where the types
-  came from — a package that no longer exists under that name — rather than what they are. Three
-  analytics graphs shipped in this package name two of those types in their serialized `$type`
-  values and were rewritten with them, so they resolve rather than deserialize as `MissingType`.
-- The rename migrator gained the two entries that carry a creator project across that rename. The
-  assembly entry runs before the namespace entry, because the namespace is a prefix of the
-  assembly name and the shorter rule would otherwise consume it.
-- **The package is `Virtuademy-SDK-Environments`.** Business ruled out the name "Creator Kit" and this package was the last place it was a wire symbol rather than prose. The id is `com.anotherealitysrl.virtuademy-sdk-environments`, and the three assemblies are `Virtuademy.SDK.Environments`, `Virtuademy.SDK.Environments.Editor` and `Virtuademy.SDK.Environments.HybridCLREditor`.
-- Every namespace under the old `Virtuademy.CreatorKit.Worlds` prefix moved to `Virtuademy.SDK.Environments`, by one substitution rule. The `.Core.` segment the merge left behind is gone with it: `...Worlds.Core.ClientModels` is now `...Environments.ClientModels`, and the three namespace pairs the merge had left duplicated (`Placeholders`, the package root, `Editor`) are single namespaces again. That merge was verified collision-free first — no two types of the same name met.
-- `Virtuademy.Environments.ScriptingApi` keeps its name. It is the one assembly `policy.json` whitelists by name, that file is deployed, and a published script records it.
-- The rename migrator handles both hops in one pass now, and its menu entry is `Package rename migration`. A creator project on the old brand is carried through the brand rename and then this one; a project already on the new brand is caught directly.
-
-### Breaking
-- **Every published world must be rebuilt.** A built Addressable bundle records each component by assembly, namespace and class, and all three changed.
-- **Every Visual Scripting graph must be migrated**, in a creator's project and in this repo. A graph records each unit as namespace plus type — no assembly — so the namespace change is the one that reaches graphs. Run `Virtuademy Worlds/Creator Kit update routines/Package rename migration`, then `Regenerate Nodes`. **Expect deserialization errors on the first open afterwards, and do not save until they stop**: while a worker cannot resolve a renamed unit yet, Visual Scripting substitutes `MissingType` and that renumbers the JSON `$id`s, which surfaces as "Object definition has not been encountered for object with id=N". Most clear by themselves once the assemblies load — the log then says the missing type "was found" — but some are cached in the asset's imported artifact and survive a reopen: those need a **Reimport** on the asset, then a look at the graph to confirm the units are real nodes, and only then a save — **on every affected asset**, since each caches its own import artifact and the errors surface a few at a time. Saving before that check is the one way to make the loss permanent. Verified on this repo: 55 graph-bearing assets, every `$ref` still preceded by its `$id` after the rename, and no compile error.
-- Every `using Virtuademy.CreatorKit.Worlds…` in a creator's own scripts breaks, and so does any asmdef that names one of the three assemblies as a string rather than a GUID. The migrator rewrites both.
-- A project that depends on `com.anotherealitysrl.virtuademy-creatorkit-worlds-core` in its `manifest.json` no longer resolves it. Existing registry releases are unaffected: each pins the git repo at a tag, and that tag still carries the old id.
-- Five namespaces the package declares are **not** renamed and are not part of this change: `Virtuademy.SDK.Core`, `...Core.ApplicationManagement`, `...Core.ChatBot`, `...Core.Networking` and `...Core.NetworkingSystem`. Those five types moved here from SDK-Core keeping their original namespaces so consumers' `using` directives kept working, and renaming them now would break the very thing they exist to preserve.
-- **`ManipulablePlaceholder.GizmosEnabled` is now `GizmosDisabled`**, with the serialized field and the inspector row inverted to match. The default for a fresh placeholder is unchanged; a placeholder authored before this carries the old boolean under the old name, so its value is lost on reimport and reads as "gizmos shown". Re-check the box on any placeholder that had gizmos turned off.
-
-### Added
-- **The TMP component under a POI placeholder is the source of truth for its text.** The inspector fields already pushed their value into the TMP on edit; selecting a placeholder now pulls the TMP text back into the serialized field, so the inspector shows what is actually displayed, and the runtime getters read the TMP with the serialized field as fallback. A creator who typed straight into the TMP no longer sees the text reverted.
-
-### Fixed
-- **POIs published from a creator project are no longer empty.** A POI finds its pages by a marker
-  under its "Pages" container, and the marker was the framework's `GenericHookComponent` (id
-  `POIPage`). Once the authoring packages stopped installing the framework, that component was a
-  missing script in every creator project, so a world published from one carried no marker, the
-  POI found no page, and its panel came up empty. Pages are now marked with the new
-  `POIPagePlaceholder`, and `POIBase` uses it. The two other hooks the package placed —
-  `PanTransform` on the POI and on the Mirror, `TeleportTarget` on the Mirror — were never read by
-  anything and are removed. **The v2026.5 -> v2026.6 update routine gained a step for it**, "POI
-  page markers": it swaps the old marker for the new one in every scene and prefab of the project
-  (pages duplicated under "Pages", unpacked POIs, copies of the prefab), keeping each component's
-  fileID, and removes the other dead hooks when the framework is not installed. Worlds with POIs
-  must be republished after the routine runs; the platform also reads the old marker, and falls
-  back to the container's direct children, so worlds already published keep working meanwhile.
-- **`PanForcer` now fires on mobile.** The graph's platform switch had `OutputTriggerWebGL` and `OutputTriggerVR` wired and `OutputTriggerMobile` dangling, so a forced pan did nothing on a phone or tablet. Mobile joins the WebGL branch.
 
 ## v9.0.0
 
