@@ -598,6 +598,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         private bool unpinLockFile = true;
         private bool consolidateFolders = true;
         private bool hasLegacyFolders;
+        private List<VirtuademyAssemblyReferenceMigrator.Finding> unmappedReferences = new();
         private List<VirtuademyPOIPageMigrator.Entry> poiPageEntries = new();
         private bool migratePOIPages = true;
         private List<VirtuademyGuidCollisionMigrator.Entry> guidEntries = new();
@@ -687,6 +688,14 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 unpinLockFile = EditorGUILayout.ToggleLeft(
                     "Unpin the git packages this update renames in Packages/packages-lock.json so UPM re-resolves them (recommended). Other packages keep their pinned versions",
                     unpinLockFile);
+            }
+
+            if (unmappedReferences.Count > 0)
+            {
+                EditorGUILayout.HelpBox(
+                    "These assembly references have no successor in this project and were left as they are; the project will not compile until " +
+                    "they are fixed by hand:\n\n" + string.Join("\n", unmappedReferences.Select(f => $"{f.Path}: {f.Detail}")),
+                    MessageType.Warning);
             }
 
             EditorGUILayout.Space(8);
@@ -888,6 +897,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
             entries = scan.Files;
             poiPageEntries = scan.Pages;
+            unmappedReferences = scan.UnmappedReferences;
             guidEntries = scan.Guids;
             hasLegacyFolders = scan.HasLegacyFolders;
             hasScanned = true;
@@ -977,6 +987,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             if (consolidate)
             {
                 report += $"\nMoved into Assets/Virtuademy: {result.Folders.Moved} asset(s), " +
+                          (result.Folders.Merged > 0 ? $"{result.Folders.Merged} merged with a namesake, " : string.Empty) +
                           $"{result.Folders.Pruned} folder(s) removed" +
                           (result.Folders.Refused > 0 ? $", {result.Folders.Refused} left in place" : string.Empty);
             }
@@ -1164,6 +1175,51 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             }
         }
 
+        /// <summary>
+        /// The hits of one file: the manifest through its own rule; an assembly definition through the assembly table for its
+        /// references (<see cref="VirtuademyAssemblyReferenceMigrator"/>) and the usual rules for the rest; anything else
+        /// through the usual rules. What cannot be mapped goes to <paramref name="unmapped"/>.
+        /// </summary>
+        internal static int CountFileHits(string path, string text,
+                                          List<VirtuademyAssemblyReferenceMigrator.Finding> unmapped,
+                                          List<VirtuademyAssemblyReferenceMigrator.Finding> partial)
+        {
+            if (IsManifest(path))
+            {
+                return ManifestHits(text);
+            }
+
+            if (VirtuademyAssemblyReferenceMigrator.AppliesTo(path))
+            {
+                VirtuademyAssemblyReferenceMigrator.Split(path, text, out string head, out string segment, out string tail);
+                VirtuademyAssemblyReferenceMigrator.MapSegment(path, segment, unmapped, partial, out int changes);
+                return CountHits(head) + CountHits(tail) + changes;
+            }
+
+            return CountHits(text);
+        }
+
+        /// <summary>The rewrite of one file; the counterpart of <see cref="CountFileHits"/>.</summary>
+        internal static string RewriteFile(string path, string text,
+                                           List<VirtuademyAssemblyReferenceMigrator.Finding> unmapped,
+                                           List<VirtuademyAssemblyReferenceMigrator.Finding> partial)
+        {
+            if (IsManifest(path))
+            {
+                return RewriteManifest(text);
+            }
+
+            if (VirtuademyAssemblyReferenceMigrator.AppliesTo(path))
+            {
+                VirtuademyAssemblyReferenceMigrator.Split(path, text, out string head, out string segment, out string tail);
+                return Rewrite(head)
+                       + VirtuademyAssemblyReferenceMigrator.MapSegment(path, segment, unmapped, partial, out _)
+                       + Rewrite(tail);
+            }
+
+            return Rewrite(text);
+        }
+
         internal static bool IsManifest(string path)
             => path.Replace('\\', '/') == VirtuademyPackageLock.ManifestPath;
 
@@ -1231,32 +1287,48 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         }
 
         /// <summary>Rebuilds the Visual Scripting node library so the renamed unit types are
-        /// picked up. Done via reflection so this assembly does not depend on Visual Scripting.
-        /// Returns whether it was rebuilt: it is not in a project whose unit options were never built.</summary>
-        internal static bool RebuildVisualScriptingUnits()
+        /// picked up. Done via reflection so this assembly does not depend on Visual Scripting.</summary>
+        /// <remarks>
+        /// Visual Scripting starts its plugin the first time a project uses it, and the node library is built then. In a project
+        /// where that has not happened (one only ever opened in batch mode, say) there is no library to rebuild, and
+        /// <c>UnitBase.Rebuild()</c> throws a NullReferenceException on the paths of the plugin that is not there. That
+        /// state is recognized instead of provoked: nothing is rebuilt, and the log says what builds the library.
+        /// </remarks>
+        internal static VirtuademyRenameRoutine.NodeLibraryState RebuildVisualScriptingUnits()
         {
             try
             {
-                Type unitBase = AppDomain.CurrentDomain.GetAssemblies()
-                    .Select(a => a.GetType("Unity.VisualScripting.UnitBase"))
-                    .FirstOrDefault(t => t != null);
-
-                unitBase?.GetMethod("Rebuild", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-                    ?.Invoke(null, null);
-
-                if (unitBase != null)
+                Type unitBase = FindType("Unity.VisualScripting.UnitBase");
+                if (unitBase == null)
                 {
-                    Debug.Log($"[{WindowTitle}] Visual Scripting node library rebuilt.");
+                    return VirtuademyRenameRoutine.NodeLibraryState.Absent;
                 }
-                return unitBase != null;
+
+                Type boltFlow = FindType("Unity.VisualScripting.BoltFlow");
+                if (boltFlow != null
+                    && boltFlow.GetProperty("Paths", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) == null)
+                {
+                    Debug.Log($"[{WindowTitle}] The Visual Scripting node library was not rebuilt: it has not been built in this project, so there is " +
+                              "nothing to rebuild. Build it once the project has recompiled: Virtuademy > Update VS Library, or " +
+                              "SetupCli -vdSetupSteps vslibrary on the command line.");
+                    return VirtuademyRenameRoutine.NodeLibraryState.NotBuilt;
+                }
+
+                unitBase.GetMethod("Rebuild", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+                    ?.Invoke(null, null);
+                Debug.Log($"[{WindowTitle}] Visual Scripting node library rebuilt.");
+                return VirtuademyRenameRoutine.NodeLibraryState.Rebuilt;
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"[{WindowTitle}] Could not rebuild the Visual Scripting node library automatically " +
-                                 $"({e.Message}). Run it manually: Edit > Project Settings > Visual Scripting > Regenerate Nodes.");
-                return false;
+                                 $"({e.InnerException?.Message ?? e.Message}). Run it manually: Edit > Project Settings > Visual Scripting > Regenerate Nodes.");
+                return VirtuademyRenameRoutine.NodeLibraryState.Failed;
             }
         }
+
+        private static Type FindType(string fullName)
+            => AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType(fullName)).FirstOrDefault(t => t != null);
 
         #endregion
     }
@@ -1303,6 +1375,24 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             public List<VirtuademyGuidCollisionMigrator.Entry> Guids = new();
             /// <summary>Step 4: a legacy folder (<c>Assets/CreatorKit</c>, <c>Assets/ReflectisSettings</c>) is still there.</summary>
             public bool HasLegacyFolders;
+            /// <summary>Step 1: assembly references (<c>.asmdef</c>, <c>.asmref</c>) to an assembly of the previous SDK that has no
+            /// successor in this project. They are left as they are: only the project's author can say what replaces them.</summary>
+            public List<VirtuademyAssemblyReferenceMigrator.Finding> UnmappedReferences = new();
+            /// <summary>Step 1: assembly references mapped to the assembly that took over only part of what the old one held.</summary>
+            public List<VirtuademyAssemblyReferenceMigrator.Finding> PartialReferences = new();
+        }
+
+        /// <summary>What became of the Visual Scripting node library after the rewrite.</summary>
+        public enum NodeLibraryState
+        {
+            /// <summary>Rebuilt in place.</summary>
+            Rebuilt,
+            /// <summary>There was none to rebuild: the project never built one. <b>Update VS Library</b> does.</summary>
+            NotBuilt,
+            /// <summary>The rebuild threw: see the Console.</summary>
+            Failed,
+            /// <summary>The project does not have Visual Scripting.</summary>
+            Absent,
         }
 
         /// <summary>Which steps to run. The window's defaults are all true.</summary>
@@ -1343,9 +1433,14 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             public List<string> Resaving = new();
             /// <summary>The rewrite changed scripts or assembly definitions: Unity recompiles, and the re-save waits for it.</summary>
             public bool CodeChanged;
-            /// <summary>The Visual Scripting node library was rebuilt in place. False in a project whose unit options were never built
-            /// (a batch-mode project nobody opened): <b>Update VS Library</b> builds them.</summary>
-            public bool NodeLibraryRebuilt;
+            /// <summary>What became of the Visual Scripting node library. <see cref="NodeLibraryState.NotBuilt"/> in a project that never
+            /// built one (a batch-mode project nobody opened): <b>Update VS Library</b> builds it.</summary>
+            public NodeLibraryState NodeLibrary;
+            /// <summary>The node library was rebuilt in place.</summary>
+            public bool NodeLibraryRebuilt => NodeLibrary == NodeLibraryState.Rebuilt;
+            /// <summary>The references <see cref="ScanResult.UnmappedReferences"/> as the rewrite met them.</summary>
+            public List<VirtuademyAssemblyReferenceMigrator.Finding> UnmappedReferences = new();
+            public List<VirtuademyAssemblyReferenceMigrator.Finding> PartialReferences = new();
             /// <summary>A recompile or a domain reload is on its way, so the re-save cannot run in this editor session.</summary>
             public bool NeedsReload => CodeChanged || LockUnpinned;
         }
@@ -1354,6 +1449,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         public static ScanResult ScanProject(Action<string, float> progress = null)
         {
             ScanResult scan = new();
+            VirtuademyAssemblyReferenceMigrator.ResetCache();
 
             try
             {
@@ -1369,9 +1465,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                         continue;
                     }
 
-                    int hits = VirtuademyRenameMigrator.IsManifest(path)
-                        ? VirtuademyRenameMigrator.ManifestHits(text)
-                        : VirtuademyRenameMigrator.CountHits(text);
+                    int hits = VirtuademyRenameMigrator.CountFileHits(path, text, scan.UnmappedReferences, scan.PartialReferences);
                     if (hits > 0)
                     {
                         scan.Files.Add(new FileEntry { Path = path.Replace('\\', '/'), Hits = hits });
@@ -1416,6 +1510,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                                    Action<string, float> progress = null)
         {
             Result result = new();
+            VirtuademyAssemblyReferenceMigrator.ResetCache();
 
             List<FileEntry> selected = options.RewriteFiles
                 ? scan.Files.Where(e => e.Selected).ToList()
@@ -1474,9 +1569,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                             continue;
                         }
 
-                        string rewritten = VirtuademyRenameMigrator.IsManifest(entry.Path)
-                            ? VirtuademyRenameMigrator.RewriteManifest(text)
-                            : VirtuademyRenameMigrator.Rewrite(text);
+                        string rewritten = VirtuademyRenameMigrator.RewriteFile(entry.Path, text, result.UnmappedReferences, result.PartialReferences);
                         if (!string.Equals(rewritten, text, StringComparison.Ordinal))
                         {
                             File.WriteAllText(entry.Path, rewritten, new UTF8Encoding(VirtuademyRenameMigrator.HasUtf8Bom(entry.Path)));
@@ -1566,7 +1659,17 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 ? VirtuademyFolderMigrator.Consolidate()
                 : default;
 
-            result.NodeLibraryRebuilt = VirtuademyRenameMigrator.RebuildVisualScriptingUnits();
+            // The files whose references the merge of two namesakes rewrote are re-saved like the others.
+            List<string> mergedReferences = result.Folders.RewrittenPaths
+                .Where(p => VirtuademyRenameMigrator.YamlExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()))
+                .ToList();
+            if (mergedReferences.Count > 0)
+            {
+                result.Resaving.AddRange(mergedReferences);
+                VirtuademyUpdateResave.Schedule(mergedReferences, new List<string>(), new List<string>(), false);
+            }
+
+            result.NodeLibrary = VirtuademyRenameMigrator.RebuildVisualScriptingUnits();
             return result;
         }
     }

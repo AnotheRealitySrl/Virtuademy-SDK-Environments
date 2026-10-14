@@ -45,15 +45,20 @@ namespace Virtuademy.BreakingChangeSolvers
         /// <summary>What a <see cref="Consolidate"/> pass did, for the caller to report.</summary>
         public readonly struct Result
         {
-            public Result(int moved, int refused, int pruned, IReadOnlyList<string> refusals = null)
+            public Result(int moved, int refused, int pruned, IReadOnlyList<string> refusals = null,
+                          IReadOnlyList<string> merges = null, IReadOnlyList<string> rewrittenPaths = null)
             {
                 Moved = moved;
                 Refused = refused;
                 Pruned = pruned;
                 this.refusals = refusals;
+                this.merges = merges;
+                this.rewrittenPaths = rewrittenPaths;
             }
 
             private readonly IReadOnlyList<string> refusals;
+            private readonly IReadOnlyList<string> merges;
+            private readonly IReadOnlyList<string> rewrittenPaths;
 
             public int Moved { get; }
             public int Refused { get; }
@@ -61,6 +66,14 @@ namespace Virtuademy.BreakingChangeSolvers
 
             /// <summary>What was left where it was, one entry per asset: the path and why.</summary>
             public IReadOnlyList<string> Refusals => refusals ?? Array.Empty<string>();
+
+            /// <summary>The assets that had a namesake at the destination, and what was done about it (see <see cref="Consolidate"/>).</summary>
+            public IReadOnlyList<string> Merges => merges ?? Array.Empty<string>();
+
+            public int Merged => Merges.Count;
+
+            /// <summary>The files whose references to a merged asset were rewritten: they are to be re-saved.</summary>
+            public IReadOnlyList<string> RewrittenPaths => rewrittenPaths ?? Array.Empty<string>();
         }
 
         private const string Root = "Assets/Virtuademy";
@@ -102,10 +115,32 @@ namespace Virtuademy.BreakingChangeSolvers
                    || Prune.Any(AssetDatabase.IsValidFolder);
         }
 
+        /// <summary>
+        /// Moves the legacy folders' assets into <c>Assets/Virtuademy</c>.
+        /// </summary>
+        /// <remarks>
+        /// <b>An asset that already has a namesake at the destination</b> is not a conflict to leave for a person when the
+        /// namesake is one the SDK regenerated (the tasks video controller writes <c>SampleTexture.asset</c> on the first run
+        /// after the update), because the folder then stays for good. Which one stays is decided by who uses it. Every
+        /// reference to either asset is looked for, by GUID, in the project's text files, before anything is deleted:
+        /// <list type="bullet">
+        /// <item>nothing references the old asset: it is deleted, the destination is kept;</item>
+        /// <item>only the old asset is referenced: the destination is deleted and the old asset moves in, so every reference
+        /// keeps its GUID;</item>
+        /// <item>both are referenced and have the same content: the references to the old asset are rewritten to the
+        /// destination's GUID and the old asset is deleted;</item>
+        /// <item>both are referenced and differ: it is left where it is and reported, because only a person can say which
+        /// one is the right one.</item>
+        /// </list>
+        /// Binary-serialized files cannot be searched, so a reference from one is not seen; the routine's precondition,
+        /// a project in version control, is what covers that.
+        /// </remarks>
         public static Result Consolidate()
         {
             List<string> moved = new();
             List<string> refused = new();
+            List<string> merges = new();
+            List<string> rewritten = new();
 
             // The destinations first, outside the editing batch: a folder created inside
             // StartAssetEditing is not in the asset database until StopAssetEditing, so every
@@ -116,6 +151,26 @@ namespace Virtuademy.BreakingChangeSolvers
                 if (AssetDatabase.IsValidFolder(from))
                 {
                     EnsureFolderExists(to);
+                }
+            }
+
+            // The assets that have a namesake at the destination, before the batch: a delete inside it is not done
+            // until StopAssetEditing, and the move that follows would still find the namesake there.
+            foreach ((string from, string to) in Moves)
+            {
+                if (!AssetDatabase.IsValidFolder(from))
+                {
+                    continue;
+                }
+
+                foreach (string asset in ChildAssets(from).ToList())
+                {
+                    string target = TargetOf(asset, to);
+                    if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(target) != null
+                        && TryMergeWithNamesake(asset, target, rewritten, out string merge))
+                    {
+                        merges.Add(merge);
+                    }
                 }
             }
 
@@ -134,15 +189,7 @@ namespace Virtuademy.BreakingChangeSolvers
                     // under it, so recursing would move the same files twice.
                     foreach (string asset in ChildAssets(from))
                     {
-                        string target = $"{to}/{Path.GetFileName(asset)}";
-
-                        foreach ((string oldName, string newName) in Renames)
-                        {
-                            if (Path.GetFileName(asset) == oldName)
-                            {
-                                target = $"{to}/{newName}";
-                            }
-                        }
+                        string target = TargetOf(asset, to);
 
                         if (AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(target) != null)
                         {
@@ -181,9 +228,126 @@ namespace Virtuademy.BreakingChangeSolvers
                 }
             }
 
-            Report(moved, refused, pruned);
+            Report(moved, refused, pruned, merges);
 
-            return new Result(moved.Count, refused.Count, pruned.Count, refused);
+            return new Result(moved.Count, refused.Count, pruned.Count, refused, merges, rewritten);
+        }
+
+        private static string TargetOf(string asset, string destinationFolder)
+        {
+            string target = $"{destinationFolder}/{Path.GetFileName(asset)}";
+
+            foreach ((string oldName, string newName) in Renames)
+            {
+                if (Path.GetFileName(asset) == oldName)
+                {
+                    target = $"{destinationFolder}/{newName}";
+                }
+            }
+
+            return target;
+        }
+
+        /// <summary>
+        /// Settles an asset whose destination is taken (see <see cref="Consolidate"/>). True when it did: either the old asset is
+        /// gone, or the namesake is gone and the move can go ahead. False leaves both where they are.
+        /// </summary>
+        private static bool TryMergeWithNamesake(string asset, string target, List<string> rewrittenPaths, out string description)
+        {
+            description = null;
+
+            if (AssetDatabase.IsValidFolder(asset) || AssetDatabase.IsValidFolder(target))
+            {
+                return false;
+            }
+
+            string oldGuid = AssetDatabase.AssetPathToGUID(asset);
+            string newGuid = AssetDatabase.AssetPathToGUID(target);
+            if (string.IsNullOrEmpty(oldGuid) || string.IsNullOrEmpty(newGuid) || oldGuid == newGuid)
+            {
+                return false;
+            }
+
+            List<string> oldReferences = new();
+            List<string> newReferences = new();
+            foreach (string path in VirtuademyGuidCollisionMigrator.ReferenceFiles())
+            {
+                string normalised = path.Replace('\\', '/');
+                // The two assets' own files name their own GUID; that is not a reference.
+                if (normalised.Equals(asset, StringComparison.OrdinalIgnoreCase) || normalised.Equals(target, StringComparison.OrdinalIgnoreCase)
+                    || normalised.Equals(asset + ".meta", StringComparison.OrdinalIgnoreCase)
+                    || normalised.Equals(target + ".meta", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string text = VirtuademyGuidCollisionMigrator.ReadTextOrNull(path);
+                if (text == null)
+                {
+                    continue;
+                }
+
+                if (text.Contains(oldGuid))
+                {
+                    oldReferences.Add(normalised);
+                }
+                if (text.Contains(newGuid))
+                {
+                    newReferences.Add(normalised);
+                }
+            }
+
+            bool identical = VirtuademyGuidCollisionMigrator.SameContent(asset, target);
+            string sameness = identical ? "same content" : "different content";
+
+            if (oldReferences.Count == 0)
+            {
+                if (!AssetDatabase.DeleteAsset(asset))
+                {
+                    return false;
+                }
+
+                description = $"{asset} deleted: {target} is already there ({sameness}) and nothing references the old one";
+                return true;
+            }
+
+            if (newReferences.Count == 0)
+            {
+                if (!AssetDatabase.DeleteAsset(target))
+                {
+                    return false;
+                }
+
+                description = $"{target} deleted (nothing references it, {sameness}): {asset} moves in, so its {oldReferences.Count} referencing file(s) keep their GUID";
+                return true;
+            }
+
+            if (!identical)
+            {
+                return false;
+            }
+
+            // Both used, and the same asset twice: the references to the old one follow it to the destination.
+            Dictionary<string, string> map = new(StringComparer.Ordinal) { { oldGuid, newGuid } };
+            foreach (string path in oldReferences)
+            {
+                string text = VirtuademyGuidCollisionMigrator.ReadTextOrNull(path);
+                string updated = VirtuademyGuidCollisionMigrator.RewriteReferences(text, map, out int hits);
+                if (hits > 0)
+                {
+                    File.WriteAllText(path, updated, new System.Text.UTF8Encoding(VirtuademyGuidCollisionMigrator.HasUtf8Bom(path)));
+                    rewrittenPaths.Add(path);
+                }
+            }
+
+            AssetDatabase.Refresh();
+            if (!AssetDatabase.DeleteAsset(asset))
+            {
+                return false;
+            }
+
+            description = $"{asset} deleted: {target} is the same asset (same content); its {oldReferences.Count} referencing file(s) now point at it";
+            return true;
         }
 
         /// <summary>Assets directly inside <paramref name="folder"/>, subfolders included.</summary>
@@ -212,18 +376,18 @@ namespace Virtuademy.BreakingChangeSolvers
             }
         }
 
-        private static void Report(List<string> moved, List<string> refused, List<string> pruned)
+        private static void Report(List<string> moved, List<string> refused, List<string> pruned, List<string> merges)
         {
-            if (moved.Count == 0 && refused.Count == 0 && pruned.Count == 0)
+            if (moved.Count == 0 && refused.Count == 0 && pruned.Count == 0 && merges.Count == 0)
             {
                 Debug.Log("[Virtuademy] Nothing to consolidate: no legacy folder in this project.");
                 return;
             }
 
             string message = $"[Virtuademy] Consolidated into {Root}: "
-                             + $"{moved.Count} asset(s) moved, {pruned.Count} folder(s) removed."
+                             + $"{moved.Count} asset(s) moved, {merges.Count} merged with a namesake, {pruned.Count} folder(s) removed."
                              + Environment.NewLine
-                             + string.Join(Environment.NewLine, moved.Concat(pruned.Select(p => $"removed {p}")));
+                             + string.Join(Environment.NewLine, moved.Concat(merges).Concat(pruned.Select(p => $"removed {p}")));
 
             if (refused.Count > 0)
             {

@@ -75,9 +75,15 @@ namespace Virtuademy.BreakingChangeSolvers
     /// <para>
     /// The method exits the editor itself, so <c>-quit</c> is not needed and must not be used: a launch that waits for
     /// the re-save would be cut short. Every launch ends with a <c>[UpdateRoutinesCli] REPORT</c> line, one JSON object,
-    /// followed by <c>[UpdateRoutinesCli] EXIT &lt;code&gt;</c>. Like the windows, it can only run when the project's own
-    /// scripts compile: it is part of the project's editor assembly, which a compile error in the project's code takes
-    /// down.
+    /// followed by <c>[UpdateRoutinesCli] EXIT &lt;code&gt;</c>.
+    /// </para>
+    /// <para>
+    /// <b>It runs in a project that does not compile.</b> That is the state the update leaves a project in when its own
+    /// scripts or assembly definitions name the old assemblies, and the one the routines exist to repair. The routines
+    /// (this class, the windows, the migrators, the re-save and the save guard) are an assembly of their own,
+    /// <c>Virtuademy.SDK.Environments.UpdateRoutines</c>, that references nothing but Unity: a compile error in the project's
+    /// assemblies cannot stop it from being built and loaded. The one thing it needs that can be missing is the SDK's editor
+    /// assembly, for <c>2026.5</c> (see <see cref="ExitRoutineUnavailable"/>).
     /// </para>
     /// </summary>
     public static class UpdateRoutinesCli
@@ -554,8 +560,21 @@ namespace Virtuademy.BreakingChangeSolvers
                 // What a skipped step found is still counted above, so that it can be seen; it does not count as work.
                 found["skipped"] = options.Skip.OrderBy(s => s).ToList();
             }
+            if (scan.UnmappedReferences.Count > 0)
+            {
+                found["unmappedAssemblyReferences"] = Findings(scan.UnmappedReferences);
+            }
+            if (scan.PartialReferences.Count > 0)
+            {
+                found["partialAssemblyReferences"] = Findings(scan.PartialReferences);
+            }
             return found;
         }
+
+        private static List<object> Findings(IEnumerable<VirtuademyAssemblyReferenceMigrator.Finding> findings)
+            => findings.Take(max_listed)
+                .Select(f => (object)new Dictionary<string, object> { { "path", f.Path }, { "reference", f.Reference }, { "detail", f.Detail } })
+                .ToList();
 
         private static void RenameDryRun(Options options)
         {
@@ -633,13 +652,27 @@ namespace Virtuademy.BreakingChangeSolvers
                     {
                         { "moved", result.Folders.Moved },
                         { "pruned", result.Folders.Pruned },
+                        { "merged", result.Folders.Merges },
                         { "refused", result.Folders.Refused },
                         { "left", result.Folders.Refusals },
                     }
                 },
                 { "toResave", result.Resaving.Count },
-                { "nodeLibraryRebuilt", result.NodeLibraryRebuilt },
+                { "nodeLibrary", result.NodeLibrary.ToString() },
             };
+            if (result.NodeLibrary == VirtuademyRenameRoutine.NodeLibraryState.NotBuilt)
+            {
+                applied["nodeLibraryNote"] = "The project never built its Visual Scripting node library, so there was none to rebuild. " +
+                                             "Build it after the last launch: SetupCli -vdSetupSteps vslibrary, or Virtuademy > Update VS Library.";
+            }
+            if (result.UnmappedReferences.Count > 0)
+            {
+                applied["unmappedAssemblyReferences"] = Findings(result.UnmappedReferences);
+            }
+            if (result.PartialReferences.Count > 0)
+            {
+                applied["partialAssemblyReferences"] = Findings(result.PartialReferences);
+            }
             if (result.DiscardedScenes.Count > 0)
             {
                 applied["discardedUnsavedScenes"] = result.DiscardedScenes;
@@ -665,7 +698,7 @@ namespace Virtuademy.BreakingChangeSolvers
             // A launch whose apply moved nothing and rewrote nothing (a folder the routine cannot empty, left
             // again) is not progress: asking for another launch would go on for ever.
             bool changed = result.RewrittenPaths.Count + result.PagePaths.Count + result.GuidPaths.Count
-                           + result.ResolvedGuids + result.Folders.Moved + result.Folders.Pruned > 0;
+                           + result.ResolvedGuids + result.Folders.Moved + result.Folders.Merged + result.Folders.Pruned > 0;
 
             if (VirtuademyUpdateResave.IsPending)
             {
@@ -688,6 +721,13 @@ namespace Virtuademy.BreakingChangeSolvers
             report["left"] = DescribeRename(left, options);
 
             bool leftWork = HasWork(left, options);
+
+            // A reference to an assembly with no successor is not work the routine can do: it is left as it was, the project
+            // does not compile, and a person has to say what replaces it.
+            if (left.UnmappedReferences.Count > 0)
+            {
+                report["problems"] = true;
+            }
             bool problems = report.ContainsKey("problems");
 
             int code = problems ? ExitProblems

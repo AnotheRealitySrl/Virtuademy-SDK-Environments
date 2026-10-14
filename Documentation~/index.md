@@ -81,9 +81,13 @@ The placeholders sit outside `Runtime/` to keep paths short: inside a creator pr
 about 96 characters for a path within the package before it reaches the 260-character limit that
 Unity, Visual Studio and most editors still enforce.
 
-The update routines under `BreakingChangeSolvers/Editor` sit outside every assembly definition, so
-they compile into the creator project's own editor assembly. `Virtuademy/Update routines/v2026.5 ->
-v2026.6` carries a project across the package renames.
+The update routines under `BreakingChangeSolvers/Editor` are an assembly definition of their own,
+`Virtuademy.SDK.Environments.UpdateRoutines`, that references nothing but Unity. A project whose own
+scripts or assembly definitions still name the old assemblies does not compile after the packages are
+updated, and the routines still open and run: that is the state they repair. `Virtuademy/Update
+routines/v2026.5 -> v2026.6` carries a project across the package renames, and the same routines run
+from the command line with `-executeMethod
+Virtuademy.BreakingChangeSolvers.UpdateRoutinesCli.Run -vdRoutine list|2026.6|2026.5`.
 
 ## History
 

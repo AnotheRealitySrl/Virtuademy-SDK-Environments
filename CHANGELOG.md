@@ -1,5 +1,44 @@
 # Release notes
 
+## Unreleased
+
+Fixes to the v2026.5 -> v2026.6 update routine, found by running it from the command line on a 2026.5 project moved to
+2026.6.0. Editor-only (to be folded into v10.0.0 when its tag moves again).
+
+### Fixed
+- **The routine opens and runs in a project that does not compile.** The migrators, the window, the re-save, the save
+  guard and `UpdateRoutinesCli` sat outside every assembly definition, so they were compiled into the project's own
+  `Assembly-CSharp-Editor`, and a compile error in the project's assemblies (an auto-referenced assembly definition that
+  still referenced `Reflectis.CreatorKit.Worlds.Placeholders` was enough) kept that assembly from being built: no menu
+  item, and `-executeMethod` answered "class could not be found", in exactly the state the routine exists to repair. They
+  are now the assembly `Virtuademy.SDK.Environments.UpdateRoutines` (`BreakingChangeSolvers/Editor/`, editor-only,
+  references nothing), which no code of the project can break. Type names, namespaces, the menu path and the entry
+  point `Virtuademy.BreakingChangeSolvers.UpdateRoutinesCli.Run` are unchanged. `BreakingChangesSolver2025_4`, which
+  names SDK runtime types, stays outside every assembly definition and moved to `BreakingChangeSolvers/Legacy/` so
+  the new assembly does not pull it in.
+- **Assembly references in `.asmdef` and `.asmref` files are mapped to the right assemblies.** They went through the
+  namespace rules, so `Reflectis.CreatorKit.Worlds.Placeholders` became `Virtuademy.Environments.ScriptingApi.Placeholders`,
+  a namespace, and the project still did not compile. `VirtuademyAssemblyReferenceMigrator` maps them from the real list
+  of the 2026.5 assemblies (Creator Kit Worlds Core, Placeholders, Visual Scripting, Tasks, Dialogs, Analytics; SDK
+  Core, Dialogs, Graphs, Tasks, Tenant Configuration, ReflectisApi; under both brands) to the 10.0.0 ones, by name and by
+  `GUID:` (a GUID that still resolves is left alone; one that does not is written as the successor's name). It only
+  writes the name of an assembly that exists in the project or its packages, never touches a reference to an assembly that
+  exists now, and removes the duplicates the mapping creates. A reference with no successor in the project is left as it
+  is and reported (`unmappedAssemblyReferences` in the command line's report, a warning in the window); one whose
+  successor took over only part of it is reported as `partialAssemblyReferences`.
+- **A legacy asset whose namesake the SDK regenerated no longer blocks the folder step for good.** The SDK writes
+  `Assets/Virtuademy/Settings/SampleTexture.asset` on the first run after the update, so the old
+  `Assets/ReflectisSettings/SampleTexture.asset` was refused ("something already sits at") on every run and the legacy
+  folder never went away. Every reference to either asset is now looked for by GUID before anything is deleted: an
+  unreferenced old asset is deleted; an unreferenced namesake is deleted and the old asset moves in (its references keep
+  their GUID); two referenced assets with the same content are merged by pointing the references of the old one at the
+  other; two referenced assets that differ are still left alone and reported. The report says what was merged.
+- **No exception when the project never built its Visual Scripting node library.** `UnitBase.Rebuild()` threw a
+  NullReferenceException (Visual Scripting's plugin is not started in such a project, which a project only ever opened in
+  batch mode is). The routine recognizes the state and skips the rebuild with a log line that says what builds the library
+  (**Update VS Library**, or `SetupCli -vdSetupSteps vslibrary`); the command line's report says `nodeLibrary:
+  "NotBuilt"`, with a note.
+
 ## v10.0.0
 
 ### Added to this release on 2026-10-14 (tag moved)

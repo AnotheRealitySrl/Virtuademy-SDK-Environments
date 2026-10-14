@@ -316,7 +316,7 @@ namespace Virtuademy.BreakingChangeSolvers
                 : packageFile.Replace('\\', '/');
         }
 
-        private static IEnumerable<string> ReferenceFiles()
+        internal static IEnumerable<string> ReferenceFiles()
         {
             IEnumerable<string> assets = Directory.EnumerateFiles("Assets", "*", SearchOption.AllDirectories)
                 .Where(p => p.EndsWith(".meta", StringComparison.OrdinalIgnoreCase)
@@ -348,7 +348,7 @@ namespace Virtuademy.BreakingChangeSolvers
         }
 
         /// <summary>Byte-equal, or equal as text once line endings are normalised.</summary>
-        private static bool SameContent(string a, string b)
+        internal static bool SameContent(string a, string b)
         {
             try
             {
@@ -385,7 +385,7 @@ namespace Virtuademy.BreakingChangeSolvers
             return false;
         }
 
-        private static string ReadTextOrNull(string path)
+        internal static string ReadTextOrNull(string path)
         {
             byte[] bytes;
             try
@@ -406,7 +406,7 @@ namespace Virtuademy.BreakingChangeSolvers
             return text.Length > 0 && text[0] == '﻿' ? text.Substring(1) : text;
         }
 
-        private static bool HasUtf8Bom(string path)
+        internal static bool HasUtf8Bom(string path)
         {
             using FileStream stream = File.OpenRead(path);
             return stream.Length >= 3 && stream.ReadByte() == 0xEF && stream.ReadByte() == 0xBB && stream.ReadByte() == 0xBF;
