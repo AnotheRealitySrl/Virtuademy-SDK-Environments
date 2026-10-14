@@ -21,8 +21,9 @@ editor-start update and `SetupCli resolve` move the packages together.
   editor itself (no `-quit`: the work is asynchronous, so the method keeps the editor alive until it is done,
   with an overall timeout, `-vdTimeoutMinutes`, 60 by default).
   - **Commands.** `status` (session, Addressables configured, scene list, interpreter; no network),
-    `session [-vdRenew]`, `tenant-config -vdConfigFile <path> [-vdAllowTracked]` (see the SDK-Core entry: the file
-    lands in `Assets/Editor/TenantConfiguration`, and the command refuses with 23 when git does not ignore where it
+    `session [-vdRenew]`, `tenant-config -vdConfigFile <path> [-vdEnv <key>] [-vdConfigFolder <folder>] [-vdAllowTracked]` (see the
+    SDK-Core entry: the file lands in `Assets/Editor/TenantConfiguration` unless `-vdConfigFolder` names another folder
+    under `Assets/`, `-vdEnv` picks its environment, the first one by default, and the command refuses with 23 when git does not ignore where it
     would sit, unless `-vdAllowTracked`), `worlds` (the worlds the
     login can deploy to, and where each included scene is already published), `build [-vdScenes a,b]` (what
     **Build Addressables** does, interpreted scripts included), `preview (-vdWorlds <ids> | -vdTenant)
@@ -90,9 +91,9 @@ editor-start update and `SetupCli resolve` move the packages together.
   style of `EnvironmentsCli` and the setup package's `SetupCli`: `-vd...` arguments, unknown options refused, one
   `[UpdateRoutinesCli] REPORT {json}` line per launch, documented exit codes (arguments are strict like
   `EnvironmentsCli`'s: `--vdDryRun`, `-VdDryRun`, a duplicate or a stray value is exit 10), and it exits the editor itself (no
-  `-quit`). It is the eighth script outside every asmdef: it has to reach the migrators, which compile into the
-  project's own `Assembly-CSharp-Editor`, and it reaches the v2026.4.x -> v2026.5.0 routine, which is in
-  `Virtuademy.SDK.Environments.Editor`, by reflection.
+  `-quit`). It compiles with the migrators into the update routines' own editor-only assembly,
+  `Virtuademy.SDK.Environments.UpdateRoutines` (see Fixed below), and reaches the v2026.4.x -> v2026.5.0 routine,
+  which is in `Virtuademy.SDK.Environments.Editor`, by reflection.
   - **Routines.** `list` (the routines the project has, their menu names, and whether each finds something to
     change: a dry scan), `2026.6` (**v2026.5 -> v2026.6**: the text rewrite, the POI page markers, the GUID
     collisions and the legacy folders, with the window's defaults) and `2026.5` (**v2026.4.x -> v2026.5.0**: the
@@ -158,7 +159,7 @@ editor-start update and `SetupCli resolve` move the packages together.
   in asset database") and the assets moved only on a second run. The destinations are now created before the
   batch.
 Fixes to the v2026.5 -> v2026.6 update routine, found by running it from the command line on a 2026.5 project moved to
-2026.6.0. Editor-only (to be folded into v10.0.0 when its tag moves again).
+2026.6.0. Editor-only.
 
 - **The routine opens and runs in a project that does not compile.** The migrators, the window, the re-save, the save
   guard and `UpdateRoutinesCli` sat outside every assembly definition, so they were compiled into the project's own
