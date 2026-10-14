@@ -1,5 +1,35 @@
 # Release notes
 
+## Unreleased
+
+### Added
+- **`AddressablesConfiguration`: apply and check the SDK's Addressables configuration without the
+  window** (minor bump). The public static class
+  `Virtuademy.SDK.Environments.Editor.AddressablesConfiguration` owns what the "Fix Addressables
+  configurations" button did in `AddressablesManagementWindow`, moved there rather than copied:
+  `IsConfigured` (the settings, the active profile and the groups all match) and `Apply()` (does
+  nothing when configured; otherwise sets the top-level settings, the profile and the default group,
+  creating the Addressables settings if the project has none, and throws if the project does not end
+  configured). `RemoteBuildPath` and `RemoteLoadPath` give the values the profile must hold.
+  - **`Apply()` resets the groups**, as the button did: every group but the default one and every
+    entry of the default group are removed.
+  - **Why.** A project set up entirely from the command line
+    (`Virtuademy-SDK-Environments-Setup` `SetupCli`) kept Unity's default profile and groups, because
+    the configuration lived in three private methods of the window and could only be reached by
+    reflection on a window nobody had opened. `SetupCli` now has an `addressables` step that calls
+    `Apply()`.
+  - The window keeps its bindings and delegates to the class; nothing changes for someone using it.
+
+### Changed
+- **"Build & Deploy" and "Build & Deploy to Tenant" refuse to start when the Addressables are not
+  configured** (behaviour change; it goes with the minor bump above). They stop before the
+  interpreted DLL step, log an error in the deploy panel and the Console naming the "Fix
+  Addressables configurations" button, show a dialog and re-enable the buttons. Until now only
+  "Build Addressables" turned into that button; the two deploy buttons built every platform for
+  minutes and failed at the end, in `CheckBuildResult`, with "Subfolder StandaloneWindows64 not
+  found in ServerData\...". The build behind "Build Addressables" checks too. None of them applies
+  the fix itself: it deletes groups and entries, which the creator has to agree to.
+
 ## v10.0.0
 
 ### Changed

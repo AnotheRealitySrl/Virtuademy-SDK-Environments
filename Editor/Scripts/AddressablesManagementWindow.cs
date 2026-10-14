@@ -65,36 +65,25 @@ namespace Virtuademy.SDK.Environments.Editor
         private const string settings_folder_path = "Assets/Virtuademy/Editor/Settings";
         private const string addressables_configuration_file = "AddressablesSceneList.asset";
 
-        private const string addressables_output_folder = "ServerData";
-
-        private const string remote_build_path_variable_name = "Remote.BuildPath";
-        private const string remote_load_path_variable_name = "Remote.LoadPath";
-
-        private const string build_target_variable_name = "BuildTarget";
-        private const string build_target_variable_value = "[UnityEditor.EditorUserBuildSettings.activeBuildTarget]";
-        private const string player_version_override_variable_name = "PlayerVersionOverride";
-        private const string player_version_override_variable_value = "[Virtuademy.SDK.Environments.Editor.AddressablesBuildScript.PlayerVersionOverride]";
-
-        private string remoteBuildPath;
-        private string remoteLoadPath;
+        private const string addressables_output_folder = AddressablesConfiguration.OutputFolder;
 
         [SerializeField] private EBuildError buildResult = EBuildError.None;
 
         [CreateProperty] private string ActiveProfileName => settings.profileSettings.GetProfileName(settings.activeProfileId);
 
-        [CreateProperty] private string CurrentRemoteBuildPathVariableValue => settings.profileSettings.GetValueByName(settings.activeProfileId, remote_build_path_variable_name);
-        [CreateProperty] private bool IsRemoteBuildPathConfigured => CurrentRemoteBuildPathVariableValue == remoteBuildPath;
+        [CreateProperty] private string CurrentRemoteBuildPathVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.RemoteBuildPathVariableName);
+        [CreateProperty] private bool IsRemoteBuildPathConfigured => CurrentRemoteBuildPathVariableValue == AddressablesConfiguration.RemoteBuildPath;
 
-        [CreateProperty] private string CurrentRemoteLoadPathVariableValue => settings.profileSettings.GetValueByName(settings.activeProfileId, remote_load_path_variable_name);
-        [CreateProperty] private bool IsRemoteLoadPathConfigured => CurrentRemoteLoadPathVariableValue == remoteLoadPath;
+        [CreateProperty] private string CurrentRemoteLoadPathVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.RemoteLoadPathVariableName);
+        [CreateProperty] private bool IsRemoteLoadPathConfigured => CurrentRemoteLoadPathVariableValue == AddressablesConfiguration.RemoteLoadPath;
 
-        [CreateProperty] private string CurrentBuildTargetVariableValue => settings.profileSettings.GetValueByName(settings.activeProfileId, build_target_variable_name);
-        [CreateProperty] private bool IsBuildTargetConfigured => CurrentBuildTargetVariableValue == build_target_variable_value;
+        [CreateProperty] private string CurrentBuildTargetVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.BuildTargetVariableName);
+        [CreateProperty] private bool IsBuildTargetConfigured => CurrentBuildTargetVariableValue == AddressablesConfiguration.BuildTargetVariableValue;
 
-        [CreateProperty] private string CurrentPlayerVersionOverrideVariableValue => settings.profileSettings.GetValueByName(settings.activeProfileId, player_version_override_variable_name);
-        [CreateProperty] private bool IsPlayerVersionOverrideConfigured => CurrentPlayerVersionOverrideVariableValue == player_version_override_variable_value;
+        [CreateProperty] private string CurrentPlayerVersionOverrideVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.PlayerVersionOverrideVariableName);
+        [CreateProperty] private bool IsPlayerVersionOverrideConfigured => CurrentPlayerVersionOverrideVariableValue == AddressablesConfiguration.PlayerVersionOverrideVariableValue;
 
-        [CreateProperty] private bool AreAddressablesConfigured => IsAddressablesSettingsConfigured && IsProfileConfigured && AreAddressablesGroupsConfigured;
+        [CreateProperty] private bool AreAddressablesConfigured => AddressablesConfiguration.IsConfiguredFor(settings);
 
 
         private static HttpClient httpClient = new HttpClient();
@@ -610,6 +599,12 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             SetDeployButtonsEnabled(false);
 
+            if (!RequireAddressablesConfigured("Build & Deploy"))
+            {
+                SetDeployButtonsEnabled(true);
+                return;
+            }
+
             // 0. Build + verify the interpreted DLL (local whitelist + authoritative server
             //    check). Block the whole build & deploy if it fails.
             if (!await BuildAndVerifyInterpretedDLLAsync())
@@ -824,6 +819,12 @@ namespace Virtuademy.SDK.Environments.Editor
         private async Task RunTenantBuildAndDeployAsync()
         {
             SetDeployButtonsEnabled(false);
+
+            if (!RequireAddressablesConfigured("Build & Deploy to Tenant"))
+            {
+                SetDeployButtonsEnabled(true);
+                return;
+            }
 
             // 0. Build + verify the interpreted DLL. Block the whole build & deploy if it fails.
             if (!await BuildAndVerifyInterpretedDLLAsync())
@@ -1711,27 +1712,7 @@ namespace Virtuademy.SDK.Environments.Editor
             if (sceneConfigurations.SyncWithProject())
                 SaveAsset(sceneConfigurations);
 
-            settings = AddressablesBuildScript.GetSettingsObject(AddressablesBuildScript.settings_asset);
-
-            if (!settings)
-            {
-                AddressableAssetSettingsDefaultObject.Settings = AddressableAssetSettings.Create(AddressableAssetSettingsDefaultObject.kDefaultConfigFolder,
-                               AddressableAssetSettingsDefaultObject.kDefaultConfigAssetName, true, true);
-                settings = AddressablesBuildScript.GetSettingsObject(AddressablesBuildScript.settings_asset);
-            }
-
-            remoteBuildPath = string.Join('/',
-                addressables_output_folder,
-                BuildtimeVariable(player_version_override_variable_name),
-                BuildtimeVariable(build_target_variable_name));
-
-            // The load path names its two runtime variables by CatalogVariables' constants, which are
-            // deliberately not C# types: a catalog must not depend on an identifier that can move.
-            remoteLoadPath = string.Join('/',
-                RuntimeVariable(CatalogVariables.BaseUrlName),
-                RuntimeVariable(CatalogVariables.WorldIdName),
-                BuildtimeVariable(player_version_override_variable_name),
-                BuildtimeVariable(build_target_variable_name));
+            settings = AddressablesConfiguration.GetOrCreateSettings();
         }
 
         private void AddDataBindings()
@@ -1836,9 +1817,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 }
                 else
                 {
-                    ConfigureAddressablesSettings();
-                    ConfigureProfile();
-                    ConfigureAddressablesGroups();
+                    AddressablesConfiguration.Apply();
+                    settings = AddressablesConfiguration.GetOrCreateSettings();
                 }
             };
 
@@ -1877,166 +1857,12 @@ namespace Virtuademy.SDK.Environments.Editor
         #region Top-Level settings configuration
 
         [CreateProperty]
-        public bool IsAddressablesSettingsConfigured =>
-                 settings.RemoteCatalogLoadPath.GetName(settings) == remote_load_path_variable_name &&
-                 settings.RemoteCatalogBuildPath.GetName(settings) == remote_build_path_variable_name &&
-                 settings.BuildRemoteCatalog &&
-                 settings.EnableJsonCatalog &&
-                 settings.CheckForContentUpdateRestrictionsOption
-                         == CheckForContentUpdateRestrictionsOptions.ListUpdatedAssetsWithRestrictions &&
-                 settings.MaxConcurrentWebRequests == 3 &&
-                 settings.CatalogRequestsTimeout == 0 &&
-                 !settings.IgnoreUnsupportedFilesInBuild &&
-                 !settings.UniqueBundleIds &&
-                 settings.ContiguousBundles &&
-                 settings.NonRecursiveBuilding &&
-                 settings.BuiltInBundleNaming == BuiltInBundleNaming.Custom &&
-                 settings.MonoScriptBundleNaming == MonoScriptBundleNaming.Custom &&
-                 !settings.DisableVisibleSubAssetRepresentations;
-
-        private void ConfigureAddressablesSettings()
-        {
-            settings.RemoteCatalogLoadPath.SetVariableByName(settings, remote_load_path_variable_name);
-            settings.RemoteCatalogBuildPath.SetVariableByName(settings, remote_build_path_variable_name);
-            settings.BuildRemoteCatalog = true;
-            settings.EnableJsonCatalog = true;
-            settings.CheckForContentUpdateRestrictionsOption = CheckForContentUpdateRestrictionsOptions.ListUpdatedAssetsWithRestrictions;
-            settings.ContentStateBuildPath = string.Empty;
-            settings.MaxConcurrentWebRequests = 3;
-            settings.CatalogRequestsTimeout = 0;
-            settings.IgnoreUnsupportedFilesInBuild = false;
-            settings.UniqueBundleIds = false;
-            settings.ContiguousBundles = true;
-            settings.NonRecursiveBuilding = true;
-            settings.BuiltInBundleNaming = BuiltInBundleNaming.Custom;
-            settings.MonoScriptBundleNaming = MonoScriptBundleNaming.Custom;
-            settings.DisableVisibleSubAssetRepresentations = false;
-            settings.BuildRemoteCatalog = true;
-            SaveAsset(settings);
-        }
+        public bool IsAddressablesSettingsConfigured => AddressablesConfiguration.IsSettingsConfigured(settings);
 
         private void ConfigureAddressablesSettingsForBuild()
         {
             settings.BuiltInBundleCustomNaming = settings.OverridePlayerVersion;
             settings.MonoScriptBundleCustomNaming = settings.OverridePlayerVersion;
-        }
-
-        #endregion
-
-        #region Profiles configuration
-
-        [CreateProperty]
-        private bool IsProfileConfigured =>
-            settings.profileSettings.GetValueByName(settings.activeProfileId, remote_build_path_variable_name) == remoteBuildPath
-                && settings.profileSettings.GetValueByName(settings.activeProfileId, remote_load_path_variable_name) == remoteLoadPath
-                && settings.profileSettings.GetValueByName(settings.activeProfileId, build_target_variable_name) == build_target_variable_value
-                && settings.profileSettings.GetValueByName(settings.activeProfileId, player_version_override_variable_name) == player_version_override_variable_value;
-
-        private void ConfigureProfile()
-        {
-            settings.profileSettings.SetValue(settings.activeProfileId, remote_build_path_variable_name, remoteBuildPath);
-            settings.profileSettings.SetValue(settings.activeProfileId, remote_load_path_variable_name, remoteLoadPath);
-
-            if (settings.profileSettings.GetValueByName(settings.activeProfileId, build_target_variable_name) == null)
-                settings.profileSettings.CreateValue(build_target_variable_name, build_target_variable_value);
-            else
-                settings.profileSettings.SetValue(settings.activeProfileId, build_target_variable_name, build_target_variable_value);
-
-            if (settings.profileSettings.GetValueByName(settings.activeProfileId, player_version_override_variable_name) == null)
-                settings.profileSettings.CreateValue(player_version_override_variable_name, player_version_override_variable_value);
-            else
-                settings.profileSettings.SetValue(settings.activeProfileId, player_version_override_variable_name, player_version_override_variable_value);
-
-            SaveAsset(settings);
-        }
-
-        #endregion
-
-        #region Groups configuration
-
-        [CreateProperty]
-        private bool AreAddressablesGroupsConfigured
-        {
-            get
-            {
-                bool configured = true;
-                var defaultGroup = settings.DefaultGroup;
-
-                configured &= !settings.groups.Where(group => group != defaultGroup).Any();
-                configured &= !defaultGroup.entries.Any();
-
-                defaultGroup.Schemas.Where(schema => schema is BundledAssetGroupSchema).ToList().ForEach(schema =>
-                {
-                    BundledAssetGroupSchema b = schema as BundledAssetGroupSchema;
-                    configured &=
-                        b.LoadPath.GetName(settings) == remote_load_path_variable_name &&
-                        b.BuildPath.GetName(settings) == remote_build_path_variable_name &&
-                        b.Compression == BundledAssetGroupSchema.BundleCompressionMode.LZ4 &&
-                        b.IncludeInBuild &&
-                        !b.ForceUniqueProvider &&
-                        b.UseAssetBundleCache &&
-                        !b.UseAssetBundleCrc &&
-                        !b.UseAssetBundleCrcForCachedBundles &&
-                        !b.UseUnityWebRequestForLocalBundles &&
-                        b.Timeout == 0 &&
-                        !b.ChunkedTransfer &&
-                        b.RedirectLimit == -1 &&
-                        b.RetryCount == 0 &&
-                        b.IncludeAddressInCatalog &&
-                        b.IncludeGUIDInCatalog &&
-                        b.IncludeLabelsInCatalog &&
-                        b.InternalIdNamingMode == BundledAssetGroupSchema.AssetNamingMode.FullPath &&
-                        b.InternalBundleIdMode == BundledAssetGroupSchema.BundleInternalIdMode.GroupGuidProjectIdHash &&
-                        b.AssetBundledCacheClearBehavior == BundledAssetGroupSchema.CacheClearBehavior.ClearWhenWhenNewVersionLoaded &&
-                        b.BundleMode == BundledAssetGroupSchema.BundlePackingMode.PackSeparately &&
-                        b.BundleNaming == BundledAssetGroupSchema.BundleNamingStyle.NoHash;
-                });
-
-                return configured;
-            }
-        }
-
-        private void ConfigureAddressablesGroups()
-        {
-            var defaultGroup = settings.DefaultGroup;
-            var groupsToDelete = settings.groups.Where(group => group != defaultGroup).ToList();
-            foreach (var group in groupsToDelete)
-                settings.RemoveGroup(group);
-
-            defaultGroup.Schemas.Where(schema => schema is BundledAssetGroupSchema).ToList().ForEach(schema =>
-            {
-                BundledAssetGroupSchema b = schema as BundledAssetGroupSchema;
-                b.LoadPath.SetVariableByName(settings, remote_load_path_variable_name);
-                b.BuildPath.SetVariableByName(settings, remote_build_path_variable_name);
-                b.Compression = BundledAssetGroupSchema.BundleCompressionMode.LZ4;
-                b.IncludeInBuild = true;
-                b.ForceUniqueProvider = false;
-                b.UseAssetBundleCache = true;
-                b.UseAssetBundleCrc = false;
-                b.UseAssetBundleCrcForCachedBundles = false;
-                b.UseUnityWebRequestForLocalBundles = false;
-                b.Timeout = 0;
-                b.ChunkedTransfer = false;
-                b.RedirectLimit = -1;
-                b.RetryCount = 0;
-                b.IncludeAddressInCatalog = true;
-                b.IncludeGUIDInCatalog = true;
-                b.IncludeLabelsInCatalog = true;
-                b.InternalIdNamingMode = BundledAssetGroupSchema.AssetNamingMode.FullPath;
-                b.InternalBundleIdMode = BundledAssetGroupSchema.BundleInternalIdMode.GroupGuidProjectIdHash;
-                b.AssetBundledCacheClearBehavior = BundledAssetGroupSchema.CacheClearBehavior.ClearWhenWhenNewVersionLoaded;
-                b.BundleMode = BundledAssetGroupSchema.BundlePackingMode.PackSeparately;
-                b.BundleNaming = BundledAssetGroupSchema.BundleNamingStyle.NoHash;
-                SaveAsset(b);
-            });
-
-            var entriesToRemove = defaultGroup.entries.ToList();
-            foreach (var entry in entriesToRemove)
-                settings.RemoveAssetEntry(entry.guid);
-
-            SaveAsset(settings);
-            SaveAsset(defaultGroup);
-            SaveAsset(settings);
         }
 
         #endregion
@@ -2163,9 +1989,6 @@ namespace Virtuademy.SDK.Environments.Editor
                 deployErrorsContainer.style.display = DisplayStyle.None;
         }
 
-        private string BuildtimeVariable(string variable) => "[" + variable + "]";
-        private string RuntimeVariable(string variable) => "{" + variable + "}";
-
         private void SaveAsset(UnityEngine.Object asset)
         {
             EditorUtility.SetDirty(asset);
@@ -2191,6 +2014,9 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <summary>Builds the interpreted DLL, verifies it, and builds the addressables only if it passed.</summary>
         private async Task RunBuildAddressablesAsync()
         {
+            if (!RequireAddressablesConfigured("Build Addressables"))
+                return;
+
             if (!await BuildAndVerifyInterpretedDLLAsync())
             {
                 EditorUtility.DisplayDialog("Build blocked",
@@ -2201,6 +2027,29 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             BuildAndZipScenes();
+        }
+
+        /// <summary>
+        /// The check every build entry makes before it starts: without the SDK's Addressables
+        /// configuration a build runs for minutes and fails only at the end, because the bundles land
+        /// in <c>Library/com.unity.addressables</c> instead of <c>ServerData</c>. Returns false after
+        /// saying so in the deploy error panel, the Console and a dialog. It does not apply the
+        /// configuration itself: that deletes every group but the default one and every entry in it,
+        /// which the creator has to agree to by pressing the button.
+        /// </summary>
+        private bool RequireAddressablesConfigured(string what)
+        {
+            if (AddressablesConfiguration.IsConfigured)
+                return true;
+
+            LogDeployError($"{what} aborted: the project's Addressables are not configured the way the SDK needs. " +
+                           "Press \"Fix Addressables configurations\" (the Build Addressables button turns into it; " +
+                           "\"Show advanced addressables configurations\" lists what is wrong), then try again. Nothing was built.");
+            EditorUtility.DisplayDialog($"{what} blocked",
+                "The project's Addressables are not configured the way the SDK needs, so a build would fail " +
+                "at the end. Press \"Fix Addressables configurations\" in this window first (it resets the " +
+                "Addressables groups to a single default group), then try again. Nothing was built.", "OK");
+            return false;
         }
 
         /// <summary>
