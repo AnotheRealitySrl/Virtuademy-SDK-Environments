@@ -1,14 +1,21 @@
 # Release notes
 
-## Unreleased
+## v10.0.0
 
-**Requires the Virtuademy-SDK-Core release that adds `EditorSessionManager.InteractiveLoginAllowed` and
-`AppConfigurationImporter`** (the `package.json` dependency is raised at the release cut): `EnvironmentsCli`
-refers to both directly, so this package does not compile against Core 0.3.0.
+### Added to this release on 2026-10-14 (tag moved)
 
-### Added
-- **`EnvironmentsCli`: build, preview and deploy an environment without the Addressables window**
-  (minor bump). A batch entry point, `-executeMethod Virtuademy.SDK.Environments.Editor.EnvironmentsCli.Run
+The `v10.0.0` tag was moved on 2026-10-14 onto the commit that adds the changes below. They are editor-only
+(command lines, editor windows); nothing a published world or the app loads changed. A project resolved before
+keeps the earlier commit until it re-resolves: the setup's editor-start update or `SetupCli -vdSetupSteps
+resolve` does it.
+
+**Requires Virtuademy-SDK-Core v0.3.0 as moved on 2026-10-14** (the commit that adds
+`EditorSessionManager.InteractiveLoginAllowed` and `AppConfigurationImporter`): `EnvironmentsCli` refers to
+both directly, so this package does not compile against the earlier v0.3.0 commit (989e0aa). The setup's
+editor-start update and `SetupCli resolve` move the packages together.
+
+#### Added
+- **`EnvironmentsCli`: build, preview and deploy an environment without the Addressables window**. A batch entry point, `-executeMethod Virtuademy.SDK.Environments.Editor.EnvironmentsCli.Run
   -vdCommand <command> [options]`, in the style of the setup package's `SetupCli`: `-vd...` arguments,
   one `[EnvironmentsCli] REPORT {json}` line at the end of every run, documented exit codes, and it exits the
   editor itself (no `-quit`: the work is asynchronous, so the method keeps the editor alive until it is done,
@@ -63,7 +70,7 @@ refers to both directly, so this package does not compile against Core 0.3.0.
     per-scene report, the API calls) and `SceneListScriptableObject.Find()` / `LoadOrCreate()`. The window keeps
     its dialogs, its deploy-error panel and its progress bar: it passes them in as a `DeployObserver`.
 - **`AddressablesConfiguration`: apply and check the SDK's Addressables configuration without the
-  window** (minor bump). The public static class
+  window**. The public static class
   `Virtuademy.SDK.Environments.Editor.AddressablesConfiguration` owns what the "Fix Addressables
   configurations" button did in `AddressablesManagementWindow`, moved there rather than copied:
   `IsConfigured` (the settings, the active profile and the groups all match) and `Apply()` (does
@@ -78,7 +85,7 @@ refers to both directly, so this package does not compile against Core 0.3.0.
     reflection on a window nobody had opened. `SetupCli` now has an `addressables` step that calls
     `Apply()`.
   - The window keeps its bindings and delegates to the class; nothing changes for someone using it.
-- **`UpdateRoutinesCli`: run the update routines from the command line** (minor bump). A batch entry point,
+- **`UpdateRoutinesCli`: run the update routines from the command line**. A batch entry point,
   `-executeMethod Virtuademy.BreakingChangeSolvers.UpdateRoutinesCli.Run -vdRoutine <routine> [options]`, in the
   style of `EnvironmentsCli` and the setup package's `SetupCli`: `-vd...` arguments, unknown options refused, one
   `[UpdateRoutinesCli] REPORT {json}` line per launch, documented exit codes (arguments are strict like
@@ -112,7 +119,7 @@ refers to both directly, so this package does not compile against Core 0.3.0.
     the node library rebuild reports whether it happened (it does not in a batch project whose unit options were
     never built: run **Update VS Library**).
 
-### Changed
+#### Changed
 - **The window's public deploy helpers moved to `EnvironmentsDeploy`** (`GetUploadLinkForWorld`,
   `ImportSceneToWorld`, `ImportEnvironmentDll`, `LinkEnvironmentDll`, `ImportSceneToTenant`,
   `GetTenantUploadLink`, `UploadZip`, `UploadZipViaFtp`, `FtpUploadConfig`), and `PublishableWorld` became
@@ -120,7 +127,7 @@ refers to both directly, so this package does not compile against Core 0.3.0.
   are static now. The window keeps the old members as `[Obsolete]` forwarders, so code written against it
   still compiles.
 - **"Build & Deploy" and "Build & Deploy to Tenant" refuse to start when the Addressables are not
-  configured** (behaviour change; it goes with the minor bump above). They stop before the
+  configured** (behaviour change). They stop before the
   interpreted DLL step, log an error in the deploy panel and the Console naming the "Fix
   Addressables configurations" button, show a dialog and re-enable the buttons. Until now only
   "Build Addressables" turned into that button; the two deploy buttons built every platform for
@@ -128,7 +135,7 @@ refers to both directly, so this package does not compile against Core 0.3.0.
   found in ServerData\...". The build behind "Build Addressables" checks too. None of them applies
   the fix itself: it deletes groups and entries, which the creator has to agree to.
 
-### Fixed
+#### Fixed
 - **The window's "Build & Deploy" and "Build & Deploy to Tenant" lock assembly reloads while they run.** The build
   switches the active build target, which queues a recompilation and a domain reload, and the flow then awaits the
   network: a reload in the middle of it ended the awaiting code silently, with a half-sent deploy. The two flows
@@ -150,8 +157,6 @@ refers to both directly, so this package does not compile against Core 0.3.0.
   where they are not in the asset database yet, so every move into them was refused ("Parent directory is not
   in asset database") and the assets moved only on a second run. The destinations are now created before the
   batch.
-
-## v10.0.0
 
 ### Changed
 - **The last nine types named after the old brand are renamed, and the nodes stop saying it.**
