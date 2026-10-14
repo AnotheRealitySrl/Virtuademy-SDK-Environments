@@ -168,8 +168,10 @@ Fixes to the v2026.5 -> v2026.6 update routine, found by running it from the com
   are now the assembly `Virtuademy.SDK.Environments.UpdateRoutines` (`BreakingChangeSolvers/Editor/`, editor-only,
   references nothing), which no code of the project can break. Type names, namespaces, the menu path and the entry
   point `Virtuademy.BreakingChangeSolvers.UpdateRoutinesCli.Run` are unchanged. `BreakingChangesSolver2025_4`, which
-  names SDK runtime types, stays outside every assembly definition and moved to `BreakingChangeSolvers/Legacy/` so
-  the new assembly does not pull it in.
+  names SDK runtime types, stays outside every assembly definition and moved to `BreakingChangeSolvers/Legacy/Editor/`:
+  the new assembly does not pull it in, and the `Editor` folder keeps it compiled into `Assembly-CSharp-Editor`, with
+  its menu **Virtuademy ▸ Update routines ▸ v2025.3 -> v2025.4** (a package script outside every assembly definition
+  and outside an `Editor` folder is not compiled at all).
 - **Assembly references in `.asmdef` and `.asmref` files are mapped to the right assemblies.** They went through the
   namespace rules, so `Reflectis.CreatorKit.Worlds.Placeholders` became `Virtuademy.Environments.ScriptingApi.Placeholders`,
   a namespace, and the project still did not compile. `VirtuademyAssemblyReferenceMigrator` maps them from the real list
