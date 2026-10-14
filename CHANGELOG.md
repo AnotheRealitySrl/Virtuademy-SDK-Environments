@@ -30,6 +30,12 @@
   found in ServerData\...". The build behind "Build Addressables" checks too. None of them applies
   the fix itself: it deletes groups and entries, which the creator has to agree to.
 
+### Fixed
+- **Addressables management window layout.** The login status at the top wraps instead of running
+  out of the window and squeezing the Login/Logout button, which keeps its width and the same margin
+  as Login. The status icons of the advanced configuration keep their size: next to a long value,
+  as Remote.LoadPath and PlayerVersionOverride have once configured, they shrank to nothing.
+
 ## v10.0.0
 
 ### Changed

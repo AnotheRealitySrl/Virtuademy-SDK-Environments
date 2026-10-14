@@ -3,8 +3,8 @@
     <engine:ScrollView>
         <engine:Label text="Addressables management window" name="Header" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 24px;" />
         <engine:VisualElement name="login-status-banner" style="flex-direction: row; align-items: center; justify-content: center; padding: 6px; margin-top: 4px; margin-bottom: 4px;">
-            <engine:Label text="Not logged in" name="login-status-label" style="font-size: 12px;" />
-            <engine:Button text="Login" name="open-tenant-selection-button" style="margin-left: 8px;" />
+            <engine:Label text="Not logged in" name="login-status-label" style="font-size: 12px; white-space: normal; flex-shrink: 1; -unity-text-align: middle-center;" />
+            <engine:Button text="Login" name="open-tenant-selection-button" style="margin-left: 8px; flex-shrink: 0;" />
         </engine:VisualElement>
         <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
         <engine:VisualElement name="build-result-errors" style="flex-grow: 1;">

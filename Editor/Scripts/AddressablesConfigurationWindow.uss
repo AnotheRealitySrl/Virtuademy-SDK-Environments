@@ -18,6 +18,7 @@
     background-image: url("project://database/Packages/com.unity.multiplayer.center/Editor/MultiplayerCenterWindow/UI/Icons/Check.png?fileID=2800000&guid=4f78a544322c742b89e63fb68557b1d2&type=3#Check");
     width: 20px;
     height: 20px;
+    flex-shrink: 0;
     align-self: center;
 }
 
@@ -25,6 +26,7 @@
     background-image: url("project://database/Packages/com.unity.collab-proxy/Editor/Assets/Images/iconconflicted.png?fileID=2800000&guid=d1c88f142eee55b4eb2b2cfd7b3624ce&type=3#iconconflicted");
     width: 20px;
     height: 20px;
+    flex-shrink: 0;
     align-self: center;
 }
 

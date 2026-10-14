@@ -219,6 +219,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 text = "Logout"
             };
             logoutButton.style.display = DisplayStyle.None;
+            logoutButton.style.marginLeft = 8;     // as the Login button, which it replaces
+            logoutButton.style.flexShrink = 0;     // the status label wraps; the button keeps its width
             loginStatusLabel.parent.Add(logoutButton);
 
             deployButton.clicked += OnDeployClicked;
