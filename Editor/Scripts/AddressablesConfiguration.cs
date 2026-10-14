@@ -5,6 +5,7 @@ using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Build;
 using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.AddressableAssets.Settings.GroupSchemas;
+using UnityEditor.Build;
 
 namespace Virtuademy.SDK.Environments.Editor
 {
@@ -148,7 +149,41 @@ namespace Virtuademy.SDK.Environments.Editor
 
         #region Top-level settings
 
+        /// <summary>
+        /// The scripting define Addressables builds a JSON catalog under. The <c>EnableJsonCatalog</c> setting alone
+        /// is not enough: Addressables' own settings inspector adds this define whenever it switches the setting on,
+        /// and without it the build writes a binary catalog, which the platform cannot import.
+        /// </summary>
+        public const string JsonCatalogDefine = "ENABLE_JSON_CATALOG";
+
+        /// <summary>The build targets a scene is built for (Windows, Android for VR and mobile, iOS, WebGL), which need <see cref="JsonCatalogDefine"/>.</summary>
+        private static readonly NamedBuildTarget[] json_catalog_targets =
+            { NamedBuildTarget.Standalone, NamedBuildTarget.Android, NamedBuildTarget.iOS, NamedBuildTarget.WebGL };
+
+        /// <summary>True when every build target a scene is built for has <see cref="JsonCatalogDefine"/>.</summary>
+        internal static bool HasJsonCatalogDefine() =>
+            json_catalog_targets.All(target =>
+            {
+                PlayerSettings.GetScriptingDefineSymbols(target, out string[] symbols);
+                return symbols.Contains(JsonCatalogDefine);
+            });
+
+        /// <summary>
+        /// Adds <see cref="JsonCatalogDefine"/> where it is missing, as Addressables' inspector does when "Enable Json
+        /// Catalog" is ticked. A changed define makes Unity recompile the scripts.
+        /// </summary>
+        private static void AddJsonCatalogDefine()
+        {
+            foreach (NamedBuildTarget target in json_catalog_targets)
+            {
+                PlayerSettings.GetScriptingDefineSymbols(target, out string[] symbols);
+                if (!symbols.Contains(JsonCatalogDefine))
+                    PlayerSettings.SetScriptingDefineSymbols(target, symbols.Append(JsonCatalogDefine).ToArray());
+            }
+        }
+
         internal static bool IsSettingsConfigured(AddressableAssetSettings settings) =>
+                 HasJsonCatalogDefine() &&
                  settings.RemoteCatalogLoadPath.GetName(settings) == RemoteLoadPathVariableName &&
                  settings.RemoteCatalogBuildPath.GetName(settings) == RemoteBuildPathVariableName &&
                  settings.BuildRemoteCatalog &&
@@ -171,6 +206,7 @@ namespace Virtuademy.SDK.Environments.Editor
             settings.RemoteCatalogBuildPath.SetVariableByName(settings, RemoteBuildPathVariableName);
             settings.BuildRemoteCatalog = true;
             settings.EnableJsonCatalog = true;
+            AddJsonCatalogDefine();
             settings.CheckForContentUpdateRestrictionsOption = CheckForContentUpdateRestrictionsOptions.ListUpdatedAssetsWithRestrictions;
             settings.ContentStateBuildPath = string.Empty;
             settings.MaxConcurrentWebRequests = 3;

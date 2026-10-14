@@ -19,26 +19,32 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
   /// lists them in a window (toggle to select, button to focus the asset/graph), and lets the
   /// user copy the WebGL control connection onto the newly added Mobile port for all
   /// selected occurrences.
+  /// <para>
+  /// The scan and the apply do not depend on the window: they take a <see cref="Context"/> for what
+  /// only a person can answer (a progress bar, "save your modified scenes?"), and
+  /// <see cref="CheckPlatformUnitMobilePortRoutine"/> drives them from the command line with the
+  /// window's defaults.
+  /// </para>
   /// </summary>
   public class CheckPlatformUnitMobilePortUpdater : EditorWindow
   {
     #region Types
 
-    private enum ContainerKind
+    internal enum ContainerKind
     {
       GraphAsset,
       Prefab,
       Scene,
     }
 
-    private enum MobileStatus
+    internal enum MobileStatus
     {
       NotConnected, // WebGL is connected, Mobile is not — the case this routine fixes.
       Aligned,      // Mobile has the same destination as WebGL (or both are unconnected).
       Custom,       // Mobile deliberately points to a different destination — nothing to fix.
     }
 
-    private class Occurrence
+    internal class Occurrence
     {
       public ContainerKind Kind;
       public string AssetPath;
@@ -60,6 +66,24 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       public string Error;
 
       public bool Selected;
+    }
+
+    /// <summary>What the scan and the apply ask of whoever drives them. The window answers with a progress bar and the
+    /// usual "save modified scenes?" prompt; the command line answers with no bar and a refusal to touch unsaved scenes.</summary>
+    internal sealed class Context
+    {
+      /// <summary>Shows what is being done: the text and the fraction done. Null for none.</summary>
+      public Action<string, float> Progress;
+
+      /// <summary>Called before the project's scenes are opened one after the other: false skips them. Must not
+      /// leave a modified scene open, because opening replaces it.</summary>
+      public Func<bool> ConfirmSaveScenes;
+
+      /// <summary>Scan only: what was found.</summary>
+      public readonly List<Occurrence> Occurrences = new();
+
+      /// <summary>Scan only: the scenes were not scanned because their unsaved changes were not dealt with.</summary>
+      public bool ScenesSkipped;
     }
 
     #endregion
@@ -263,20 +287,12 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
 
     private void ScanProject()
     {
+      Context context = WindowContext();
+      Scan(context);
+
       occurrences.Clear();
-      scenesSkipped = false;
-
-      try
-      {
-        ScanGraphAssets();
-        ScanPrefabs();
-        ScanScenes();
-      }
-      finally
-      {
-        EditorUtility.ClearProgressBar();
-      }
-
+      occurrences.AddRange(context.Occurrences);
+      scenesSkipped = context.ScenesSkipped;
       hasScanned = true;
 
       // Preselect only the rows that actually need fixing: WebGL connected, Mobile not.
@@ -285,7 +301,31 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       Repaint();
     }
 
-    private void ScanGraphAssets()
+    private static Context WindowContext() => new()
+    {
+      Progress = (text, fraction) => EditorUtility.DisplayProgressBar(WindowTitle, text, fraction),
+      ConfirmSaveScenes = EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo,
+    };
+
+    /// <summary>Finds every Platform Switch node in the graph assets, prefabs and scenes under Assets/.</summary>
+    internal static void Scan(Context context)
+    {
+      try
+      {
+        ScanGraphAssets(context);
+        ScanPrefabs(context);
+        ScanScenes(context);
+      }
+      finally
+      {
+        if (context.Progress != null)
+        {
+          EditorUtility.ClearProgressBar();
+        }
+      }
+    }
+
+    private static void ScanGraphAssets(Context context)
     {
       string[] guids = AssetDatabase.FindAssets("t:ScriptGraphAsset", new[] { "Assets" })
           .Concat(AssetDatabase.FindAssets("t:StateGraphAsset", new[] { "Assets" }))
@@ -295,7 +335,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       for (int i = 0; i < guids.Length; i++)
       {
         string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-        EditorUtility.DisplayProgressBar(WindowTitle, $"Scanning graph assets… {path}", (float)i / guids.Length);
+        context.Progress?.Invoke($"Scanning graph assets… {path}", (float)i / guids.Length);
 
         if (!FileMightContainNode(path))
         {
@@ -309,19 +349,19 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
 
         foreach ((List<Guid> nestingPath, string graphLabel, CheckPlatformUnit unit) in CollectUnits(macro.graph))
         {
-          AddOccurrence(ContainerKind.GraphAsset, path, null, null, 0, nestingPath, graphLabel, unit);
+          AddOccurrence(context, ContainerKind.GraphAsset, path, null, null, 0, nestingPath, graphLabel, unit);
         }
       }
     }
 
-    private void ScanPrefabs()
+    private static void ScanPrefabs(Context context)
     {
       string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" });
 
       for (int i = 0; i < guids.Length; i++)
       {
         string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-        EditorUtility.DisplayProgressBar(WindowTitle, $"Scanning prefabs… {path}", (float)i / guids.Length);
+        context.Progress?.Invoke($"Scanning prefabs… {path}", (float)i / guids.Length);
 
         if (!FileMightContainNode(path))
         {
@@ -334,11 +374,11 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
           continue;
         }
 
-        ScanHierarchy(prefab.transform, prefab.transform, ContainerKind.Prefab, path);
+        ScanHierarchy(context, prefab.transform, prefab.transform, ContainerKind.Prefab, path);
       }
     }
 
-    private void ScanScenes()
+    private static void ScanScenes(Context context)
     {
       string[] guids = AssetDatabase.FindAssets("t:Scene", new[] { "Assets" });
 
@@ -357,9 +397,9 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
         return;
       }
 
-      if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+      if (!context.ConfirmSaveScenes())
       {
-        scenesSkipped = true;
+        context.ScenesSkipped = true;
         return;
       }
 
@@ -370,12 +410,12 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
         for (int i = 0; i < candidates.Count; i++)
         {
           string path = candidates[i];
-          EditorUtility.DisplayProgressBar(WindowTitle, $"Scanning scenes… {path}", (float)i / candidates.Count);
+          context.Progress?.Invoke($"Scanning scenes… {path}", (float)i / candidates.Count);
 
           Scene scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
           foreach (GameObject root in scene.GetRootGameObjects())
           {
-            ScanHierarchy(root.transform, null, ContainerKind.Scene, path);
+            ScanHierarchy(context, root.transform, null, ContainerKind.Scene, path);
           }
         }
       }
@@ -385,7 +425,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       }
     }
 
-    private void ScanHierarchy(Transform hierarchyRoot, Transform indexPathRoot, ContainerKind kind, string assetPath)
+    private static void ScanHierarchy(Context context, Transform hierarchyRoot, Transform indexPathRoot, ContainerKind kind, string assetPath)
     {
       foreach (MonoBehaviour behaviour in hierarchyRoot.GetComponentsInChildren<MonoBehaviour>(true))
       {
@@ -404,12 +444,12 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
 
         foreach ((List<Guid> nestingPath, string graphLabel, CheckPlatformUnit unit) in CollectUnits(nester.nest.embed))
         {
-          AddOccurrence(kind, assetPath, behaviour.transform, indexPathRoot, machineIndex, nestingPath, graphLabel, unit);
+          AddOccurrence(context, kind, assetPath, behaviour.transform, indexPathRoot, machineIndex, nestingPath, graphLabel, unit);
         }
       }
     }
 
-    private void AddOccurrence(ContainerKind kind, string assetPath, Transform owner, Transform indexPathRoot,
+    private static void AddOccurrence(Context context, ContainerKind kind, string assetPath, Transform owner, Transform indexPathRoot,
         int machineIndex, List<Guid> nestingPath, string graphLabel, CheckPlatformUnit unit)
     {
       Occurrence occ = new()
@@ -426,7 +466,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       };
 
       RefreshStatus(occ, unit);
-      occurrences.Add(occ);
+      context.Occurrences.Add(occ);
     }
 
     /// <summary>
@@ -628,20 +668,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
         return;
       }
 
-      int changed = 0, untouched = 0, failed = 0;
-
-      try
-      {
-        ApplyToGraphAssets(selected, ref changed, ref untouched, ref failed);
-        ApplyToPrefabs(selected, ref changed, ref untouched, ref failed);
-        ApplyToScenes(selected, ref changed, ref untouched, ref failed);
-
-        AssetDatabase.SaveAssets();
-      }
-      finally
-      {
-        EditorUtility.ClearProgressBar();
-      }
+      ApplyTo(WindowContext(), selected, out int changed, out int untouched, out int failed);
 
       EditorUtility.DisplayDialog(
           WindowTitle,
@@ -652,13 +679,38 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       Repaint();
     }
 
-    private void ApplyToGraphAssets(List<Occurrence> selected, ref int changed, ref int untouched, ref int failed)
+    /// <summary>Aligns the Mobile connection with the WebGL one on every occurrence in <paramref name="selected"/>,
+    /// and saves what changed: a graph asset or a prefab through the AssetDatabase, a scene by opening it.</summary>
+    internal static void ApplyTo(Context context, List<Occurrence> selected, out int changed, out int untouched, out int failed)
+    {
+      changed = 0;
+      untouched = 0;
+      failed = 0;
+
+      try
+      {
+        ApplyToGraphAssets(context, selected, ref changed, ref untouched, ref failed);
+        ApplyToPrefabs(context, selected, ref changed, ref untouched, ref failed);
+        ApplyToScenes(context, selected, ref changed, ref untouched, ref failed);
+
+        AssetDatabase.SaveAssets();
+      }
+      finally
+      {
+        if (context.Progress != null)
+        {
+          EditorUtility.ClearProgressBar();
+        }
+      }
+    }
+
+    private static void ApplyToGraphAssets(Context context, List<Occurrence> selected, ref int changed, ref int untouched, ref int failed)
     {
       foreach (IGrouping<string, Occurrence> byAsset in selected
                    .Where(o => o.Kind == ContainerKind.GraphAsset)
                    .GroupBy(o => o.AssetPath))
       {
-        EditorUtility.DisplayProgressBar(WindowTitle, $"Updating {byAsset.Key}…", 0f);
+        context.Progress?.Invoke($"Updating {byAsset.Key}…", 0f);
 
         if (AssetDatabase.LoadAssetAtPath<UnityObject>(byAsset.Key) is not IMacro macro || macro.graph == null)
         {
@@ -679,13 +731,13 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       }
     }
 
-    private void ApplyToPrefabs(List<Occurrence> selected, ref int changed, ref int untouched, ref int failed)
+    private static void ApplyToPrefabs(Context context, List<Occurrence> selected, ref int changed, ref int untouched, ref int failed)
     {
       foreach (IGrouping<string, Occurrence> byPrefab in selected
                    .Where(o => o.Kind == ContainerKind.Prefab)
                    .GroupBy(o => o.AssetPath))
       {
-        EditorUtility.DisplayProgressBar(WindowTitle, $"Updating {byPrefab.Key}…", 0f);
+        context.Progress?.Invoke($"Updating {byPrefab.Key}…", 0f);
 
         GameObject root = PrefabUtility.LoadPrefabContents(byPrefab.Key);
 
@@ -710,7 +762,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       }
     }
 
-    private void ApplyToScenes(List<Occurrence> selected, ref int changed, ref int untouched, ref int failed)
+    private static void ApplyToScenes(Context context, List<Occurrence> selected, ref int changed, ref int untouched, ref int failed)
     {
       List<IGrouping<string, Occurrence>> sceneGroups = selected
           .Where(o => o.Kind == ContainerKind.Scene)
@@ -722,7 +774,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
         return;
       }
 
-      if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+      if (!context.ConfirmSaveScenes())
       {
         failed += sceneGroups.Sum(g => Fail(g, "Scene update skipped (unsaved scene changes)"));
         return;
@@ -734,7 +786,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       {
         foreach (IGrouping<string, Occurrence> byScene in sceneGroups)
         {
-          EditorUtility.DisplayProgressBar(WindowTitle, $"Updating {byScene.Key}…", 0f);
+          context.Progress?.Invoke($"Updating {byScene.Key}…", 0f);
 
           Scene scene = EditorSceneManager.OpenScene(byScene.Key, OpenSceneMode.Single);
 
@@ -758,7 +810,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
       }
     }
 
-    private void ProcessOccurrence(Occurrence occ, IGraph rootGraph,
+    private static void ProcessOccurrence(Occurrence occ, IGraph rootGraph,
         ref int changed, ref int untouched, ref int failed, ref bool dirty)
     {
       try
@@ -1003,5 +1055,106 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
     }
 
     #endregion
+  }
+
+  /// <summary>
+  /// The v2026.4.x -> v2026.5.0 update routine without its window: the scan and the apply of
+  /// <see cref="CheckPlatformUnitMobilePortUpdater"/>, for the command line of the update routines
+  /// (<c>UpdateRoutinesCli</c>, in the project's own editor assembly).
+  /// </summary>
+  /// <remarks>
+  /// <para>
+  /// <b>Called by reflection, and returning plain collections.</b> The command line lives outside every
+  /// assembly definition, so it compiles into the creator project's own editor assembly, which must not start
+  /// depending on this assembly compiling: the migrators of the v2026.5 -> v2026.6 routine have to stay
+  /// reachable in exactly the states where this one does not. So it finds this class by name, and both
+  /// methods answer with dictionaries, lists, strings, numbers and booleans, which it writes into its report.
+  /// </para>
+  /// <para>
+  /// What the window preselects is what runs here: only the nodes whose Mobile output is not connected while
+  /// WebGL is. A node whose Mobile connection is already aligned, or deliberately different, is reported and left.
+  /// Scenes are scanned by opening them one after the other and restoring the open scenes afterwards; a scene open
+  /// with unsaved changes makes the scan skip all of them (<c>scenesSkipped</c>), because opening would replace
+  /// it.
+  /// </para>
+  /// </remarks>
+  public static class CheckPlatformUnitMobilePortRoutine
+  {
+    /// <summary>Finds the Platform Switch nodes. Changes nothing (but opens, and closes again, the scenes that mention the node).</summary>
+    public static Dictionary<string, object> Scan()
+    {
+      CheckPlatformUnitMobilePortUpdater.Context context = BatchContext();
+      CheckPlatformUnitMobilePortUpdater.Scan(context);
+
+      List<CheckPlatformUnitMobilePortUpdater.Occurrence> found = context.Occurrences;
+      return new Dictionary<string, object>
+      {
+        { "nodes", found.Count },
+        { "notConnected", found.Count(o => o.Status == CheckPlatformUnitMobilePortUpdater.MobileStatus.NotConnected) },
+        { "aligned", found.Count(o => o.Status == CheckPlatformUnitMobilePortUpdater.MobileStatus.Aligned) },
+        { "custom", found.Count(o => o.Status == CheckPlatformUnitMobilePortUpdater.MobileStatus.Custom) },
+        { "scenesSkipped", context.ScenesSkipped },
+        {
+          "occurrences", found.Select(o => (object)new Dictionary<string, object>
+          {
+            { "path", o.AssetPath },
+            { "kind", o.Kind.ToString() },
+            { "where", o.GameObjectPath },
+            { "graph", o.GraphLabel },
+            { "status", o.Status.ToString() },
+            { "webgl", o.WebGLSummary },
+            { "mobile", o.MobileSummary },
+          }).ToList()
+        },
+      };
+    }
+
+    /// <summary>
+    /// Connects the Mobile output to the WebGL destination on every node whose Mobile output is not connected,
+    /// except in <paramref name="excludedPaths"/> (asset paths), and saves what changed. Rescans first, so it
+    /// acts on the project as it is.
+    /// </summary>
+    public static Dictionary<string, object> Apply(ICollection<string> excludedPaths)
+    {
+      CheckPlatformUnitMobilePortUpdater.Context context = BatchContext();
+      CheckPlatformUnitMobilePortUpdater.Scan(context);
+
+      HashSet<string> excluded = new(excludedPaths ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
+      List<CheckPlatformUnitMobilePortUpdater.Occurrence> selected = context.Occurrences
+        .Where(o => o.Status == CheckPlatformUnitMobilePortUpdater.MobileStatus.NotConnected && !excluded.Contains(o.AssetPath))
+        .ToList();
+      foreach (CheckPlatformUnitMobilePortUpdater.Occurrence occurrence in selected)
+      {
+        occurrence.Selected = true;
+      }
+
+      int changed = 0, untouched = 0, failed = 0;
+      if (selected.Count > 0)
+      {
+        CheckPlatformUnitMobilePortUpdater.ApplyTo(context, selected, out changed, out untouched, out failed);
+      }
+
+      return new Dictionary<string, object>
+      {
+        { "selected", selected.Count },
+        { "changed", changed },
+        { "untouched", untouched },
+        { "failed", failed },
+        { "scenesSkipped", context.ScenesSkipped },
+        {
+          "files", selected.Select(o => o.AssetPath).Distinct().Cast<object>().ToList()
+        },
+        {
+          "errors", selected.Where(o => !string.IsNullOrEmpty(o.Error))
+            .Select(o => (object)new Dictionary<string, object> { { "path", o.AssetPath }, { "error", o.Error } }).ToList()
+        },
+      };
+    }
+
+    // No bar, and unsaved scenes are never saved nor discarded: a scan or an apply that finds one skips the scenes.
+    private static CheckPlatformUnitMobilePortUpdater.Context BatchContext() => new()
+    {
+      ConfirmSaveScenes = () => !Enumerable.Range(0, SceneManager.sceneCount).Select(SceneManager.GetSceneAt).Any(scene => scene.isDirty),
+    };
   }
 }

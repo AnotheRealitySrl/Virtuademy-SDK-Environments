@@ -2,7 +2,66 @@
 
 ## Unreleased
 
+**Requires the Virtuademy-SDK-Core release that adds `EditorSessionManager.InteractiveLoginAllowed` and
+`AppConfigurationImporter`** (the `package.json` dependency is raised at the release cut): `EnvironmentsCli`
+refers to both directly, so this package does not compile against Core 0.3.0.
+
 ### Added
+- **`EnvironmentsCli`: build, preview and deploy an environment without the Addressables window**
+  (minor bump). A batch entry point, `-executeMethod Virtuademy.SDK.Environments.Editor.EnvironmentsCli.Run
+  -vdCommand <command> [options]`, in the style of the setup package's `SetupCli`: `-vd...` arguments,
+  one `[EnvironmentsCli] REPORT {json}` line at the end of every run, documented exit codes, and it exits the
+  editor itself (no `-quit`: the work is asynchronous, so the method keeps the editor alive until it is done,
+  with an overall timeout, `-vdTimeoutMinutes`, 60 by default).
+  - **Commands.** `status` (session, Addressables configured, scene list, interpreter; no network),
+    `session [-vdRenew]`, `tenant-config -vdConfigFile <path> [-vdAllowTracked]` (see the SDK-Core entry: the file
+    lands in `Assets/Editor/TenantConfiguration`, and the command refuses with 23 when git does not ignore where it
+    would sit, unless `-vdAllowTracked`), `worlds` (the worlds the
+    login can deploy to, and where each included scene is already published), `build [-vdScenes a,b]` (what
+    **Build Addressables** does, interpreted scripts included), `preview (-vdWorlds <ids> | -vdTenant)
+    [-vdExpectTenant <label>]` (what a deploy would add and update, per scene) and `deploy (-vdWorlds <ids> |
+    -vdTenant) -vdExpectTenant <label> [-vdBuild] [-vdDryRun] [-vdScenes a,b]` (what **Deploy** / **Build &
+    Deploy** and the tenant buttons do). The target of a deploy is always explicit, and an id the login cannot
+    deploy to stops the command before anything is built or sent. `-vdDryRun` does everything but the uploads
+    and imports. At tenant level the scripts are not uploaded, and the command says so.
+  - **A deploy names its tenant, and the platform it will call.** `deploy` requires `-vdExpectTenant <label>`,
+    the tenant label the session shows (`session` prints it), compared case-insensitively with the logged-in
+    tenant's: missing or different, it exits with 24 before anything is built or sent (`preview` checks it when
+    given). Every command that calls the platform (`worlds`, `preview`, `deploy`) also checks that the
+    Application API it will call, which the editor takes from the project's generated `PlatformEndpoints` asset
+    before it looks at the login, is on the same host as the one the logged-in tenant's configuration names, and
+    exits with 25 when it is not (the token would go to another platform). The REPORT of those three carries a
+    `target` object: tenant label, environment and both hosts.
+  - **A timeout never cuts a deploy in half.** When `-vdTimeoutMinutes` passes during a deploy, the scene step in
+    flight (its upload and import) finishes, no further world, assembly, scene or link step starts, and the run
+    exits with 21 and a REPORT whose `deploy` says, per world and scene, what was uploaded, started and linked and
+    what was not; ten minutes after the deadline a hard ceiling ends the run anyway, with the same partial report.
+    `deploy.importsStarted` (renamed from `published`) counts the imports the platform accepted: it answers
+    "started", and the import runs on the platform afterwards, so it is not a count of live environments.
+  - **Arguments are strict.** Any `-vd...` argument (prefix `-`, `--` or `/`, any case) that is not exactly one of
+    the command's options is refused with 10, as is an option given twice, a bad `-vdTimeoutMinutes` and a stray
+    value (`-vdWorlds 12 13`, which used to deploy to 12 alone). Unity's own arguments are not touched.
+  - **Exit codes.** 0 done, 1 unexpected, 10 bad arguments, 11 login required, 12 Addressables not configured,
+    13 nothing to build, 14 build failed, 15 interpreted scripts refused, 16 world not deployable, 17 deploy
+    finished with problems, 18 not a tenant manager, 19 configuration file not imported, 20 platform
+    unreachable, 21 timeout, 22 zips missing, 23 configuration file would not be ignored by git, 24 tenant not
+    confirmed (`-vdExpectTenant` missing or different), 25 API host does not match the logged-in tenant.
+  - **Batch mode never starts an interactive login.** A command that calls the platform renews an expired
+    session silently and, when that is not possible, exits with 11 and says to log in from
+    **Virtuademy > Addressables management**. `build` needs a session only for a project with interpreted
+    scripts (the server's verification is the authoritative one, so without a session such a build is refused,
+    as in the window, unless the scripts are unchanged since they were last published); a project without
+    interpreted scripts builds with no session at all.
+  - **The editor is kept from reloading its scripts for the whole run.** A build switches the active build
+    target, which queues a recompilation and, a few seconds later, a domain reload that ends any awaiting code:
+    measured in batch mode, a deploy that followed a build never resumed. The command locks the reload
+    (`EditorApplication.LockReloadAssemblies`) and exits without unlocking.
+  - **Window and command line share the code, so they cannot drift.** The orchestration moved out of
+    `AddressablesManagementWindow` into public static classes: `EnvironmentsBuild` (verify the interpreted
+    scripts, build and zip, `BuildAndZip` returns what was built where), `EnvironmentsDeploy` (the world list
+    and its role filter, the deploy preview, the deploy to worlds and to the tenant with a per-world and
+    per-scene report, the API calls) and `SceneListScriptableObject.Find()` / `LoadOrCreate()`. The window keeps
+    its dialogs, its deploy-error panel and its progress bar: it passes them in as a `DeployObserver`.
 - **`AddressablesConfiguration`: apply and check the SDK's Addressables configuration without the
   window** (minor bump). The public static class
   `Virtuademy.SDK.Environments.Editor.AddressablesConfiguration` owns what the "Fix Addressables
@@ -19,8 +78,47 @@
     reflection on a window nobody had opened. `SetupCli` now has an `addressables` step that calls
     `Apply()`.
   - The window keeps its bindings and delegates to the class; nothing changes for someone using it.
+- **`UpdateRoutinesCli`: run the update routines from the command line** (minor bump). A batch entry point,
+  `-executeMethod Virtuademy.BreakingChangeSolvers.UpdateRoutinesCli.Run -vdRoutine <routine> [options]`, in the
+  style of `EnvironmentsCli` and the setup package's `SetupCli`: `-vd...` arguments, unknown options refused, one
+  `[UpdateRoutinesCli] REPORT {json}` line per launch, documented exit codes (arguments are strict like
+  `EnvironmentsCli`'s: `--vdDryRun`, `-VdDryRun`, a duplicate or a stray value is exit 10), and it exits the editor itself (no
+  `-quit`). It is the eighth script outside every asmdef: it has to reach the migrators, which compile into the
+  project's own `Assembly-CSharp-Editor`, and it reaches the v2026.4.x -> v2026.5.0 routine, which is in
+  `Virtuademy.SDK.Environments.Editor`, by reflection.
+  - **Routines.** `list` (the routines the project has, their menu names, and whether each finds something to
+    change: a dry scan), `2026.6` (**v2026.5 -> v2026.6**: the text rewrite, the POI page markers, the GUID
+    collisions and the legacy folders, with the window's defaults) and `2026.5` (**v2026.4.x -> v2026.5.0**: the
+    Mobile output of Platform: Switch nodes, in the nodes where it is not connected). `-vdDryRun` scans and reports and
+    changes nothing; `-vdExclude a,b` unticks files (asset paths, or a folder with a trailing `/`); `-vdSkip` turns off
+    `unpin`, `pages`, `guids` or `folders` of `2026.6`. The report names the files changed per category, the ones the
+    re-save left for a manual check, and what is left. Running a routine again finds nothing.
+  - **Exit codes.** 0 done, 1 unexpected, 2 launch again, 3 changes pending (a dry run found something), 10 bad
+    arguments, 11 routine not loaded, 12 compile errors, 13 finished with problems, 14 timeout, 15 run `2026.6`
+    first.
+  - **One launch is one round.** `2026.6` rewrites scripts and the manifest, so Unity has to recompile before the
+    changed files can be re-saved: the launch that changes the project exits with 2, and the next one waits for the
+    re-save (`VirtuademyUpdateResave`), reports it and finds nothing more to change. The caller launches again, with
+    the same arguments, while the code is 2.
+  - **Nothing is saved before the routine.** `2026.6` only rewrites text; the re-save goes through
+    `VirtuademyUpdateSaveGuard` like any save. `2026.5` saves the graphs it changes, so it refuses to start (15) while
+    any scene, prefab or asset still has Visual Scripting data that `2026.6` renames.
+  - **Window and command line share the code.** The scan and the apply of `2026.6` moved out of
+    `VirtuademyRenameMigrator` into `VirtuademyRenameRoutine` (`ScanProject`, `Apply`, `Options`, `Result`), those of
+    `2026.5` out of `CheckPlatformUnitMobilePortUpdater` into static methods taking a `Context` (the progress bar and
+    the "save modified scenes?" prompt are what the window passes in), exposed to the command line by
+    `CheckPlatformUnitMobilePortRoutine`. The windows behave as before. `VirtuademyUpdateResave.LastRun` gives the
+    outcome of the last re-save, `VirtuademyFolderMigrator.Result.Refusals` says what was left in place and why, and
+    the node library rebuild reports whether it happened (it does not in a batch project whose unit options were
+    never built: run **Update VS Library**).
 
 ### Changed
+- **The window's public deploy helpers moved to `EnvironmentsDeploy`** (`GetUploadLinkForWorld`,
+  `ImportSceneToWorld`, `ImportEnvironmentDll`, `LinkEnvironmentDll`, `ImportSceneToTenant`,
+  `GetTenantUploadLink`, `UploadZip`, `UploadZipViaFtp`, `FtpUploadConfig`), and `PublishableWorld` became
+  public with them. Nothing in the SDK called them from outside the window. `UploadZip` and `UploadZipViaFtp`
+  are static now. The window keeps the old members as `[Obsolete]` forwarders, so code written against it
+  still compiles.
 - **"Build & Deploy" and "Build & Deploy to Tenant" refuse to start when the Addressables are not
   configured** (behaviour change; it goes with the minor bump above). They stop before the
   interpreted DLL step, log an error in the deploy panel and the Console naming the "Fix
@@ -31,10 +129,27 @@
   the fix itself: it deletes groups and entries, which the creator has to agree to.
 
 ### Fixed
+- **The window's "Build & Deploy" and "Build & Deploy to Tenant" lock assembly reloads while they run.** The build
+  switches the active build target, which queues a recompilation and a domain reload, and the flow then awaits the
+  network: a reload in the middle of it ended the awaiting code silently, with a half-sent deploy. The two flows
+  call `EditorApplication.LockReloadAssemblies()` and always unlock in a `finally` (early returns and exceptions
+  included), so the reload waits for the end of the flow.
 - **Addressables management window layout.** The login status at the top wraps instead of running
   out of the window and squeezing the Login/Logout button, which keeps its width and the same margin
   as Login. The status icons of the advanced configuration keep their size: next to a long value,
   as Remote.LoadPath and PlayerVersionOverride have once configured, they shrank to nothing.
+- **"Fix Addressables configurations" no longer leads to a binary catalog.** It set Addressables'
+  "Enable Json Catalog" but not the `ENABLE_JSON_CATALOG` scripting define that Addressables' own settings
+  inspector adds with it, so the first build after the fix wrote a binary catalog and failed with the
+  "Unable to build Addressables correctly" help box (untick and tick "Enable Json catalog" by hand, save,
+  restart). `AddressablesConfiguration.Apply()` now adds the define for Windows, Android, iOS and WebGL,
+  and `IsConfigured` requires it: projects fixed before show the top-level settings in red until fixed
+  again.
+- **The 2026.6 update routine moves the legacy folders on its first run.** `VirtuademyFolderMigrator`
+  created the destination folders (`Assets/Virtuademy/Editor/Settings`, …) inside the asset-editing batch,
+  where they are not in the asset database yet, so every move into them was refused ("Parent directory is not
+  in asset database") and the assets moved only on a second run. The destinations are now created before the
+  batch.
 
 ## v10.0.0
 

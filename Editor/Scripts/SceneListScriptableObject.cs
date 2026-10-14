@@ -86,6 +86,48 @@ namespace Virtuademy.SDK.Environments.Editor
 
         public List<SceneConfiguration> SceneConfigurations => sceneConfigurations;
 
+        /// <summary>The folder the list's asset is created in when the project has none.</summary>
+        public const string DefaultFolder = "Assets/Virtuademy/Editor/Settings";
+
+        /// <summary>The file name of the asset created in <see cref="DefaultFolder"/>.</summary>
+        public const string DefaultFileName = "AddressablesSceneList.asset";
+
+        /// <summary>
+        /// The project's scene list, or null when it has none yet. Creates and changes nothing: the
+        /// list is only created by <see cref="LoadOrCreate"/>, which the Addressables management
+        /// window calls when it opens.
+        /// </summary>
+        public static SceneListScriptableObject Find()
+        {
+            string guid = AssetDatabase.FindAssets("t:" + nameof(SceneListScriptableObject)).FirstOrDefault();
+            return guid == null ? null : AssetDatabase.LoadAssetAtPath<SceneListScriptableObject>(AssetDatabase.GUIDToAssetPath(guid));
+        }
+
+        /// <summary>
+        /// <see cref="Find"/>, and when the project has no list, a new one at <see cref="DefaultFolder"/>.
+        /// It is not synchronised with the project's scenes here: <see cref="SyncWithProject"/> does that.
+        /// </summary>
+        public static SceneListScriptableObject LoadOrCreate()
+        {
+            SceneListScriptableObject existing = Find();
+            if (existing != null)
+                return existing;
+
+            string current = "Assets";
+            foreach (string folder in DefaultFolder.Split('/').Skip(1))
+            {
+                string next = current + "/" + folder;
+                if (!AssetDatabase.IsValidFolder(next))
+                    AssetDatabase.CreateFolder(current, folder);
+                current = next;
+            }
+
+            SceneListScriptableObject created = CreateInstance<SceneListScriptableObject>();
+            AssetDatabase.CreateAsset(created, $"{DefaultFolder}/{DefaultFileName}");
+            AssetDatabase.SaveAssets();
+            return created;
+        }
+
         /// <summary>
         /// Makes the list mirror the scenes of the project — every <c>.unity</c> under <c>Assets/</c>, packages
         /// excluded — so nothing gets published because it was added by hand, and nothing is forgotten because

@@ -45,16 +45,22 @@ namespace Virtuademy.BreakingChangeSolvers
         /// <summary>What a <see cref="Consolidate"/> pass did, for the caller to report.</summary>
         public readonly struct Result
         {
-            public Result(int moved, int refused, int pruned)
+            public Result(int moved, int refused, int pruned, IReadOnlyList<string> refusals = null)
             {
                 Moved = moved;
                 Refused = refused;
                 Pruned = pruned;
+                this.refusals = refusals;
             }
+
+            private readonly IReadOnlyList<string> refusals;
 
             public int Moved { get; }
             public int Refused { get; }
             public int Pruned { get; }
+
+            /// <summary>What was left where it was, one entry per asset: the path and why.</summary>
+            public IReadOnlyList<string> Refusals => refusals ?? Array.Empty<string>();
         }
 
         private const string Root = "Assets/Virtuademy";
@@ -101,6 +107,18 @@ namespace Virtuademy.BreakingChangeSolvers
             List<string> moved = new();
             List<string> refused = new();
 
+            // The destinations first, outside the editing batch: a folder created inside
+            // StartAssetEditing is not in the asset database until StopAssetEditing, so every
+            // MoveAsset into it was refused ("Parent directory is not in asset database") and the
+            // assets only moved on a second run.
+            foreach ((string from, string to) in Moves)
+            {
+                if (AssetDatabase.IsValidFolder(from))
+                {
+                    EnsureFolderExists(to);
+                }
+            }
+
             try
             {
                 AssetDatabase.StartAssetEditing();
@@ -111,8 +129,6 @@ namespace Virtuademy.BreakingChangeSolvers
                     {
                         continue;
                     }
-
-                    EnsureFolderExists(to);
 
                     // Direct children only. A nested folder moves as one asset, with everything
                     // under it, so recursing would move the same files twice.
@@ -167,7 +183,7 @@ namespace Virtuademy.BreakingChangeSolvers
 
             Report(moved, refused, pruned);
 
-            return new Result(moved.Count, refused.Count, pruned.Count);
+            return new Result(moved.Count, refused.Count, pruned.Count, refused);
         }
 
         /// <summary>Assets directly inside <paramref name="folder"/>, subfolders included.</summary>

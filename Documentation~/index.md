@@ -28,10 +28,41 @@ ones carry no platform and can be used on their own.
 | Assembly | Holds |
 |---|---|
 | `Virtuademy.SDK.Environments` | the runtime code an interpreted script must not reach: Visual Scripting nodes, the task, dialog and analytics adapters, the catalog variables |
-| `Virtuademy.SDK.Environments.Editor` | editor code, publish tooling and editor authentication |
+| `Virtuademy.SDK.Environments.Editor` | editor code, publish tooling (`EnvironmentsBuild`, `EnvironmentsDeploy`, the window and the `EnvironmentsCli` command line) |
 | `Virtuademy.SDK.Environments.HybridCLREditor` | the HybridCLR integration (`defineConstraints: [HYBRIDCLR_INSTALLED]`) |
 | `Virtuademy.SDK.Environments.I2Loc`, `.I2Loc.Editor` | the optional I2 Localization bridge |
 | `Virtuademy.Environments.ScriptingApi` | the interpreted-script facade and the placeholders, the part of this package the server-side whitelist admits by name |
+
+## Command line
+
+`Virtuademy.SDK.Environments.Editor.EnvironmentsCli` builds and publishes from a terminal what the
+**Virtuademy > Addressables management** window does with buttons, for CI and for an assistant:
+
+```
+Unity -batchmode -nographics -projectPath <project> -logFile -
+      -executeMethod Virtuademy.SDK.Environments.Editor.EnvironmentsCli.Run
+      -vdCommand <command> [options]
+```
+
+| Command | What it does |
+|---|---|
+| `status` | the session, whether the Addressables are configured, the scene list and the interpreter. No network |
+| `session [-vdRenew]` | the session fields; with `-vdRenew` renews an expired session silently, or exits 11 |
+| `tenant-config -vdConfigFile <path> [-vdEnv <key>] [-vdConfigFolder <folder>] [-vdAllowTracked]` | imports the file downloaded from the Back Office into `Assets/Editor/TenantConfiguration`, adds it to the App Assets and selects it; exits 23 when git does not ignore where it would land (it holds the app's secret), unless `-vdAllowTracked` |
+| `worlds` | the worlds the login can deploy to, and where each included scene is already published |
+| `build [-vdScenes a,b]` | verifies the interpreted scripts, builds every platform each included scene needs, zips into `ServerData` |
+| `preview (-vdWorlds <ids> \| -vdTenant) [-vdExpectTenant <label>] [-vdScenes a,b]` | what a deploy there would add and update; checks the tenant label when given |
+| `deploy (-vdWorlds <ids> \| -vdTenant) -vdExpectTenant <label> [-vdBuild] [-vdDryRun] [-vdScenes a,b]` | uploads and imports the built zips (and the interpreted assembly, to worlds); `-vdExpectTenant` is the tenant label the session shows and is mandatory (exit 24 when missing or different); `-vdBuild` builds first, `-vdDryRun` sends nothing |
+
+Every run ends with a `[EnvironmentsCli] REPORT {json}` line and exits the editor with a code: 0 done,
+1 unexpected, 10 bad arguments, 11 login required, 12 Addressables not configured, 13 nothing to build, 14
+build failed, 15 interpreted scripts refused, 16 world not deployable, 17 deploy finished with problems, 18
+not a tenant manager, 19 configuration file not imported, 20 platform unreachable, 21 timeout, 22 zips
+missing, 23 configuration file would not be ignored by git, 24 tenant not confirmed, 25 API host does not match
+the logged-in tenant. Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
+a deploy lets the step in flight finish and reports what was and was not done. Batch mode never starts an interactive login: log in once from the window, and the commands renew
+the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list
+(`Assets/Virtuademy/Editor/Settings/AddressablesSceneList.asset`). Details: the class's XML documentation.
 
 ## Folders
 

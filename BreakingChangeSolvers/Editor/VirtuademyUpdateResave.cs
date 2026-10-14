@@ -96,6 +96,22 @@ namespace Virtuademy.BreakingChangeSolvers
         /// run by hand either.</summary>
         public static bool IsWaitingForReload => waitingForReload;
 
+        /// <summary>What one run of the re-save did, for a caller that is not a person reading the
+        /// Console: the command line of the update routines (<c>UpdateRoutinesCli</c>) puts it in its report.</summary>
+        public sealed class Summary
+        {
+            public int Resaved;
+            public int Unchanged;
+            /// <summary>Files that were scheduled and are no longer in the project.</summary>
+            public int Missing;
+            /// <summary>Files left as the rewrite wrote them, and why: each needs a manual check and save.</summary>
+            public List<(string Path, string Reason)> ToCheck = new();
+        }
+
+        /// <summary>The summary of the last run in this editor session, or null when none has run since the
+        /// scripts were last loaded.</summary>
+        public static Summary LastRun { get; private set; }
+
         /// <summary>
         /// Records the files to re-save and when to do it. Call it after the rewrite and after
         /// <see cref="AssetDatabase.Refresh()"/>, but before anything moves the files.
@@ -286,6 +302,11 @@ namespace Virtuademy.BreakingChangeSolvers
             }
 
             ReopenScenes(pending.ReopenSceneGuids);
+
+            LastRun = new Summary { Resaved = resaved, Unchanged = unchanged, Missing = missing };
+            LastRun.ToCheck.AddRange(restored);
+            LastRun.ToCheck.AddRange(skipped.Select(p => (p, "open with unsaved changes")));
+
             Report(resaved, unchanged, missing, restored, skipped);
         }
 

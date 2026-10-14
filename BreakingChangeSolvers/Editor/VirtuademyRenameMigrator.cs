@@ -101,20 +101,13 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
     /// </summary>
     public class VirtuademyRenameMigrator : EditorWindow
     {
-        private class Entry
-        {
-            public string Path;
-            public int Hits;
-            public bool Selected = true;
-        }
-
         // The old brand token is split so this file never matches its own patterns
         // (neither when the repo-side rename scripts run, nor when the tool scans itself
         // in a project where packages are embedded).
         private static readonly string OldBrand = "Reflec" + "tis";
         private const string NewBrand = "Virtuademy";
         private const string MenuPath = "Virtuademy/Update routines/v2026.5 -> v2026.6";
-        private const string WindowTitle = "Update v2026.5 -> v2026.6";
+        internal const string WindowTitle = "Update v2026.5 -> v2026.6";
 
         // Ordered: specific mappings first, then the generic namespace rule.
         private static readonly (string oldValue, string newValue)[] LiteralMap =
@@ -588,18 +581,18 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             return result;
         }
 
-        private static readonly string[] TextExtensions =
+        internal static readonly string[] TextExtensions =
         {
             ".cs", ".asmdef", ".asmref", ".json", ".uxml", ".uss", ".tss",
             ".unity", ".prefab", ".asset", ".md", ".txt",
         };
 
-        private static readonly string[] YamlExtensions = { ".unity", ".prefab", ".asset" };
+        internal static readonly string[] YamlExtensions = { ".unity", ".prefab", ".asset" };
 
         /// <summary>What recompiles when rewritten, so the re-save has to wait for the next domain.</summary>
-        private static readonly string[] CodeExtensions = { ".cs", ".asmdef", ".asmref" };
+        internal static readonly string[] CodeExtensions = { ".cs", ".asmdef", ".asmref" };
 
-        private readonly List<Entry> entries = new();
+        private List<VirtuademyRenameRoutine.FileEntry> entries = new();
         private Vector2 scrollPosition;
         private bool hasScanned;
         private bool unpinLockFile = true;
@@ -671,7 +664,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                     EditorStyles.miniLabel);
 
                 scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
-                foreach (Entry entry in entries)
+                foreach (VirtuademyRenameRoutine.FileEntry entry in entries)
                 {
                     using (new EditorGUILayout.HorizontalScope(EditorStyles.helpBox))
                     {
@@ -890,46 +883,22 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
         private void ScanProject()
         {
-            entries.Clear();
+            VirtuademyRenameRoutine.ScanResult scan = VirtuademyRenameRoutine.ScanProject(
+                (path, fraction) => EditorUtility.DisplayProgressBar(WindowTitle, path, fraction));
 
-            try
-            {
-                int index = 0;
-                List<string> candidates = CandidateFiles().ToList();
-                foreach (string path in candidates)
-                {
-                    EditorUtility.DisplayProgressBar(WindowTitle, path, (float)index++ / candidates.Count);
-
-                    string text = ReadTextOrNull(path);
-                    if (text == null)
-                    {
-                        continue;
-                    }
-
-                    int hits = IsManifest(path) ? ManifestHits(text) : CountHits(text);
-                    if (hits > 0)
-                    {
-                        entries.Add(new Entry { Path = path.Replace('\\', '/'), Hits = hits });
-                    }
-                }
-            }
-            finally
-            {
-                EditorUtility.ClearProgressBar();
-            }
-
-            poiPageEntries = VirtuademyPOIPageMigrator.Scan();
-            guidEntries = VirtuademyGuidCollisionMigrator.Scan();
-            hasLegacyFolders = VirtuademyFolderMigrator.HasLegacyFolders();
+            entries = scan.Files;
+            poiPageEntries = scan.Pages;
+            guidEntries = scan.Guids;
+            hasLegacyFolders = scan.HasLegacyFolders;
             hasScanned = true;
             Repaint();
         }
 
         private void Apply(bool rewriteFiles, bool migratePages, bool resolveGuids, bool consolidate)
         {
-            List<Entry> selected = rewriteFiles
+            List<VirtuademyRenameRoutine.FileEntry> selected = rewriteFiles
                 ? entries.Where(e => e.Selected).ToList()
-                : new List<Entry>();
+                : new List<VirtuademyRenameRoutine.FileEntry>();
 
             List<string> steps = new();
             if (rewriteFiles)
@@ -962,183 +931,62 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 return;
             }
 
-            // A scene open while its file is rewritten under it comes back as a "modified externally"
-            // prompt, and a later save of it would write the old content back over the rewrite. Close
-            // it first; the re-save opens it again when it is done.
-            //
-            // Closed WITHOUT saving, never through the usual "save modified scenes?" prompt. An open
-            // scene was deserialized by the updated packages under its old type names, so its graphs
-            // hold MissingType units with renumbered JSON ids; saving it writes that out, and no rewrite
-            // brings the graph back ("Object definition has not been encountered for object with id=N"
-            // on every later open — reproduced on 2026-10-09). Its unsaved changes are lost instead, and
-            // the creator is told so before anything happens.
-            HashSet<string> toRewrite = new(
-                selected.Select(e => e.Path)
-                    .Concat(migratePages ? poiPageEntries.Select(e => e.Path) : Enumerable.Empty<string>())
-                    .Concat(resolveGuids ? guidEntries.SelectMany(e => e.ReferencingFiles) : Enumerable.Empty<string>()),
-                StringComparer.OrdinalIgnoreCase);
-            List<Scene> openSceneList = Enumerable.Range(0, SceneManager.sceneCount)
-                .Select(SceneManager.GetSceneAt)
-                .Where(s => !string.IsNullOrEmpty(s.path))
-                .ToList();
-            List<string> openScenes = openSceneList.Select(s => s.path).ToList();
-            List<string> reopenScenes = new();
-            if (openScenes.Any(toRewrite.Contains))
+            VirtuademyRenameRoutine.Result result = VirtuademyRenameRoutine.Apply(
+                new VirtuademyRenameRoutine.ScanResult
+                {
+                    Files = entries,
+                    Pages = poiPageEntries,
+                    Guids = guidEntries,
+                    HasLegacyFolders = hasLegacyFolders,
+                },
+                new VirtuademyRenameRoutine.Options
+                {
+                    RewriteFiles = rewriteFiles,
+                    MigratePOIPages = migratePages,
+                    ResolveGuidCollisions = resolveGuids,
+                    ConsolidateFolders = consolidate,
+                    UnpinLockFile = unpinLockFile,
+                },
+                ConfirmDiscardingScenes,
+                (text, fraction) => EditorUtility.DisplayProgressBar(WindowTitle, text, fraction));
+
+            if (result.Cancelled)
             {
-                List<string> dirty = openSceneList.Where(s => s.isDirty).Select(s => s.path).ToList();
-                if (dirty.Count > 0 && !EditorUtility.DisplayDialog(
-                        WindowTitle,
-                        "These open scenes have unsaved changes:\n\n  " + string.Join("\n  ", dirty) +
-                        "\n\nThey are closed WITHOUT saving. Saved now, before the update, their Visual Scripting " +
-                        "graphs would be written with the nodes the updated packages cannot resolve yet, and could " +
-                        "not be recovered. Their unsaved changes are lost.",
-                        "Discard changes and apply", "Cancel"))
-                {
-                    return;
-                }
-                reopenScenes = openScenes;
-                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                return;
             }
-
-            int changedFiles = 0, failed = 0, changedPages = 0, failedPages = 0, resolvedGuids = 0, failedGuids = 0;
-            List<string> changedPaths = new();
-            bool lockUnpinned = false;
-            HashSet<string> rewrittenDependencies = new(StringComparer.Ordinal);
-
-            try
-            {
-                for (int i = 0; i < selected.Count; i++)
-                {
-                    Entry entry = selected[i];
-                    EditorUtility.DisplayProgressBar(WindowTitle, entry.Path, (float)i / selected.Count);
-
-                    try
-                    {
-                        string text = ReadTextOrNull(entry.Path);
-                        if (text == null)
-                        {
-                            continue;
-                        }
-
-                        string rewritten = IsManifest(entry.Path) ? RewriteManifest(text) : Rewrite(text);
-                        if (!string.Equals(rewritten, text, StringComparison.Ordinal))
-                        {
-                            File.WriteAllText(entry.Path, rewritten, new UTF8Encoding(HasUtf8Bom(entry.Path)));
-                            changedFiles++;
-                            changedPaths.Add(entry.Path);
-
-                            if (entry.Path == VirtuademyPackageLock.ManifestPath)
-                            {
-                                rewrittenDependencies = VirtuademyPackageLock.RewrittenDependencies(text, rewritten);
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        failed++;
-                        Debug.LogError($"[{WindowTitle}] Failed to rewrite {entry.Path}: {e}");
-                    }
-                }
-
-                // After the rename, which may have rewritten the same scenes: the page pass re-reads
-                // every file it touches, so it works on what the rename left.
-                if (migratePages)
-                {
-                    EditorUtility.DisplayProgressBar(WindowTitle, "POI page markers", 1f);
-                    changedPages = VirtuademyPOIPageMigrator.Apply(poiPageEntries, out failedPages, changedPaths);
-                }
-
-                // After both rewrites, and before the refresh: it deletes and re-GUIDs files, which
-                // the refresh then imports, and it re-reads every file it rewrites.
-                if (resolveGuids)
-                {
-                    EditorUtility.DisplayProgressBar(WindowTitle, "GUID collisions", 1f);
-                    resolvedGuids = VirtuademyGuidCollisionMigrator.Apply(guidEntries, out failedGuids, changedPaths);
-                }
-
-                // Only the git packages whose manifest entry this run rewrote: deleting the whole lock
-                // also unpinned every third-party git dependency, and one with no #ref then resolved
-                // to whatever its default branch is today (see VirtuademyPackageLock).
-                if (rewriteFiles && unpinLockFile && rewrittenDependencies.Count > 0)
-                {
-                    List<string> unpinned = VirtuademyPackageLock.UnpinGitPackages(rewrittenDependencies);
-                    // Resolve and wait whenever the manifest changed, not only when an entry left the
-                    // lock: a renamed package's new id was never in it.
-                    lockUnpinned = true;
-                    if (unpinned.Count > 0)
-                    {
-                        Debug.Log($"[{WindowTitle}] Unpinned {unpinned.Count} git package(s) in {VirtuademyPackageLock.LockPath} " +
-                                  "so UPM resolves them again; every other entry keeps its pinned version:\n  " +
-                                  string.Join("\n  ", unpinned));
-                    }
-                }
-            }
-            finally
-            {
-                EditorUtility.ClearProgressBar();
-            }
-
-            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
-
-            if (lockUnpinned)
-            {
-                // Explicitly, rather than trusting the refresh to notice: the re-save waits for the
-                // unpinned entries to come back, and only a resolve writes them.
-                UnityEditor.PackageManager.Client.Resolve();
-            }
-
-            // After the refresh, which is what gives a rewritten file its place in the AssetDatabase
-            // under the path the scan saw; before the folder move, which changes that path. The re-save
-            // records GUIDs, so the move does not lose it.
-            List<string> toResave = changedPaths
-                .Where(p => YamlExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            bool codeChanged = changedPaths.Any(p =>
-                CodeExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()));
-            VirtuademyUpdateResave.Schedule(toResave, reopenScenes,
-                lockUnpinned ? rewrittenDependencies.ToList() : new List<string>(), codeChanged);
-
-            // After the rewrite, never before: the rewrite writes to the paths the scan recorded,
-            // and moving a folder out from under it would send those writes to files that moved.
-            VirtuademyFolderMigrator.Result folders = consolidate
-                ? VirtuademyFolderMigrator.Consolidate()
-                : default;
-
-            RebuildVisualScriptingUnits();
 
             string report = "Done.\n";
 
             if (rewriteFiles)
             {
-                report += $"\nRewritten: {changedFiles}\nFailed: {failed}";
+                report += $"\nRewritten: {result.RewrittenPaths.Count}\nFailed: {result.FailedFiles}";
             }
 
             if (migratePages)
             {
-                report += $"\nPOI page markers replaced in: {changedPages} file(s)" +
-                          (failedPages > 0 ? $", {failedPages} failed" : string.Empty);
+                report += $"\nPOI page markers replaced in: {result.PagePaths.Count} file(s)" +
+                          (result.FailedPages > 0 ? $", {result.FailedPages} failed" : string.Empty);
             }
 
             if (resolveGuids)
             {
-                report += $"\nGUID collisions resolved: {resolvedGuids}" +
-                          (failedGuids > 0 ? $", {failedGuids} failed" : string.Empty);
+                report += $"\nGUID collisions resolved: {result.ResolvedGuids}" +
+                          (result.FailedGuids > 0 ? $", {result.FailedGuids} failed" : string.Empty);
             }
 
             if (consolidate)
             {
-                report += $"\nMoved into Assets/Virtuademy: {folders.Moved} asset(s), " +
-                          $"{folders.Pruned} folder(s) removed" +
-                          (folders.Refused > 0 ? $", {folders.Refused} left in place" : string.Empty);
+                report += $"\nMoved into Assets/Virtuademy: {result.Folders.Moved} asset(s), " +
+                          $"{result.Folders.Pruned} folder(s) removed" +
+                          (result.Folders.Refused > 0 ? $", {result.Folders.Refused} left in place" : string.Empty);
             }
 
             EditorUtility.DisplayDialog(
                 WindowTitle,
                 report +
-                (failed > 0 || failedPages > 0 || failedGuids > 0 || folders.Refused > 0 ? "\n\nSee the Console for details." : string.Empty) +
-                (toResave.Count > 0
-                    ? $"\n\nUnity will now recompile. Afterwards the {toResave.Count} scene(s), prefab(s) and asset(s) " +
+                (result.FailedFiles > 0 || result.FailedPages > 0 || result.FailedGuids > 0 || result.Folders.Refused > 0 ? "\n\nSee the Console for details." : string.Empty) +
+                (result.Resaving.Count > 0
+                    ? $"\n\nUnity will now recompile. Afterwards the {result.Resaving.Count} scene(s), prefab(s) and asset(s) " +
                       "changed by the update are re-saved automatically, without opening them; you will get a report. " +
                       "Do not save them by hand before that."
                     : "\n\nUnity will now recompile."),
@@ -1147,7 +995,18 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             ScanProject();
         }
 
-        private static IEnumerable<string> CandidateFiles()
+        /// <summary>The window's answer when open scenes have unsaved changes: ask, because the routine closes
+        /// them without saving (see <see cref="VirtuademyRenameRoutine.Apply"/>).</summary>
+        private static bool ConfirmDiscardingScenes(IReadOnlyList<string> dirty)
+            => EditorUtility.DisplayDialog(
+                WindowTitle,
+                "These open scenes have unsaved changes:\n\n  " + string.Join("\n  ", dirty) +
+                "\n\nThey are closed WITHOUT saving. Saved now, before the update, their Visual Scripting " +
+                "graphs would be written with the nodes the updated packages cannot resolve yet, and could " +
+                "not be recovered. Their unsaved changes are lost.",
+                "Discard changes and apply", "Cancel");
+
+        internal static IEnumerable<string> CandidateFiles()
         {
             foreach (string path in Directory.EnumerateFiles("Assets", "*", SearchOption.AllDirectories))
             {
@@ -1168,7 +1027,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 
         /// <summary>Reads the file as text; returns null for binary content (NUL bytes,
         /// or a scene/prefab/asset that is not text-serialized YAML).</summary>
-        private static string ReadTextOrNull(string path)
+        internal static string ReadTextOrNull(string path)
         {
             byte[] bytes;
             try
@@ -1204,13 +1063,13 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             return text;
         }
 
-        private static bool HasUtf8Bom(string path)
+        internal static bool HasUtf8Bom(string path)
         {
             using FileStream stream = File.OpenRead(path);
             return stream.Length >= 3 && stream.ReadByte() == 0xEF && stream.ReadByte() == 0xBB && stream.ReadByte() == 0xBF;
         }
 
-        private static int CountHits(string text)
+        internal static int CountHits(string text)
         {
             // Mirror Apply exactly: literal replacements first, then count what the generic
             // rules would still match on the intermediate text (avoids double counting).
@@ -1305,14 +1164,14 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             }
         }
 
-        private static bool IsManifest(string path)
+        internal static bool IsManifest(string path)
             => path.Replace('\\', '/') == VirtuademyPackageLock.ManifestPath;
 
         /// <summary>The manifest, with only the entries of <see cref="RegistryPackageIds"/> rewritten.</summary>
-        private static string RewriteManifest(string text)
+        internal static string RewriteManifest(string text)
             => VirtuademyPackageLock.RewriteDependencies(text, RegistryPackageIds.Contains, Rewrite);
 
-        private static int ManifestHits(string text)
+        internal static int ManifestHits(string text)
         {
             int hits = 0;
             VirtuademyPackageLock.RewriteDependencies(text, RegistryPackageIds.Contains, entry =>
@@ -1323,7 +1182,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             return hits;
         }
 
-        private static string Rewrite(string text)
+        internal static string Rewrite(string text)
         {
             foreach ((string oldValue, string newValue) in LiteralMap)
             {
@@ -1372,8 +1231,9 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         }
 
         /// <summary>Rebuilds the Visual Scripting node library so the renamed unit types are
-        /// picked up. Done via reflection so this assembly does not depend on Visual Scripting.</summary>
-        private static void RebuildVisualScriptingUnits()
+        /// picked up. Done via reflection so this assembly does not depend on Visual Scripting.
+        /// Returns whether it was rebuilt: it is not in a project whose unit options were never built.</summary>
+        internal static bool RebuildVisualScriptingUnits()
         {
             try
             {
@@ -1388,15 +1248,327 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 {
                     Debug.Log($"[{WindowTitle}] Visual Scripting node library rebuilt.");
                 }
+                return unitBase != null;
             }
             catch (Exception e)
             {
                 Debug.LogWarning($"[{WindowTitle}] Could not rebuild the Visual Scripting node library automatically " +
                                  $"({e.Message}). Run it manually: Edit > Project Settings > Visual Scripting > Regenerate Nodes.");
+                return false;
             }
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// The scan and the apply of the v2026.5 -> v2026.6 update routine, without a window: what
+    /// <see cref="VirtuademyRenameMigrator"/> draws and what <c>UpdateRoutinesCli</c> drives.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The window keeps what is a person's business — the list, the toggles, the confirmation
+    /// dialogs, the report box — and hands this class what it has chosen. The command line chooses
+    /// the window's defaults (every file the scan finds, every option ticked) and calls the same two
+    /// methods, so the two cannot drift: <see cref="ScanProject"/> finds the work and
+    /// <see cref="Apply"/> does it, in the order the window has always done it (the text rewrite, the
+    /// POI page markers, the GUID collisions, the unpinning of the lock file, the refresh, the
+    /// re-save scheduled for after the recompile, the folder consolidation, the node library).
+    /// </para>
+    /// <para>
+    /// Nothing here saves a scene, a prefab or an asset: what is rewritten is rewritten as text, and
+    /// the saving is <see cref="VirtuademyUpdateResave"/>'s, after the recompile.
+    /// <see cref="VirtuademyUpdateSaveGuard"/> stays in force the whole time.
+    /// </para>
+    /// </remarks>
+    public static class VirtuademyRenameRoutine
+    {
+        /// <summary>One file with outdated references: its path, the number of matches, and whether the
+        /// routine rewrites it (the window's tick).</summary>
+        public sealed class FileEntry
+        {
+            public string Path;
+            public int Hits;
+            public bool Selected = true;
+        }
+
+        /// <summary>What the project holds for the four steps.</summary>
+        public sealed class ScanResult
+        {
+            /// <summary>Step 1: the files with old names.</summary>
+            public List<FileEntry> Files = new();
+            /// <summary>Step 2: the files with a POI page marker to replace.</summary>
+            public List<VirtuademyPOIPageMigrator.Entry> Pages = new();
+            /// <summary>Step 3: the assets that share a GUID with a package asset.</summary>
+            public List<VirtuademyGuidCollisionMigrator.Entry> Guids = new();
+            /// <summary>Step 4: a legacy folder (<c>Assets/CreatorKit</c>, <c>Assets/ReflectisSettings</c>) is still there.</summary>
+            public bool HasLegacyFolders;
+        }
+
+        /// <summary>Which steps to run. The window's defaults are all true.</summary>
+        public sealed class Options
+        {
+            public bool RewriteFiles = true;
+            public bool MigratePOIPages = true;
+            public bool ResolveGuidCollisions = true;
+            public bool ConsolidateFolders = true;
+            /// <summary>Release, in <c>Packages/packages-lock.json</c>, the git packages whose manifest entry the rewrite changed.</summary>
+            public bool UnpinLockFile = true;
+        }
+
+        /// <summary>What <see cref="Apply"/> did.</summary>
+        public sealed class Result
+        {
+            /// <summary>The caller declined to discard the unsaved open scenes: nothing was changed.</summary>
+            public bool Cancelled;
+            /// <summary>Open scenes with unsaved changes that were closed without saving.</summary>
+            public List<string> DiscardedScenes = new();
+            /// <summary>Step 1: the files whose text changed.</summary>
+            public List<string> RewrittenPaths = new();
+            public int FailedFiles;
+            /// <summary>Step 2: the files whose POI page markers changed.</summary>
+            public List<string> PagePaths = new();
+            public int FailedPages;
+            /// <summary>Step 3: the collisions resolved, and the files whose references were rewritten.</summary>
+            public int ResolvedGuids;
+            public int FailedGuids;
+            public List<string> GuidPaths = new();
+            /// <summary>The git packages released in the lock file (the manifest entries the rewrite changed).</summary>
+            public List<string> Unpinned = new();
+            /// <summary>The manifest changed and the lock was released, so the Package Manager resolves again.</summary>
+            public bool LockUnpinned;
+            /// <summary>Step 4.</summary>
+            public VirtuademyFolderMigrator.Result Folders;
+            /// <summary>The scenes, prefabs and assets scheduled for <see cref="VirtuademyUpdateResave"/>.</summary>
+            public List<string> Resaving = new();
+            /// <summary>The rewrite changed scripts or assembly definitions: Unity recompiles, and the re-save waits for it.</summary>
+            public bool CodeChanged;
+            /// <summary>The Visual Scripting node library was rebuilt in place. False in a project whose unit options were never built
+            /// (a batch-mode project nobody opened): <b>Update VS Library</b> builds them.</summary>
+            public bool NodeLibraryRebuilt;
+            /// <summary>A recompile or a domain reload is on its way, so the re-save cannot run in this editor session.</summary>
+            public bool NeedsReload => CodeChanged || LockUnpinned;
+        }
+
+        /// <summary>Scans the project for all four steps. <paramref name="progress"/> gets the file being read and the fraction done.</summary>
+        public static ScanResult ScanProject(Action<string, float> progress = null)
+        {
+            ScanResult scan = new();
+
+            try
+            {
+                int index = 0;
+                List<string> candidates = VirtuademyRenameMigrator.CandidateFiles().ToList();
+                foreach (string path in candidates)
+                {
+                    progress?.Invoke(path, (float)index++ / candidates.Count);
+
+                    string text = VirtuademyRenameMigrator.ReadTextOrNull(path);
+                    if (text == null)
+                    {
+                        continue;
+                    }
+
+                    int hits = VirtuademyRenameMigrator.IsManifest(path)
+                        ? VirtuademyRenameMigrator.ManifestHits(text)
+                        : VirtuademyRenameMigrator.CountHits(text);
+                    if (hits > 0)
+                    {
+                        scan.Files.Add(new FileEntry { Path = path.Replace('\\', '/'), Hits = hits });
+                    }
+                }
+            }
+            finally
+            {
+                if (progress != null)
+                {
+                    EditorUtility.ClearProgressBar();
+                }
+            }
+
+            scan.Pages = VirtuademyPOIPageMigrator.Scan();
+            scan.Guids = VirtuademyGuidCollisionMigrator.Scan();
+            scan.HasLegacyFolders = VirtuademyFolderMigrator.HasLegacyFolders();
+            return scan;
+        }
+
+        /// <summary>
+        /// The scenes, prefabs and assets under <c>Assets/</c> whose Visual Scripting data still carries the names
+        /// the routine renames: the files <see cref="VirtuademyUpdateSaveGuard"/> refuses to save. While there are
+        /// any, nothing may save Visual Scripting data in this project.
+        /// </summary>
+        public static List<string> FilesWithUnmigratedGraphData()
+            => Directory.EnumerateFiles("Assets", "*", SearchOption.AllDirectories)
+                .Where(p => VirtuademyRenameMigrator.YamlExtensions.Contains(Path.GetExtension(p).ToLowerInvariant())
+                            && VirtuademyRenameMigrator.HasUnmigratedGraphData(p))
+                .Select(p => p.Replace('\\', '/'))
+                .ToList();
+
+        /// <summary>
+        /// Runs the steps <paramref name="options"/> asks for on what <paramref name="scan"/> found (the files of
+        /// step 1 that are <see cref="FileEntry.Selected"/>, and the resolution chosen on each GUID collision).
+        /// </summary>
+        /// <param name="confirmDiscardingScenes">Asked, with the paths, when open scenes with unsaved changes are
+        /// about to be closed without saving; false cancels the whole apply. Null goes ahead.</param>
+        /// <param name="progress">Shows what is being done (a progress bar); null for none.</param>
+        public static Result Apply(ScanResult scan, Options options,
+                                   Func<IReadOnlyList<string>, bool> confirmDiscardingScenes = null,
+                                   Action<string, float> progress = null)
+        {
+            Result result = new();
+
+            List<FileEntry> selected = options.RewriteFiles
+                ? scan.Files.Where(e => e.Selected).ToList()
+                : new List<FileEntry>();
+
+            // A scene open while its file is rewritten under it comes back as a "modified externally"
+            // prompt, and a later save of it would write the old content back over the rewrite. Close
+            // it first; the re-save opens it again when it is done.
+            //
+            // Closed WITHOUT saving, never through the usual "save modified scenes?" prompt. An open
+            // scene was deserialized by the updated packages under its old type names, so its graphs
+            // hold MissingType units with renumbered JSON ids; saving it writes that out, and no rewrite
+            // brings the graph back ("Object definition has not been encountered for object with id=N"
+            // on every later open — reproduced on 2026-10-09). Its unsaved changes are lost instead, and
+            // the creator is told so before anything happens.
+            HashSet<string> toRewrite = new(
+                selected.Select(e => e.Path)
+                    .Concat(options.MigratePOIPages ? scan.Pages.Select(e => e.Path) : Enumerable.Empty<string>())
+                    .Concat(options.ResolveGuidCollisions ? scan.Guids.SelectMany(e => e.ReferencingFiles) : Enumerable.Empty<string>()),
+                StringComparer.OrdinalIgnoreCase);
+            List<Scene> openSceneList = Enumerable.Range(0, SceneManager.sceneCount)
+                .Select(SceneManager.GetSceneAt)
+                .Where(s => !string.IsNullOrEmpty(s.path))
+                .ToList();
+            List<string> openScenes = openSceneList.Select(s => s.path).ToList();
+            List<string> reopenScenes = new();
+            if (openScenes.Any(toRewrite.Contains))
+            {
+                List<string> dirty = openSceneList.Where(s => s.isDirty).Select(s => s.path).ToList();
+                if (dirty.Count > 0 && confirmDiscardingScenes != null && !confirmDiscardingScenes(dirty))
+                {
+                    result.Cancelled = true;
+                    return result;
+                }
+
+                result.DiscardedScenes = dirty;
+                reopenScenes = openScenes;
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            }
+
+            List<string> changedPaths = new();
+            HashSet<string> rewrittenDependencies = new(StringComparer.Ordinal);
+
+            try
+            {
+                for (int i = 0; i < selected.Count; i++)
+                {
+                    FileEntry entry = selected[i];
+                    progress?.Invoke(entry.Path, (float)i / selected.Count);
+
+                    try
+                    {
+                        string text = VirtuademyRenameMigrator.ReadTextOrNull(entry.Path);
+                        if (text == null)
+                        {
+                            continue;
+                        }
+
+                        string rewritten = VirtuademyRenameMigrator.IsManifest(entry.Path)
+                            ? VirtuademyRenameMigrator.RewriteManifest(text)
+                            : VirtuademyRenameMigrator.Rewrite(text);
+                        if (!string.Equals(rewritten, text, StringComparison.Ordinal))
+                        {
+                            File.WriteAllText(entry.Path, rewritten, new UTF8Encoding(VirtuademyRenameMigrator.HasUtf8Bom(entry.Path)));
+                            result.RewrittenPaths.Add(entry.Path);
+                            changedPaths.Add(entry.Path);
+
+                            if (entry.Path == VirtuademyPackageLock.ManifestPath)
+                            {
+                                rewrittenDependencies = VirtuademyPackageLock.RewrittenDependencies(text, rewritten);
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        result.FailedFiles++;
+                        Debug.LogError($"[{VirtuademyRenameMigrator.WindowTitle}] Failed to rewrite {entry.Path}: {e}");
+                    }
+                }
+
+                // After the rename, which may have rewritten the same scenes: the page pass re-reads
+                // every file it touches, so it works on what the rename left.
+                if (options.MigratePOIPages)
+                {
+                    progress?.Invoke("POI page markers", 1f);
+                    VirtuademyPOIPageMigrator.Apply(scan.Pages, out result.FailedPages, result.PagePaths);
+                    changedPaths.AddRange(result.PagePaths);
+                }
+
+                // After both rewrites, and before the refresh: it deletes and re-GUIDs files, which
+                // the refresh then imports, and it re-reads every file it rewrites.
+                if (options.ResolveGuidCollisions)
+                {
+                    progress?.Invoke("GUID collisions", 1f);
+                    result.ResolvedGuids = VirtuademyGuidCollisionMigrator.Apply(scan.Guids, out result.FailedGuids, result.GuidPaths);
+                    changedPaths.AddRange(result.GuidPaths);
+                }
+
+                // Only the git packages whose manifest entry this run rewrote: deleting the whole lock
+                // also unpinned every third-party git dependency, and one with no #ref then resolved
+                // to whatever its default branch is today (see VirtuademyPackageLock).
+                if (options.RewriteFiles && options.UnpinLockFile && rewrittenDependencies.Count > 0)
+                {
+                    result.Unpinned = VirtuademyPackageLock.UnpinGitPackages(rewrittenDependencies);
+                    // Resolve and wait whenever the manifest changed, not only when an entry left the
+                    // lock: a renamed package's new id was never in it.
+                    result.LockUnpinned = true;
+                    if (result.Unpinned.Count > 0)
+                    {
+                        Debug.Log($"[{VirtuademyRenameMigrator.WindowTitle}] Unpinned {result.Unpinned.Count} git package(s) in {VirtuademyPackageLock.LockPath} " +
+                                  "so UPM resolves them again; every other entry keeps its pinned version:\n  " +
+                                  string.Join("\n  ", result.Unpinned));
+                    }
+                }
+            }
+            finally
+            {
+                if (progress != null)
+                {
+                    EditorUtility.ClearProgressBar();
+                }
+            }
+
+            AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
+
+            if (result.LockUnpinned)
+            {
+                // Explicitly, rather than trusting the refresh to notice: the re-save waits for the
+                // unpinned entries to come back, and only a resolve writes them.
+                UnityEditor.PackageManager.Client.Resolve();
+            }
+
+            // After the refresh, which is what gives a rewritten file its place in the AssetDatabase
+            // under the path the scan saw; before the folder move, which changes that path. The re-save
+            // records GUIDs, so the move does not lose it.
+            result.Resaving = changedPaths
+                .Where(p => VirtuademyRenameMigrator.YamlExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            result.CodeChanged = changedPaths.Any(p =>
+                VirtuademyRenameMigrator.CodeExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()));
+            VirtuademyUpdateResave.Schedule(result.Resaving, reopenScenes,
+                result.LockUnpinned ? rewrittenDependencies.ToList() : new List<string>(), result.CodeChanged);
+
+            // After the rewrite, never before: the rewrite writes to the paths the scan recorded,
+            // and moving a folder out from under it would send those writes to files that moved.
+            result.Folders = options.ConsolidateFolders
+                ? VirtuademyFolderMigrator.Consolidate()
+                : default;
+
+            result.NodeLibraryRebuilt = VirtuademyRenameMigrator.RebuildVisualScriptingUnits();
+            return result;
+        }
     }
 }
 

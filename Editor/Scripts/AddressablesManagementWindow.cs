@@ -1,16 +1,10 @@
 using Newtonsoft.Json;
 using Virtuademy.SDK.TenantConfiguration.Editor;
 using Virtuademy.SDK.TenantConfiguration;
-using Renci.SshNet;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 using Unity.Properties;
 using UnityEditor;
@@ -27,23 +21,6 @@ using static Virtuademy.SDK.Environments.Editor.SceneListScriptableObject;
 
 namespace Virtuademy.SDK.Environments.Editor
 {
-    /// <summary>
-    /// The two fields this window reads off the platform's world listing.
-    /// </summary>
-    /// <remarks>
-    /// Declared here rather than taken from the platform's own <c>WorldDTO</c>, because that type
-    /// belongs to the HTTP client and lives in the package an application installs and a creator
-    /// does not. Naming it here would put this package — the one every creator installs — a
-    /// reference away from the platform client, which is the coupling the whole package split
-    /// exists to prevent. The window already does its own request and its own deserialisation;
-    /// this is the shape it deserialises into.
-    /// </remarks>
-    internal class PublishableWorld
-    {
-        public int Id { get; set; }
-
-        public string Label { get; set; }
-    }
     public class AddressablesManagementWindow : EditorWindow
     {
         private enum EBuildError
@@ -61,9 +38,6 @@ namespace Virtuademy.SDK.Environments.Editor
         private SceneListScriptableObject sceneConfigurations;
 
         private AddressableAssetSettings settings;
-
-        private const string settings_folder_path = "Assets/Virtuademy/Editor/Settings";
-        private const string addressables_configuration_file = "AddressablesSceneList.asset";
 
         private const string addressables_output_folder = AddressablesConfiguration.OutputFolder;
 
@@ -85,8 +59,6 @@ namespace Virtuademy.SDK.Environments.Editor
 
         [CreateProperty] private bool AreAddressablesConfigured => AddressablesConfiguration.IsConfiguredFor(settings);
 
-
-        private static HttpClient httpClient = new HttpClient();
 
         [Obsolete("Reading the bearer token directly skips expiry checks and renewal. Route API calls " +
                   "through EditorSessionManager.SendAuthorizedAsync instead.")]
@@ -371,79 +343,24 @@ namespace Virtuademy.SDK.Environments.Editor
 
             try
             {
-                string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrl;
-                if (string.IsNullOrEmpty(applicationApiUrl))
-                {
-                    worldsLoadingLabel.text = "Error: no application API URL in tenant config";
-                    return;
-                }
-
-                string apiUrl = $"{applicationApiUrl}/worlds?api-version=2";
-
                 // Silent renewal only: this runs just from opening the window, and popping a
                 // browser login at someone who only clicked a menu item would be startling.
                 // Deploy actions, which the user explicitly asked for, do allow it.
-                var response = await EditorSessionManager.SendAuthorizedAsync(
-                    () => new HttpRequestMessage(HttpMethod.Get, apiUrl), httpClient, allowInteractive: false);
+                WorldListResult listing = await EnvironmentsDeploy.LoadWorldsAsync(
+                    progress: text => worldsLoadingLabel.text = text,
+                    // Where every scene is already published, shown under each scene by SceneConfigurationDrawer:
+                    // computed on ALL the worlds the account can see, before the deploy-role filter.
+                    onListed: visible => _ = PublishedEnvironmentsIndex.RefreshAsync(visible.Select(w => (w.Id, w.Label))));
 
-                if (response == null)
-                {
-                    worldsLoadingLabel.text = "Session expired. Log in again to load the worlds.";
-                    return;
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    string body = await response.Content.ReadAsStringAsync();
-                    Debug.LogError($"[AddressablesManagement] Failed to get worlds: {response.StatusCode} - {body}");
-                    worldsLoadingLabel.text = $"Error loading worlds: {response.StatusCode}";
-                    return;
-                }
-
-                string json = await response.Content.ReadAsStringAsync();
-                availableWorlds = JsonConvert.DeserializeObject<List<PublishableWorld>>(json) ?? new();
-                // Where every scene is already published, shown under each scene by SceneConfigurationDrawer:
-                // computed on ALL the worlds the account can see, before the deploy-role filter below.
-                _ = PublishedEnvironmentsIndex.RefreshAsync(availableWorlds.Select(w => (w.Id, w.Label)));
                 selectedWorlds.Clear();
 
-                // Filter worlds by user roles
-                worldsLoadingLabel.text = "Checking permissions...";
-                List<PublishableWorld> deployableWorlds = new();
-                string[] deployRoles = { "TenantManager", "EnvironmentManager", "Owner" };
-
-                foreach (var world in availableWorlds)
+                if (listing.Status != WorldListStatus.Ok)
                 {
-                    try
-                    {
-                        string rolesUrl = $"{applicationApiUrl}/worlds/{world.Id}/users/my/roles?api-version=2";
-                        var rolesResponse = await EditorSessionManager.SendAuthorizedAsync(
-                            () => new HttpRequestMessage(HttpMethod.Get, rolesUrl), httpClient, allowInteractive: false);
-
-                        if (rolesResponse == null)
-                        {
-                            worldsLoadingLabel.text = "Session expired. Log in again to load the worlds.";
-                            return;
-                        }
-
-                        if (rolesResponse.IsSuccessStatusCode)
-                        {
-                            string rolesJson = await rolesResponse.Content.ReadAsStringAsync();
-                            List<string> roles = JsonConvert.DeserializeObject<List<string>>(rolesJson) ?? new();
-
-                            if (roles.Any(r => deployRoles.Contains(r)))
-                            {
-                                deployableWorlds.Add(world);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.LogWarning($"[AddressablesManagement] Could not check roles for world {world.Id}: {ex.Message}");
-                    }
+                    worldsLoadingLabel.text = listing.Message;
+                    return;
                 }
 
-                availableWorlds = deployableWorlds;
+                availableWorlds = listing.Deployable;
                 worldsLoadingLabel.style.display = DisplayStyle.None;
 
                 HashSet<int> savedSelection = LoadSelectedWorldIds();
@@ -597,7 +514,32 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>The build and deploy itself, with the world ids passed in rather than read off the window.</summary>
-        private async Task RunBuildAndDeployAsync(List<int> worldIds)
+        /// <remarks>
+        /// Assembly reloads are locked for the whole flow (<see cref="LockedReloadAsync"/>): the build switches the
+        /// build target, which queues a recompilation and a domain reload, and a reload while the code below awaits
+        /// the network would end it silently.
+        /// </remarks>
+        private Task RunBuildAndDeployAsync(List<int> worldIds) => LockedReloadAsync(() => BuildAndDeployToWorldsAsync(worldIds));
+
+        /// <summary>
+        /// Runs <paramref name="flow"/> with assembly reloads locked, and always unlocks afterwards: on every
+        /// early return and on an exception too, because a lock left behind stops the editor from ever
+        /// compiling a script again until it is restarted.
+        /// </summary>
+        private static async Task LockedReloadAsync(Func<Task> flow)
+        {
+            EditorApplication.LockReloadAssemblies();
+            try
+            {
+                await flow();
+            }
+            finally
+            {
+                EditorApplication.UnlockReloadAssemblies();
+            }
+        }
+
+        private async Task BuildAndDeployToWorldsAsync(List<int> worldIds)
         {
             SetDeployButtonsEnabled(false);
 
@@ -638,128 +580,23 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private async Task DeployToWorlds(List<int> worldIds, List<string> scenes)
         {
-            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrl;
-            if (string.IsNullOrEmpty(applicationApiUrl))
-            {
-                LogDeployError("No application API URL available.");
-                return;
-            }
-
-            // Renew the session before the uploads start rather than discovering it is dead on
-            // the first call: the renewal can need an interactive login, and that is far less
-            // disruptive here than halfway through a multi-world deploy. Every call below still
-            // re-checks on its own — this deploy can outlive the token it starts with.
-            if (!await EditorSessionManager.EnsureValidTokenAsync())
-            {
-                LogDeployError("Could not establish a valid session. Nothing was deployed.");
-                return;
-            }
-
-            int totalWorlds = worldIds.Count;
             int errorsBefore = deployErrorCount;
-            int published = 0;
+            DeployReport report = await EnvironmentsDeploy.DeployToWorldsAsync(worldIds, availableWorlds, scenes, NewDeployObserver());
 
-            try
-            {
-                for (int w = 0; w < totalWorlds; w++)
-                {
-                    int worldId = worldIds[w];
-                    PublishableWorld world = availableWorlds.FirstOrDefault(wd => wd.Id == worldId);
-                    string worldLabel = world?.Label ?? worldId.ToString();
+            // Nothing was sent (no API URL, no session): the problem is already in the panel.
+            if (report.Fatal != null)
+                return;
 
-                    string progressPrefix = $"Deploy ({w + 1}/{totalWorlds}) - World \"{worldLabel}\"";
-
-                    EditorUtility.DisplayProgressBar(progressPrefix, "Getting upload link...", (float)w / totalWorlds);
-
-                    string uploadLink = await GetUploadLinkForWorld(applicationApiUrl, worldId);
-                    if (string.IsNullOrEmpty(uploadLink))
-                    {
-                        LogDeployError($"World \"{worldLabel}\": failed to get upload link. Skipping.");
-                        continue;
-                    }
-
-                    bool useFtp = EditorLoginState.CurrentTenant?.Env == Env.Sandbox;
-                    FtpUploadConfig ftpConfig = null;
-
-                    if (useFtp)
-                    {
-                        try
-                        {
-                            ftpConfig = JsonConvert.DeserializeObject<FtpUploadConfig>(uploadLink);
-                            if (ftpConfig == null || string.IsNullOrEmpty(ftpConfig.host))
-                            {
-                                LogDeployError($"World \"{worldLabel}\": invalid SFTP config. Skipping.");
-                                continue;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            LogDeployError($"World \"{worldLabel}\": failed to parse SFTP config — {ex.Message}. Skipping.");
-                            continue;
-                        }
-                    }
-
-                    // Before the scenes: the archive import resolves the assembly each scene zip
-                    // declares, so the assembly has to be registered when the first scene arrives.
-                    HashSet<string> rejectedAssemblies = await ImportDeclaredAssembliesAsync(
-                        applicationApiUrl, worldId, worldLabel, scenes, uploadLink, useFtp, ftpConfig, progressPrefix);
-
-                    List<string> importedScenes = new();
-
-                    for (int s = 0; s < scenes.Count; s++)
-                    {
-                        string scene = scenes[s];
-                        string zipPath = Path.Combine(addressables_output_folder, scene + ".zip");
-                        if (!File.Exists(zipPath))
-                        {
-                            LogDeployError($"World \"{worldLabel}\": zip not found for \"{scene}\". Skipping scene.");
-                            continue;
-                        }
-
-                        string declared = ReadDeclaredAssembly(scene, out _);
-                        if (declared != null && rejectedAssemblies.Contains(declared))
-                        {
-                            // Publishing it would hand the world a scene whose scripts were turned down.
-                            LogDeployError($"World \"{worldLabel}\": \"{scene}\" was not published, because its interpreted " +
-                                           "assembly was not accepted (see above).");
-                            continue;
-                        }
-
-                        float progress = ((float)w + (float)s / scenes.Count) / totalWorlds;
-
-                        EditorUtility.DisplayProgressBar(progressPrefix, $"Uploading {scene}.zip ({s + 1}/{scenes.Count})...", progress);
-
-                        bool uploaded = useFtp
-                            ? await UploadZipViaFtp(zipPath, ftpConfig)
-                            : await UploadZip(zipPath, uploadLink);
-
-                        if (!uploaded)
-                        {
-                            LogDeployError($"World \"{worldLabel}\": upload failed for \"{scene}.zip\". Skipping import.");
-                            continue;
-                        }
-
-                        EditorUtility.DisplayProgressBar(progressPrefix, $"Importing {scene} ({s + 1}/{scenes.Count})...", progress);
-
-                        bool imported = await ImportSceneToWorld(applicationApiUrl, worldId, scene);
-                        if (imported)
-                            importedScenes.Add(scene);
-                        else
-                            LogDeployError($"World \"{worldLabel}\": import failed for \"{scene}\". Check the console for details.");
-                    }
-
-                    await LinkDeclaredAssembliesAsync(applicationApiUrl, worldLabel, worldId, importedScenes);
-                    published += importedScenes.Count;
-                }
-            }
-            finally
-            {
-                EditorUtility.ClearProgressBar();
-            }
-
-            ReportDeployOutcome("World deploy", errorsBefore, published, totalWorlds * scenes.Count);
-            _ = PublishedEnvironmentsIndex.RefreshAsync();
+            ReportDeployOutcome("World deploy", errorsBefore, report.ImportsStarted, report.Expected);
         }
+
+        /// <summary>Errors go to the deploy panel and the Console, progress to the editor's progress bar.</summary>
+        private DeployObserver NewDeployObserver() => new()
+        {
+            Error = LogDeployError,
+            Progress = (title, info, fraction) => EditorUtility.DisplayProgressBar(title, info, fraction),
+            ProgressDone = EditorUtility.ClearProgressBar,
+        };
 
         private void SetDeployButtonsEnabled(bool enabled)
         {
@@ -817,8 +654,10 @@ namespace Virtuademy.SDK.Environments.Editor
             await RunTenantBuildAndDeployAsync();
         }
 
-        /// <summary>Same as above for the tenant deploy.</summary>
-        private async Task RunTenantBuildAndDeployAsync()
+        /// <summary>Same as above for the tenant deploy, with the reloads locked the same way.</summary>
+        private Task RunTenantBuildAndDeployAsync() => LockedReloadAsync(BuildAndDeployToTenantAsync);
+
+        private async Task BuildAndDeployToTenantAsync()
         {
             SetDeployButtonsEnabled(false);
 
@@ -855,587 +694,14 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private async Task DeployToTenant(List<string> scenes)
         {
-            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrl;
-            if (string.IsNullOrEmpty(applicationApiUrl))
-            {
-                LogDeployError("Tenant: no application API URL available.");
-                return;
-            }
-
-            // See DeployToWorlds: renew before the uploads, not on the first failure.
-            if (!await EditorSessionManager.EnsureValidTokenAsync())
-            {
-                LogDeployError("Tenant: could not establish a valid session. Nothing was deployed.");
-                return;
-            }
-
             int tenantErrorsBefore = deployErrorCount;
-            int tenantPublished = 0;
+            DeployReport report = await EnvironmentsDeploy.DeployToTenantAsync(scenes, NewDeployObserver());
 
-            try
-            {
-                EditorUtility.DisplayProgressBar("Deploy to Tenant", "Getting upload link...", 0f);
+            // Not even started, or stopped before any scene: the problem is already in the panel.
+            if (report.Fatal != null || report.Targets.Count == 0 || !report.Targets[0].UploadLinkObtained)
+                return;
 
-                string uploadLink = await GetTenantUploadLink(applicationApiUrl);
-                if (string.IsNullOrEmpty(uploadLink))
-                {
-                    LogDeployError("Tenant: failed to get upload link.");
-                    return;
-                }
-
-                bool useFtp = EditorLoginState.CurrentTenant?.Env == Env.Sandbox;
-                FtpUploadConfig ftpConfig = null;
-
-                if (useFtp)
-                {
-                    try
-                    {
-                        ftpConfig = JsonConvert.DeserializeObject<FtpUploadConfig>(uploadLink);
-                        if (ftpConfig == null || string.IsNullOrEmpty(ftpConfig.host))
-                        {
-                            LogDeployError("Tenant: invalid SFTP config. Aborting.");
-                            return;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogDeployError($"Tenant: failed to parse SFTP config — {ex.Message}. Aborting.");
-                        return;
-                    }
-                }
-
-                for (int s = 0; s < scenes.Count; s++)
-                {
-                    string scene = scenes[s];
-                    string zipPath = Path.Combine(addressables_output_folder, scene + ".zip");
-                    if (!File.Exists(zipPath))
-                    {
-                        LogDeployError($"Tenant: zip not found for \"{scene}\". Skipping scene.");
-                        continue;
-                    }
-
-                    float progress = (float)s / scenes.Count;
-
-                    EditorUtility.DisplayProgressBar("Deploy to Tenant", $"Uploading {scene}.zip ({s + 1}/{scenes.Count})...", progress);
-
-                    bool uploaded = useFtp
-                        ? await UploadZipViaFtp(zipPath, ftpConfig)
-                        : await UploadZip(zipPath, uploadLink);
-
-                    if (!uploaded)
-                    {
-                        LogDeployError($"Tenant: upload failed for \"{scene}.zip\". Skipping import.");
-                        continue;
-                    }
-
-                    EditorUtility.DisplayProgressBar("Deploy to Tenant", $"Importing {scene} ({s + 1}/{scenes.Count})...", progress);
-
-                    bool imported = await ImportSceneToTenant(applicationApiUrl, scene);
-                    if (imported)
-                        tenantPublished++;
-                    else
-                        LogDeployError($"Tenant: import failed for \"{scene}\". Check the console for details.");
-                }
-            }
-            finally
-            {
-                EditorUtility.ClearProgressBar();
-            }
-
-            ReportDeployOutcome("Tenant deploy", tenantErrorsBefore, tenantPublished, scenes.Count);
-            _ = PublishedEnvironmentsIndex.RefreshAsync();
-        }
-
-        /// <summary>The setupper lives in the HYBRIDCLR_INSTALLED-gated assembly this window does
-        /// not reference, so it is reached by reflection like the verifier is.</summary>
-        private static Type FindHotUpdateSetupperType() => FindEditorType("HotUpdateSetupper");
-
-        private static Type FindEditorType(string name)
-            => AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => { try { return a.GetTypes(); } catch { return new Type[0]; } })
-                .FirstOrDefault(t => t.Name == name);
-
-        /// <summary>
-        /// Uploads and imports the interpreted assemblies the scene zips declare, BEFORE the scenes:
-        /// the platform's archive import resolves the assembly a scene declares and refuses the
-        /// scene when it is not registered. Normally one assembly — the bundle built with the
-        /// scenes, <c>ServerData/&lt;AssemblyName&gt;.zip</c>.
-        ///
-        /// Uploaded on every deploy, even when the scripts have not changed since the last one: the
-        /// import of a name already registered is a no-op on the platform, and the marker that says
-        /// "already published" is per project, not per tenant, so skipping would leave a deploy to a
-        /// second tenant without its scripts.
-        ///
-        /// Returns the assemblies the platform did not accept, so the caller can hold back the
-        /// scenes that need them.
-        /// </summary>
-        private async Task<HashSet<string>> ImportDeclaredAssembliesAsync(string applicationApiUrl, int worldId, string worldLabel,
-                                                                         List<string> scenes, string uploadLink,
-                                                                         bool useFtp, FtpUploadConfig ftpConfig, string progressPrefix)
-        {
-            HashSet<string> rejected = new(StringComparer.Ordinal);
-
-            IEnumerable<string> declared = scenes
-                .Select(scene => ReadDeclaredAssembly(scene, out _))
-                .Where(name => name != null)
-                .Distinct(StringComparer.Ordinal);
-
-            foreach (string assemblyName in declared)
-            {
-                string zipPath = Path.Combine(addressables_output_folder, assemblyName + ".zip");
-                if (!File.Exists(zipPath))
-                {
-                    // The build could not produce the bundle and said why. The scenes still go: the
-                    // platform accepts them where this assembly is already registered.
-                    Debug.LogWarning($"[AddressablesManagement] World \"{worldLabel}\": no bundle for '{assemblyName}' in " +
-                                     $"{addressables_output_folder}. The scenes that need it import only if it is already registered.");
-                    continue;
-                }
-
-                EditorUtility.DisplayProgressBar(progressPrefix, "Uploading interpreted assembly...", 0f);
-
-                bool uploaded = useFtp
-                    ? await UploadZipViaFtp(zipPath, ftpConfig)
-                    : await UploadZip(zipPath, uploadLink);
-
-                if (!uploaded)
-                {
-                    LogDeployError($"World \"{worldLabel}\": upload failed for \"{Path.GetFileName(zipPath)}\".");
-                    rejected.Add(assemblyName);
-                    continue;
-                }
-
-                (bool imported, string reason) = await ImportEnvironmentDll(applicationApiUrl, worldId, Path.GetFileName(zipPath));
-                if (!imported)
-                {
-                    LogDeployError($"World \"{worldLabel}\": the platform rejected the interpreted assembly '{assemblyName}': {reason}");
-                    rejected.Add(assemblyName);
-                    continue;
-                }
-
-                // Only now: a marker written before the import would remember a failed publish as
-                // done, and the next build would skip its compile and verification.
-                FindHotUpdateSetupperType()?
-                    .GetMethod("MarkBundlePublished", BindingFlags.Public | BindingFlags.Static)?
-                    .Invoke(null, null);
-            }
-
-            return rejected;
-        }
-
-        /// <summary>
-        /// Points each imported scene's catalog at the assembly it declares, or clears the link for
-        /// a scene built without scripts. A platform that reads the declaration has already done
-        /// this during the archive import, and repeating it changes nothing; one that predates it
-        /// does not, and this is the only call that links its scenes.
-        /// </summary>
-        private async Task LinkDeclaredAssembliesAsync(string applicationApiUrl, string worldLabel, int worldId, List<string> scenes)
-        {
-            foreach (string scene in scenes)
-            {
-                string assemblyName = ReadDeclaredAssembly(scene, out bool declares);
-                if (!declares)
-                {
-                    Debug.LogWarning($"[AddressablesManagement] World \"{worldLabel}\": \"{scene}\" was built before the " +
-                                     "scene zips declared their interpreted assembly, so its script link was left as it was. " +
-                                     "Build the scenes again.");
-                    continue;
-                }
-
-                // An empty body clears the link.
-                if (!await LinkEnvironmentDll(applicationApiUrl, worldId, scene, assemblyName ?? string.Empty))
-                    LogDeployError($"World \"{worldLabel}\": could not link the interpreted assembly to \"{scene}\".");
-            }
-        }
-
-        #endregion
-
-        #region API calls
-
-        public static async Task<string> GetUploadLinkForWorld(string applicationApiUrl, int worldId)
-        {
-            string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/upload-link?api-version=2";
-
-            HttpResponseMessage response;
-            try
-            {
-                response = await EditorSessionManager.SendAuthorizedAsync(
-                    () => new HttpRequestMessage(HttpMethod.Get, apiUrl), httpClient);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Error getting upload link for world {worldId}: {ex.Message}");
-                return null;
-            }
-
-            if (response == null)
-            {
-                Debug.LogError($"[AddressablesManagement] Could not get an upload link for world {worldId}: no valid session.");
-                return null;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                Debug.LogError($"[AddressablesManagement] GetUploadLink failed for world {worldId}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
-                return null;
-            }
-
-            string uploadLink = await response.Content.ReadAsStringAsync();
-            // Remove surrounding quotes if the API returns a JSON string
-            uploadLink = uploadLink.Trim('"');
-            Debug.Log($"[AddressablesManagement] Upload link received for world {worldId}");
-            return uploadLink;
-        }
-
-        public static async Task<bool> ImportSceneToWorld(string applicationApiUrl, int worldId, string zipName)
-        {
-            string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environments/archives/import?api-version=2";
-
-            HttpResponseMessage response;
-            try
-            {
-                response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Post, apiUrl)
-                {
-                    Content = new StringContent($"\"{zipName + ".zip"}\"", Encoding.UTF8, "application/json")
-                }, httpClient);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Error importing {zipName} to world {worldId}: {ex.Message}");
-                return false;
-            }
-
-            if (response == null)
-            {
-                Debug.LogError($"[AddressablesManagement] Could not import {zipName} to world {worldId}: no valid session.");
-                return false;
-            }
-
-            if (!response.IsSuccessStatusCode)
-            {
-                Debug.LogError($"[AddressablesManagement] Import failed for {zipName} to world {worldId}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
-                return false;
-            }
-
-            Debug.Log($"[AddressablesManagement] Import {zipName} to world {worldId} started successfully.");
-            return true;
-        }
-
-        [Serializable]
-        public class FtpUploadConfig
-        {
-            public string type;
-            public string host;
-            [JsonProperty(DefaultValueHandling = DefaultValueHandling.Populate)]
-            [System.ComponentModel.DefaultValue(22)]
-            public int port = 22;
-            public string username;
-            public string password;
-            public string remotePath;
-            public string privateKey;
-            public string passphrase;
-        }
-
-        public async Task<bool> UploadZip(string filePath, string sasUrl)
-        {
-            string fileName = Path.GetFileName(filePath);
-
-            var uriBuilder = new UriBuilder(sasUrl);
-            uriBuilder.Path = uriBuilder.Path.TrimEnd('/') + "/" + fileName;
-            Uri uploadUri = uriBuilder.Uri;
-
-            byte[] fileBytes = File.ReadAllBytes(filePath);
-            var content = new ByteArrayContent(fileBytes);
-            content.Headers.Add("x-ms-blob-type", "BlockBlob");
-
-            try
-            {
-                HttpResponseMessage response = await httpClient.PutAsync(uploadUri, content);
-                if (response.IsSuccessStatusCode)
-                {
-                    Debug.Log($"[AddressablesManagement] Upload completed: {fileName}");
-                    return true;
-                }
-                else
-                {
-                    string responseBody = await response.Content.ReadAsStringAsync();
-                    Debug.LogError($"[AddressablesManagement] Upload failed: {fileName} - {response.StatusCode}\n{responseBody}");
-                    return false;
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Upload error {fileName}: {ex.Message}");
-                return false;
-            }
-        }
-
-        public async Task<bool> UploadZipViaFtp(string filePath, FtpUploadConfig ftpConfig)
-        {
-            string fileName = Path.GetFileName(filePath);
-            // Resolve to absolute path before entering Task.Run — the thread-pool thread
-            // may have a different working directory than the Unity project root.
-            string absoluteFilePath = Path.GetFullPath(filePath);
-
-            if (ftpConfig.port <= 0 || ftpConfig.port > 65535)
-            {
-                Debug.LogWarning($"[AddressablesManagement] Invalid SFTP port ({ftpConfig.port}), defaulting to 22.");
-                ftpConfig.port = 22;
-            }
-
-            string remotePath = ftpConfig.remotePath ?? "/";
-            remotePath = remotePath.Replace('\\', '/');
-            if (!remotePath.StartsWith("/"))
-                remotePath = "/" + remotePath;
-
-            string remoteFilePath = remotePath.TrimEnd('/') + "/" + fileName;
-
-            try
-            {
-                await Task.Run(() =>
-                {
-                    ConnectionInfo connectionInfo;
-
-                    if (!string.IsNullOrEmpty(ftpConfig.privateKey))
-                    {
-                        PrivateKeyFile keyFile;
-                        using (var keyStream = new MemoryStream(Encoding.UTF8.GetBytes(ftpConfig.privateKey)))
-                        {
-                            keyFile = string.IsNullOrEmpty(ftpConfig.passphrase)
-                                ? new PrivateKeyFile(keyStream)
-                                : new PrivateKeyFile(keyStream, ftpConfig.passphrase);
-                        }
-
-                        var keyAuth = new PrivateKeyAuthenticationMethod(ftpConfig.username, keyFile);
-                        connectionInfo = new ConnectionInfo(ftpConfig.host, ftpConfig.port, ftpConfig.username, keyAuth);
-                    }
-                    else
-                    {
-                        string decodedPassword = Encoding.UTF8.GetString(Convert.FromBase64String(ftpConfig.password));
-                        var passAuth = new PasswordAuthenticationMethod(ftpConfig.username, decodedPassword);
-                        var kbdAuth = new KeyboardInteractiveAuthenticationMethod(ftpConfig.username);
-                        kbdAuth.AuthenticationPrompt += (sender, e) =>
-                        {
-                            foreach (var prompt in e.Prompts)
-                            {
-                                prompt.Response = decodedPassword;
-                            }
-                        };
-                        connectionInfo = new ConnectionInfo(ftpConfig.host, ftpConfig.port, ftpConfig.username, passAuth, kbdAuth);
-                    }
-
-                    using (var sftp = new SftpClient(connectionInfo))
-                    {
-                        sftp.Connect();
-
-                        // Ensure every segment of the remote directory exists before uploading.
-                        // SSH.NET throws "Can't open file" when the destination folder is missing.
-                        string[] segments = remotePath.TrimStart('/').Split('/');
-                        string currentDir = "";
-                        foreach (string segment in segments)
-                        {
-                            if (string.IsNullOrEmpty(segment)) continue;
-                            currentDir += "/" + segment;
-                            if (!sftp.Exists(currentDir))
-                                sftp.CreateDirectory(currentDir);
-                        }
-
-                        using (var fileStream = File.OpenRead(absoluteFilePath))
-                        {
-                            sftp.UploadFile(fileStream, remoteFilePath, true);
-                        }
-
-                        sftp.Disconnect();
-                    }
-                });
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] SFTP upload error {fileName}: {ex.Message}");
-                if (ex.InnerException != null)
-                    Debug.LogError($"[AddressablesManagement] Inner exception: {ex.InnerException.Message}");
-                return false;
-            }
-        }
-
-        public static async Task<string> GetTenantUploadLink(string applicationApiUrl)
-        {
-            string apiUrl = $"{applicationApiUrl}/tenants/environments/upload-link?api-version=2";
-
-            try
-            {
-                var response = await EditorSessionManager.SendAuthorizedAsync(
-                    () => new HttpRequestMessage(HttpMethod.Get, apiUrl), httpClient);
-
-                if (response == null)
-                {
-                    Debug.LogError("[AddressablesManagement] Could not get the tenant upload link: no valid session.");
-                    return null;
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    Debug.LogError($"[AddressablesManagement] GetTenantUploadLink failed: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
-                    return null;
-                }
-
-                string uploadLink = await response.Content.ReadAsStringAsync();
-                uploadLink = uploadLink.Trim('"');
-                Debug.Log("[AddressablesManagement] Tenant upload link received.");
-                return uploadLink;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Error getting tenant upload link: {ex.Message}");
-                return null;
-            }
-        }
-
-
-        /// <summary>
-        /// Imports the uploaded assembly bundle. On failure, <c>Reason</c> says why in one line, for
-        /// the deploy panel; the full response still goes to the Console.
-        /// </summary>
-        public static async Task<(bool Ok, string Reason)> ImportEnvironmentDll(string applicationApiUrl, int worldId, string zipName)
-        {
-            string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environment-dll/import?api-version=2";
-
-            try
-            {
-                var response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Post, apiUrl)
-                {
-                    Content = new StringContent($"\"{zipName}\"", Encoding.UTF8, "application/json")
-                }, httpClient);
-
-                if (response == null)
-                {
-                    Debug.LogError("[AddressablesManagement] Could not import the environment DLL: no valid session.");
-                    return (false, "no valid session.");
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    // Read only on the way out: a 422 carries the whitelist violations, one per
-                    // offending reference, each tagged with the platform DLL it came from — worth
-                    // surfacing verbatim. The success body is the stored record, which is the
-                    // platform's business and not something a creator's console should carry.
-                    string body = await response.Content.ReadAsStringAsync();
-
-                    Debug.LogError($"[AddressablesManagement] Environment DLL import failed: {response.StatusCode} - {body}");
-                    return (false, DescribeDllImportFailure((int)response.StatusCode, body));
-                }
-
-                return (true, null);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Error importing the environment DLL: {ex.Message}");
-                return (false, ex.Message);
-            }
-        }
-
-        /// <summary>
-        /// One line for the deploy panel out of the import's error body: the violations of a 422,
-        /// each distinct one once with the platforms that raised it, or the detail and code of a
-        /// ProblemDetails. Falls back to the status code when the body is neither.
-        /// </summary>
-        private static string DescribeDllImportFailure(int statusCode, string body)
-        {
-            try
-            {
-                Newtonsoft.Json.Linq.JObject json = Newtonsoft.Json.Linq.JObject.Parse(body);
-
-                if (json["violations"] is Newtonsoft.Json.Linq.JArray violations && violations.Count > 0)
-                {
-                    IEnumerable<string> distinct = violations
-                        .GroupBy(v => $"{(string)v["kind"]}: {(string)v["detail"]}")
-                        .Select(g =>
-                        {
-                            string[] platforms = g.Select(v => (string)v["platform"]).Where(x => !string.IsNullOrEmpty(x)).Distinct().ToArray();
-                            return platforms.Length > 0 ? $"{g.Key} ({string.Join(", ", platforms)})" : g.Key;
-                        });
-
-                    return string.Join("; ", distinct);
-                }
-
-                string detail = (string)json["detail"] ?? (string)json["title"];
-                string code = (string)json["code"];
-                if (!string.IsNullOrEmpty(detail))
-                    return string.IsNullOrEmpty(code) ? detail : $"{detail} [{code}]";
-            }
-            catch (Newtonsoft.Json.JsonException)
-            {
-                // Not JSON: the status code is all there is to say.
-            }
-
-            return $"HTTP {statusCode} (details in the Console).";
-        }
-
-        public static async Task<bool> LinkEnvironmentDll(string applicationApiUrl, int worldId,
-                                                          string catalogName, string assemblyName)
-        {
-            string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environments/catalog/{catalogName}/environment-dll?api-version=2";
-
-            try
-            {
-                var response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Put, apiUrl)
-                {
-                    Content = new StringContent($"\"{assemblyName}\"", Encoding.UTF8, "application/json")
-                }, httpClient);
-
-                if (response == null)
-                {
-                    Debug.LogError($"[AddressablesManagement] Could not link {catalogName}: no valid session.");
-                    return false;
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    Debug.LogError($"[AddressablesManagement] Linking {catalogName} to {assemblyName} failed: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
-                    return false;
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Error linking {catalogName}: {ex.Message}");
-                return false;
-            }
-        }
-        public static async Task<bool> ImportSceneToTenant(string applicationApiUrl, string zipName)
-        {
-            string apiUrl = $"{applicationApiUrl}/tenants/environments/archives/import?api-version=2";
-
-            try
-            {
-                var response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Post, apiUrl)
-                {
-                    Content = new StringContent($"\"{zipName + ".zip"}\"", Encoding.UTF8, "application/json")
-                }, httpClient);
-
-                if (response == null)
-                {
-                    Debug.LogError($"[AddressablesManagement] Could not import {zipName} to the tenant: no valid session.");
-                    return false;
-                }
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    Debug.LogError($"[AddressablesManagement] Tenant import failed for {zipName}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
-                    return false;
-                }
-
-                Debug.Log($"[AddressablesManagement] Tenant import {zipName} started successfully.");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Error importing {zipName} to tenant: {ex.Message}");
-                return false;
-            }
+            ReportDeployOutcome("Tenant deploy", tenantErrorsBefore, report.ImportsStarted, report.Expected);
         }
 
         #endregion
@@ -1660,30 +926,23 @@ namespace Virtuademy.SDK.Environments.Editor
             target.Clear();
             if (sceneConfigurations?.SceneConfigurations == null) return;
 
-            List<SceneConfiguration> built = sceneConfigurations.SceneConfigurations
-                .Where(c => c.Scene != null && c.IncludeInBuild).ToList();
+            DeployPreview preview = EnvironmentsDeploy.Preview(EnvironmentsBuild.IncludedScenes(sceneConfigurations), worldId);
 
-            if (built.Count == 0)
+            switch (preview.State)
             {
-                target.Add(PreviewLine("Nothing is included in the build.", preview_note_color));
-                return;
-            }
-            if (!PublishedEnvironmentsIndex.HasData)
-            {
-                target.Add(PreviewLine(PublishedEnvironmentsIndex.IsLoading
-                    ? "Checking what is already published…"
-                    : $"{built.Count} scene(s) in the build; what is already published could not be read.", preview_note_color));
-                return;
-            }
-
-            List<string> updated = new(), added = new();
-            foreach (SceneConfiguration cfg in built)
-            {
-                (PublishedEnvironmentsIndex.IsPublishedIn(cfg.SceneNameFiltered, worldId) ? updated : added).Add(cfg.Scene.name);
+                case DeployPreviewState.NothingIncluded:
+                    target.Add(PreviewLine("Nothing is included in the build.", preview_note_color));
+                    return;
+                case DeployPreviewState.Checking:
+                    target.Add(PreviewLine("Checking what is already published…", preview_note_color));
+                    return;
+                case DeployPreviewState.Unreadable:
+                    target.Add(PreviewLine($"{preview.Included} scene(s) in the build; what is already published could not be read.", preview_note_color));
+                    return;
             }
 
-            if (updated.Count > 0) target.Add(PreviewLine($"Updated ({updated.Count}): {string.Join(", ", updated)}", preview_update_color));
-            if (added.Count > 0) target.Add(PreviewLine($"New ({added.Count}): {string.Join(", ", added)}", preview_new_color));
+            if (preview.Updated.Count > 0) target.Add(PreviewLine($"Updated ({preview.Updated.Count}): {string.Join(", ", preview.Updated)}", preview_update_color));
+            if (preview.Added.Count > 0) target.Add(PreviewLine($"New ({preview.Added.Count}): {string.Join(", ", preview.Added)}", preview_new_color));
         }
 
         private static Label PreviewLine(string text, Color color)
@@ -1697,18 +956,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private void LoadSettings()
         {
-            string addressablesBundleScriptableObjectsStr = AssetDatabase.FindAssets("t:" + typeof(SceneListScriptableObject).Name).ToList().FirstOrDefault();
-            sceneConfigurations = AssetDatabase.LoadAssetAtPath<SceneListScriptableObject>(AssetDatabase.GUIDToAssetPath(addressablesBundleScriptableObjectsStr));
-
-            if (sceneConfigurations == null)
-            {
-                EnsureFolderExists(settings_folder_path);
-
-                sceneConfigurations = CreateInstance<SceneListScriptableObject>();
-                string settingsAssetPath = $"{settings_folder_path}/{addressables_configuration_file}";
-                AssetDatabase.CreateAsset(sceneConfigurations, settingsAssetPath);
-                AssetDatabase.SaveAssets();
-            }
+            sceneConfigurations = SceneListScriptableObject.LoadOrCreate();
 
             // The list is a registry of the project's scenes (see SceneListScriptableObject.SyncWithProject).
             if (sceneConfigurations.SyncWithProject())
@@ -1861,12 +1109,6 @@ namespace Virtuademy.SDK.Environments.Editor
         [CreateProperty]
         public bool IsAddressablesSettingsConfigured => AddressablesConfiguration.IsSettingsConfigured(settings);
 
-        private void ConfigureAddressablesSettingsForBuild()
-        {
-            settings.BuiltInBundleCustomNaming = settings.OverridePlayerVersion;
-            settings.MonoScriptBundleCustomNaming = settings.OverridePlayerVersion;
-        }
-
         #endregion
 
         #region Utility
@@ -1969,17 +1211,17 @@ namespace Virtuademy.SDK.Environments.Editor
         /// many problems there were and what got published, in the Console and in a dialog — the
         /// panel lists the problems, but a creator who looked away needs to be told to look.
         /// </summary>
-        private void ReportDeployOutcome(string what, int errorsBefore, int published, int expected)
+        private void ReportDeployOutcome(string what, int errorsBefore, int importsStarted, int expected)
         {
             int problems = deployErrorCount - errorsBefore;
             if (problems == 0)
             {
-                Debug.Log($"[AddressablesManagement] {what} completed: {published} scene import(s).");
+                Debug.Log($"[AddressablesManagement] {what} completed: {importsStarted} scene import(s) started on the platform.");
                 return;
             }
 
-            string summary = $"{what} finished with {problems} problem(s): {published} of {expected} scene import(s) " +
-                             "went through. The problems are listed in the Addressables window and in the Console.";
+            string summary = $"{what} finished with {problems} problem(s): {importsStarted} of {expected} scene import(s) " +
+                             "started on the platform. The problems are listed in the Addressables window and in the Console.";
             Debug.LogWarning("[AddressablesManagement] " + summary);
             EditorUtility.DisplayDialog($"{what} finished with problems", summary, "OK");
         }
@@ -1995,18 +1237,6 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssetIfDirty(asset);
-        }
-
-        private void EnsureFolderExists(string folderPath)
-        {
-            string[] folders = folderPath.Split('/');
-            string currentPath = "";
-            foreach (string folder in folders)
-            {
-                currentPath = Path.Combine(currentPath, folder);
-                if (!AssetDatabase.IsValidFolder(currentPath))
-                    AssetDatabase.CreateFolder(Path.GetDirectoryName(currentPath), Path.GetFileName(currentPath));
-            }
         }
 
         #endregion
@@ -2056,35 +1286,10 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// Builds the interpreted hot-update DLL and verifies it (local whitelist + authoritative
-        /// server check). Returns true if the build may proceed. Called via reflection so this
-        /// window stays decoupled from the HYBRIDCLR_INSTALLED-gated assembly; when HybridCLR is
-        /// not installed the setupper is absent and we simply proceed (nothing to gate).
+        /// server check). Returns true if the build may proceed; see
+        /// <see cref="EnvironmentsBuild.VerifyInterpretedScriptsAsync"/>.
         /// </summary>
-        private async Task<bool> BuildAndVerifyInterpretedDLLAsync()
-        {
-            Type setupperType = FindHotUpdateSetupperType();
-
-            var method = setupperType?.GetMethod("CompileVerifyAsync", BindingFlags.Public | BindingFlags.Static);
-            if (method == null)
-            {
-                // HybridCLR not installed → no interpreted-scripts pipeline to gate.
-                Debug.LogWarning("[AddressablesManagement] HotUpdate verifier not found (HybridCLR not installed?). " +
-                                 "Skipping interpreted DLL build/verify.");
-                return true;
-            }
-
-            try
-            {
-                // CompileVerifyAsync returns Task<bool>, a BCL type this assembly can await directly.
-                var task = (Task<bool>)method.Invoke(null, null);
-                return await task;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Interpreted DLL verify failed to run: {ex.Message}");
-                return false;
-            }
-        }
+        private Task<bool> BuildAndVerifyInterpretedDLLAsync() => EnvironmentsBuild.VerifyInterpretedScriptsAsync();
 
         /// <summary>
         /// Builds addressables for all platforms and creates zip files.
@@ -2092,283 +1297,70 @@ namespace Virtuademy.SDK.Environments.Editor
         /// </summary>
         private void BuildAndZipScenes()
         {
-            // ── Pre-flight: check that all required build modules are installed ──────
-            var scenesWithMissingModules = sceneConfigurations.SceneConfigurations
-                .Where(s => s.IncludeInBuild && s.GetMissingBuildTargets().Count > 0)
-                .ToList();
+            EnvironmentsBuildResult result = EnvironmentsBuild.BuildAndZip(EnvironmentsBuild.IncludedScenes(sceneConfigurations));
 
-            if (scenesWithMissingModules.Count > 0)
+            if (result.Failure == EnvironmentsBuildFailure.MissingModule)
+                EditorUtility.DisplayDialog("Missing Build Modules", result.Message, "OK");
+
+            buildResult = result.Failure switch
             {
-                var lines = scenesWithMissingModules.Select(s =>
-                {
-                    var missing = s.GetMissingBuildTargets().Select(t => t switch
-                    {
-                        BuildTarget.Android => "Android (VR / Mobile)",
-                        BuildTarget.iOS => "iOS (Mobile)",
-                        BuildTarget.WebGL => "WebGL",
-                        _ => t.ToString()
-                    });
-                    return $"• {s.SceneNameFiltered}: {string.Join(", ", missing)}";
-                });
-
-                string message =
-                    "The following scenes require build modules that are not installed:\n\n" +
-                    string.Join("\n", lines) +
-                    "\n\nInstall the missing modules via Unity Hub → Installs → Add modules, " +
-                    "then retry.";
-
-                EditorUtility.DisplayDialog("Missing Build Modules", message, "OK");
-                buildResult = EBuildError.MissingModule;
-                return;
-            }
-            // ─────────────────────────────────────────────────────────────────────────
-
-            // ── Clean up stale platform folders ──────────────────────────────────────
-            // Delete any platform subfolder that is no longer required for a scene so
-            // it does not end up in the zip and get imported on the server.
-            foreach (var scene in sceneConfigurations.SceneConfigurations)
-            {
-                if (!scene.IncludeInBuild) continue;
-
-                string sceneFolderPath = Path.Combine(addressables_output_folder, scene.SceneNameFiltered);
-                if (!Directory.Exists(sceneFolderPath)) continue;
-
-                var requiredFolderNames = new HashSet<string>(
-                    scene.GetRequiredBuildTargets().Select(t => t.ToString()),
-                    StringComparer.OrdinalIgnoreCase
-                );
-
-                foreach (string subfolder in Directory.GetDirectories(sceneFolderPath))
-                {
-                    string folderName = Path.GetFileName(subfolder);
-                    if (!requiredFolderNames.Contains(folderName))
-                    {
-                        Directory.Delete(subfolder, true);
-                        Debug.Log($"[AddressablesManagement] Removed stale platform folder: {subfolder}");
-                    }
-                }
-            }
-            // ─────────────────────────────────────────────────────────────────────────
-
-            // Collect all required BuildTargets from selected scenes
-            var allTargets = new HashSet<BuildTarget>();
-            foreach (var scene in sceneConfigurations.SceneConfigurations)
-            {
-                if (scene.IncludeInBuild)
-                {
-                    foreach (var target in scene.GetRequiredBuildTargets())
-                        allTargets.Add(target);
-                }
-            }
-
-            // Build for each required platform
-            foreach (BuildTarget target in allTargets)
-            {
-                BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
-                EditorUserBuildSettings.SwitchActiveBuildTarget(group, target);
-                BuildAddressablesForSelectedPlatform();
-            }
-
-            buildResult = CheckBuildResult();
-
-            if (buildResult == EBuildError.None)
-            {
-                Debug.Log("[AddressablesManagement] Build successful for all platforms.");
-                ZipBuiltScenes(PrepareInterpretedAssemblyBundle());
-            }
-            else
-            {
-                Debug.LogError("[AddressablesManagement] Build failed. Check errors above.");
-            }
+                EnvironmentsBuildFailure.MissingModule => EBuildError.MissingModule,
+                EnvironmentsBuildFailure.FolderMissing => EBuildError.FolderMissing,
+                EnvironmentsBuildFailure.BinaryCatalog => EBuildError.BinaryCatalog,
+                _ => EBuildError.None,
+            };
         }
 
-        private void BuildAddressablesForSelectedPlatform()
-        {
-            AddressableAssetGroup assetGroup = settings.DefaultGroup;
-            foreach (AddressableAssetEntry entry in assetGroup.entries.Where(x => x.IsScene))
-                settings.RemoveAssetEntry(entry.guid);
+        #endregion
 
-            foreach (var scene in sceneConfigurations.SceneConfigurations)
-            {
-                if (scene.IncludeInBuild)
-                    BuildAddressablesForTargetGroup(scene);
-            }
-        }
+        #region Moved to EnvironmentsDeploy
 
-        private void BuildAddressablesForTargetGroup(SceneConfiguration configuration)
-        {
-            AddressableAssetGroup assetGroup = settings.DefaultGroup;
+        // The platform calls were public members of this window until they moved to EnvironmentsDeploy, which the
+        // window and EnvironmentsCli share. These forward to it, so code written against the window keeps compiling.
 
-            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(configuration.Scene, out string guid, out long _);
-            AddressableAssetEntry addressableEntry = settings.CreateOrMoveEntry(guid, assetGroup);
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.GetUploadLinkForWorld"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.GetUploadLinkForWorld.")]
+        public static Task<string> GetUploadLinkForWorld(string applicationApiUrl, int worldId)
+            => EnvironmentsDeploy.GetUploadLinkForWorld(applicationApiUrl, worldId);
 
-            string sceneNameFiltered = configuration.SceneNameFiltered;
-            addressableEntry.SetAddress(sceneNameFiltered);
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.ImportSceneToWorld"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.ImportSceneToWorld.")]
+        public static Task<bool> ImportSceneToWorld(string applicationApiUrl, int worldId, string zipName)
+            => EnvironmentsDeploy.ImportSceneToWorld(applicationApiUrl, worldId, zipName);
 
-            settings.OverridePlayerVersion = sceneNameFiltered;
-            ConfigureAddressablesSettingsForBuild();
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.FtpUploadConfig"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.FtpUploadConfig.")]
+        public class FtpUploadConfig : EnvironmentsDeploy.FtpUploadConfig { }
 
-            AddressablesBuildScript.BuildAddressables();
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.UploadZip"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.UploadZip.")]
+        public Task<bool> UploadZip(string filePath, string sasUrl)
+            => EnvironmentsDeploy.UploadZip(filePath, sasUrl);
 
-            settings.RemoveAssetEntry(guid);
-            settings.OverridePlayerVersion = string.Empty;
-        }
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.UploadZipViaFtp"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.UploadZipViaFtp.")]
+        public Task<bool> UploadZipViaFtp(string filePath, EnvironmentsDeploy.FtpUploadConfig ftpConfig)
+            => EnvironmentsDeploy.UploadZipViaFtp(filePath, ftpConfig);
 
-        private EBuildError CheckBuildResult()
-        {
-            foreach (var scene in sceneConfigurations.SceneConfigurations)
-            {
-                if (!scene.IncludeInBuild) continue;
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.GetTenantUploadLink"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.GetTenantUploadLink.")]
+        public static Task<string> GetTenantUploadLink(string applicationApiUrl)
+            => EnvironmentsDeploy.GetTenantUploadLink(applicationApiUrl);
 
-                string sceneFolderPath = Path.Combine(addressables_output_folder, scene.SceneNameFiltered);
-                var requiredTargets = scene.GetRequiredBuildTargets();
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.ImportEnvironmentDll"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.ImportEnvironmentDll.")]
+        public static Task<(bool Ok, string Reason)> ImportEnvironmentDll(string applicationApiUrl, int worldId, string zipName)
+            => EnvironmentsDeploy.ImportEnvironmentDll(applicationApiUrl, worldId, zipName);
 
-                foreach (BuildTarget target in requiredTargets)
-                {
-                    string subfolder = target.ToString();
-                    string subfolderPath = Path.Combine(sceneFolderPath, subfolder);
-                    if (!Directory.Exists(subfolderPath))
-                    {
-                        Debug.LogError($"Subfolder {subfolder} not found in {sceneFolderPath}");
-                        return EBuildError.FolderMissing;
-                    }
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.LinkEnvironmentDll"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.LinkEnvironmentDll.")]
+        public static Task<bool> LinkEnvironmentDll(string applicationApiUrl, int worldId, string catalogName, string assemblyName)
+            => EnvironmentsDeploy.LinkEnvironmentDll(applicationApiUrl, worldId, catalogName, assemblyName);
 
-                    bool catalogFileExists = Directory.GetFiles(subfolderPath, "*catalog*.json").Any();
-                    if (!catalogFileExists)
-                    {
-                        Debug.LogError($"Catalog file not found in {subfolderPath}");
-                        return EBuildError.BinaryCatalog;
-                    }
-                }
-            }
-
-            return EBuildError.None;
-        }
-
-        /// <summary>
-        /// Builds this project's interpreted-assembly bundle beside the scene zips, as
-        /// <c>ServerData/&lt;AssemblyName&gt;.zip</c>, and returns the name the scenes are compiled
-        /// against — null when the project has no interpreted scripts (HybridCLR not installed, or
-        /// installed with no script under the hot-update folder).
-        ///
-        /// Built on every addressables build, not only on a deploy from this window: the scene zips
-        /// and the bundle are what someone uploads by hand and imports from the Backoffice, and
-        /// the import needs the bundle beside the scenes to register their scripts.
-        /// </summary>
-        private static string PrepareInterpretedAssemblyBundle()
-        {
-            Type setupperType = FindHotUpdateSetupperType();
-            Type bundleType = FindEditorType("EnvironmentDllBundle");
-
-            if (setupperType == null || bundleType == null)
-                return null;
-
-            // Bundles of earlier builds go: a stale one beside the new scene zips is the wrong file
-            // to upload, and nothing else would ever remove it. The project prefix keeps this to
-            // assemblies this project produced.
-            string prefix = setupperType.GetProperty("ProjectAssemblyPrefix", BindingFlags.Public | BindingFlags.Static)?
-                .GetValue(null) as string;
-
-            if (!string.IsNullOrEmpty(prefix) && Directory.Exists(addressables_output_folder))
-            {
-                foreach (string stale in Directory.GetFiles(addressables_output_folder, prefix + "*.zip"))
-                    File.Delete(stale);
-            }
-
-            // HybridCLR configured but no script written: no assembly exists, so the scenes declare
-            // none and the import clears any link a previous build left on their catalog. The same
-            // question the build gate asked, so the two cannot disagree about whether there is code.
-            bool hasScripts = setupperType.GetMethod("ProjectHasInterpretedScripts", BindingFlags.Public | BindingFlags.Static)?
-                .Invoke(null, null) as bool? ?? true;
-
-            if (!hasScripts)
-                return null;
-
-            string zipPath = bundleType.GetMethod("Build", BindingFlags.Public | BindingFlags.Static)?
-                .Invoke(null, null) as string;
-
-            // The name comes from the file Build wrote, not from a second read of the assembly-name
-            // property: that rescans the source on every access, and a script saved in between would
-            // let the declaration name one build and the bundle carry another.
-            if (!string.IsNullOrEmpty(zipPath))
-                return Path.GetFileNameWithoutExtension(zipPath);
-
-            string assemblyName = bundleType.GetProperty("AssemblyName", BindingFlags.Public | BindingFlags.Static)?
-                .GetValue(null) as string;
-
-            // The scenes still need the assembly, so they still declare it; the import will accept
-            // them only where it is already registered.
-            Debug.LogWarning($"[AddressablesManagement] The interpreted-assembly bundle could not be built (see above). " +
-                             $"The scene zips declare '{assemblyName}', and an import accepts them only where that " +
-                             "assembly is already registered.");
-
-            return string.IsNullOrEmpty(assemblyName) ? null : assemblyName;
-        }
-
-        /// <summary>
-        /// Written into every scene folder before it is zipped, so the archive itself says which
-        /// interpreted assembly its scenes were compiled against. The platform's archive import
-        /// reads it: a name links the catalog to that assembly, null clears the link.
-        /// </summary>
-        private const string EnvironmentDllDeclarationFile = "environment-dll.json";
-
-        [Serializable]
-        private class EnvironmentDllDeclaration
-        {
-            public string assemblyName;
-        }
-
-        /// <summary>
-        /// The assembly a built scene declares. <paramref name="declares"/> is false when the
-        /// folder carries no declaration — a build made before this window wrote one.
-        /// </summary>
-        private static string ReadDeclaredAssembly(string scene, out bool declares)
-        {
-            declares = false;
-
-            string path = Path.Combine(addressables_output_folder, scene, EnvironmentDllDeclarationFile);
-            if (!File.Exists(path))
-                return null;
-
-            try
-            {
-                EnvironmentDllDeclaration declaration = JsonConvert.DeserializeObject<EnvironmentDllDeclaration>(File.ReadAllText(path));
-                declares = declaration != null;
-                return string.IsNullOrEmpty(declaration?.assemblyName) ? null : declaration.assemblyName;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[AddressablesManagement] Unreadable {path}: {ex.Message}. Build the scenes again.");
-                return null;
-            }
-        }
-
-        private void ZipBuiltScenes(string assemblyName)
-        {
-            List<string> builtScenes = GetBuiltSceneNames();
-            string declaration = JsonConvert.SerializeObject(new EnvironmentDllDeclaration { assemblyName = assemblyName });
-
-            foreach (string scene in builtScenes)
-            {
-                string fullBuildPath = Path.Combine(addressables_output_folder, scene);
-                string fullZipPath = fullBuildPath + ".zip";
-
-                if (!Directory.Exists(fullBuildPath))
-                    throw new DirectoryNotFoundException($"Build folder not found: {fullBuildPath}");
-
-                File.WriteAllText(Path.Combine(fullBuildPath, EnvironmentDllDeclarationFile), declaration);
-
-                // Remove existing zip with the same name
-                if (File.Exists(fullZipPath))
-                {
-                    File.Delete(fullZipPath);
-                    Debug.Log($"[AddressablesManagement] Removed existing zip: {fullZipPath}");
-                }
-
-                ZipFile.CreateFromDirectory(fullBuildPath, fullZipPath, System.IO.Compression.CompressionLevel.Optimal, true);
-                Debug.Log($"[AddressablesManagement] Created zip: {fullZipPath}");
-            }
-        }
+        /// <summary>Moved to <see cref="EnvironmentsDeploy.ImportSceneToTenant"/>.</summary>
+        [Obsolete("Use EnvironmentsDeploy.ImportSceneToTenant.")]
+        public static Task<bool> ImportSceneToTenant(string applicationApiUrl, string zipName)
+            => EnvironmentsDeploy.ImportSceneToTenant(applicationApiUrl, zipName);
 
         #endregion
     }
