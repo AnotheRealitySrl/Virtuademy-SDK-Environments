@@ -30,6 +30,8 @@ namespace Virtuademy.SDK.Environments.Editor
             BinaryCatalog,
             MissingModule,
             FirstpassScripts,
+            BuildFailed,
+            InvalidSceneNames,
         }
 
         [SerializeField] private VisualTreeAsset m_VisualTreeAsset = default;
@@ -495,8 +497,14 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             SetDeployButtonsEnabled(false);
-            await DeployToWorlds(worldIds, scenes);
-            SetDeployButtonsEnabled(true);
+            try
+            {
+                await DeployToWorlds(worldIds, scenes);
+            }
+            finally
+            {
+                SetDeployButtonsEnabled(true);
+            }
         }
 
         private async void OnBuildAndDeployClicked()
@@ -544,39 +552,40 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             SetDeployButtonsEnabled(false);
 
-            if (!RequireAddressablesConfigured("Build & Deploy"))
+            // The buttons come back on every way out, an exception included.
+            try
+            {
+                if (!RequireAddressablesConfigured("Build & Deploy"))
+                    return;
+
+                // 0. Build + verify the interpreted DLL (local whitelist + authoritative server
+                //    check). Block the whole build & deploy if it fails.
+                if (!await BuildAndVerifyInterpretedDLLAsync())
+                {
+                    LogDeployError("Interpreted script DLL failed the security checks. Build & deploy aborted (see Console).");
+                    EditorUtility.DisplayDialog("Build & Deploy blocked",
+                        "The interpreted script DLL did not pass the security checks. See the Console. " +
+                        "Nothing was built or deployed.", "OK");
+                    return;
+                }
+
+                // 1. Build
+                BuildAndZipScenes();
+
+                if (buildResult != EBuildError.None)
+                {
+                    LogDeployError($"Build failed ({buildResult}). Aborting deploy.");
+                    return;
+                }
+
+                // 2. Deploy
+                List<string> scenes = GetBuiltSceneNames();
+                await DeployToWorlds(worldIds, scenes);
+            }
+            finally
             {
                 SetDeployButtonsEnabled(true);
-                return;
             }
-
-            // 0. Build + verify the interpreted DLL (local whitelist + authoritative server
-            //    check). Block the whole build & deploy if it fails.
-            if (!await BuildAndVerifyInterpretedDLLAsync())
-            {
-                LogDeployError("Interpreted script DLL failed the security checks. Build & deploy aborted (see Console).");
-                EditorUtility.DisplayDialog("Build & Deploy blocked",
-                    "The interpreted script DLL did not pass the security checks. See the Console. " +
-                    "Nothing was built or deployed.", "OK");
-                SetDeployButtonsEnabled(true);
-                return;
-            }
-
-            // 1. Build
-            BuildAndZipScenes();
-
-            if (buildResult != EBuildError.None)
-            {
-                LogDeployError($"Build failed ({buildResult}). Aborting deploy.");
-                SetDeployButtonsEnabled(true);
-                return;
-            }
-
-            // 2. Deploy
-            List<string> scenes = GetBuiltSceneNames();
-            await DeployToWorlds(worldIds, scenes);
-
-            SetDeployButtonsEnabled(true);
         }
 
         private async Task DeployToWorlds(List<int> worldIds, List<string> scenes)
@@ -644,8 +653,14 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             SetDeployButtonsEnabled(false);
-            await DeployToTenant(scenes);
-            SetDeployButtonsEnabled(true);
+            try
+            {
+                await DeployToTenant(scenes);
+            }
+            finally
+            {
+                SetDeployButtonsEnabled(true);
+            }
         }
 
         private async void OnTenantBuildAndDeployClicked()
@@ -662,35 +677,37 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             SetDeployButtonsEnabled(false);
 
-            if (!RequireAddressablesConfigured("Build & Deploy to Tenant"))
+            // The buttons come back on every way out, an exception included.
+            try
+            {
+                if (!RequireAddressablesConfigured("Build & Deploy to Tenant"))
+                    return;
+
+                // 0. Build + verify the interpreted DLL. Block the whole build & deploy if it fails.
+                if (!await BuildAndVerifyInterpretedDLLAsync())
+                {
+                    LogDeployError("Interpreted script DLL failed the security checks. Tenant build & deploy aborted (see Console).");
+                    EditorUtility.DisplayDialog("Build & Deploy blocked",
+                        "The interpreted script DLL did not pass the security checks. See the Console. " +
+                        "Nothing was built or deployed.", "OK");
+                    return;
+                }
+
+                BuildAndZipScenes();
+
+                if (buildResult != EBuildError.None)
+                {
+                    LogDeployError($"Build failed ({buildResult}). Aborting tenant deploy.");
+                    return;
+                }
+
+                List<string> scenes = GetBuiltSceneNames();
+                await DeployToTenant(scenes);
+            }
+            finally
             {
                 SetDeployButtonsEnabled(true);
-                return;
             }
-
-            // 0. Build + verify the interpreted DLL. Block the whole build & deploy if it fails.
-            if (!await BuildAndVerifyInterpretedDLLAsync())
-            {
-                LogDeployError("Interpreted script DLL failed the security checks. Tenant build & deploy aborted (see Console).");
-                EditorUtility.DisplayDialog("Build & Deploy blocked",
-                    "The interpreted script DLL did not pass the security checks. See the Console. " +
-                    "Nothing was built or deployed.", "OK");
-                SetDeployButtonsEnabled(true);
-                return;
-            }
-
-            BuildAndZipScenes();
-
-            if (buildResult != EBuildError.None)
-            {
-                LogDeployError($"Build failed ({buildResult}). Aborting tenant deploy.");
-                SetDeployButtonsEnabled(true);
-                return;
-            }
-
-            List<string> scenes = GetBuiltSceneNames();
-            await DeployToTenant(scenes);
-            SetDeployButtonsEnabled(true);
         }
 
         private async Task DeployToTenant(List<string> scenes)
@@ -1304,6 +1321,10 @@ namespace Virtuademy.SDK.Environments.Editor
                 EditorUtility.DisplayDialog("Missing Build Modules", result.Message, "OK");
             else if (result.Failure == EnvironmentsBuildFailure.FirstpassScripts)
                 EditorUtility.DisplayDialog("Scripts the app cannot load", result.Message, "OK");
+            else if (result.Failure == EnvironmentsBuildFailure.InvalidSceneNames)
+                EditorUtility.DisplayDialog("Scene names", result.Message, "OK");
+            else if (result.Failure == EnvironmentsBuildFailure.BuildFailed)
+                EditorUtility.DisplayDialog("Build failed", result.Message, "OK");
 
             buildResult = result.Failure switch
             {
@@ -1311,6 +1332,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 EnvironmentsBuildFailure.FirstpassScripts => EBuildError.FirstpassScripts,
                 EnvironmentsBuildFailure.FolderMissing => EBuildError.FolderMissing,
                 EnvironmentsBuildFailure.BinaryCatalog => EBuildError.BinaryCatalog,
+                EnvironmentsBuildFailure.BuildFailed => EBuildError.BuildFailed,
+                EnvironmentsBuildFailure.InvalidSceneNames => EBuildError.InvalidSceneNames,
                 _ => EBuildError.None,
             };
         }

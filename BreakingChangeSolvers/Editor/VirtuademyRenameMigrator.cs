@@ -354,6 +354,12 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         };
 
         /// <summary>
+        /// The literal each rule of <see cref="TypeMap"/> matches, recorded as the rules are built. Declared before the
+        /// table, which builds its rules while it is initialized. Read by <see cref="MayNeedMigration"/>.
+        /// </summary>
+        private static readonly List<string> TypeRuleLiterals = new();
+
+        /// <summary>
         /// Renames that must stop at a word boundary, applied after <see cref="EnvironmentsMap"/>.
         /// </summary>
         /// <remarks>
@@ -371,6 +377,8 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         /// </remarks>
         private static readonly (Regex Rule, string NewValue)[] TypeMap =
         {
+            // Every rule below is built through Boundary, Identifier or Register, which record the literal it
+            // matches in TypeRuleLiterals (declared just before the table): the save guard's prefilter reads them.
             (Boundary(OldSyncedObject), "Virtuademy.Environments.ScriptingApi.Placeholders.SyncedObject"),
             (Boundary(OldSyncedVariables), "Virtuademy.Environments.ScriptingApi.Placeholders.SyncedVariables"),
 
@@ -394,7 +402,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             // running this tool on the application). The `using` line is left alone and
             // SupplementUtilitiesUsing adds `using SPACS.Utilities;` beside it instead, so the moved
             // utilities keep resolving without losing what stayed.
-            (new Regex(@"(?<!using\s)" + Regex.Escape(OldCoreUtilities) + @"(?!\.(Editor|JwtToken|HmacCredential))(?![A-Za-z0-9_])", RegexOptions.Compiled), "SPACS.Utilities"),
+            (Register(OldCoreUtilities, new Regex(@"(?<!using\s)" + Regex.Escape(OldCoreUtilities) + @"(?!\.(Editor|JwtToken|HmacCredential))(?![A-Za-z0-9_])", RegexOptions.Compiled)), "SPACS.Utilities"),
             (Boundary(OldCoreVisualScripting), "SPACS.VisualScripting"),
             (Boundary(OldCoreEditor), "SPACS.Editor"),
             (Boundary(OldCreateTypeInstance), "SPACS.CreateTypeInstanceUnit"),
@@ -469,7 +477,14 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         /// name="unless"/> is how the caller says which child.
         /// </remarks>
         private static Regex Boundary(string typeName, string unless = "")
-            => new(Regex.Escape(typeName) + unless + "(?![A-Za-z0-9_])", RegexOptions.Compiled);
+            => Register(typeName, new(Regex.Escape(typeName) + unless + "(?![A-Za-z0-9_])", RegexOptions.Compiled));
+
+        /// <summary>Records the literal <paramref name="rule"/> cannot match without (<see cref="TypeRuleLiterals"/>).</summary>
+        private static Regex Register(string literal, Regex rule)
+        {
+            TypeRuleLiterals.Add(literal);
+            return rule;
+        }
 
         /// <summary>
         /// Matches <paramref name="typeName"/> only as a whole identifier: neither glued to a
@@ -477,7 +492,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         /// fine, which is how the qualified spelling is reached.
         /// </summary>
         private static Regex Identifier(string typeName)
-            => new(@"(?<![A-Za-z0-9_])" + Regex.Escape(typeName) + @"(?![A-Za-z0-9_])", RegexOptions.Compiled);
+            => Register(typeName, new(@"(?<![A-Za-z0-9_])" + Regex.Escape(typeName) + @"(?![A-Za-z0-9_])", RegexOptions.Compiled));
 
         /// <summary>
         /// An assembly-qualified name of one of our types: <c>Full.Type.Name, AssemblyName, Version=…</c>.
@@ -901,6 +916,14 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             guidEntries = scan.Guids;
             hasLegacyFolders = scan.HasLegacyFolders;
             hasScanned = true;
+
+            // Opening the routine on a project with nothing left to migrate completes it: Apply, where the save guard
+            // is otherwise retired, is never pressed there.
+            if (entries.Count == 0 && poiPageEntries.Count == 0 && guidEntries.Count == 0 && !hasLegacyFolders
+                && !VirtuademyUpdateResave.IsPending)
+            {
+                VirtuademyUpdateSaveGuard.RetireIfMigrated();
+            }
             Repaint();
         }
 
@@ -1135,7 +1158,12 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         /// <c>_json</c> field of a machine, a graph asset or a Variables component; other matches in
         /// the file (a label, a narrative text) do not count.
         /// </summary>
-        /// <remarks>Used by <see cref="VirtuademyUpdateSaveGuard"/>, which refuses to save such a file.</remarks>
+        /// <remarks>
+        /// Used by <see cref="VirtuademyUpdateSaveGuard"/>, which refuses to save such a file, on every save, and by the
+        /// scan of the whole project. The answer for a file is kept until its size or last write time changes, so a file
+        /// that has not changed is read once per editor session; and a <c>_json</c> value is only run through the rules
+        /// when it holds a literal one of them matches (<see cref="MayNeedMigration"/>).
+        /// </remarks>
         internal static bool HasUnmigratedGraphData(string path)
         {
             if (string.IsNullOrEmpty(path)
@@ -1145,8 +1173,75 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 return false;
             }
 
+            FileInfo info = new(path);
+            string key = path.Replace('\\', '/');
+            DateTime written = info.LastWriteTimeUtc;
+            long length = info.Length;
+
+            if (graphDataCache.TryGetValue(key, out (DateTime Written, long Length, bool Result) cached)
+                && cached.Written == written && cached.Length == length)
+            {
+                return cached.Result;
+            }
+
+            // The stamp is taken before the read: a file written in between is read newer than it is stamped,
+            // so the next call finds the stamp stale and reads it again.
+            bool result = ScanGraphData(path);
+            graphDataCache[key] = (written, length, result);
+            return result;
+        }
+
+        private static readonly Dictionary<string, (DateTime Written, long Length, bool Result)> graphDataCache =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private static bool ScanGraphData(string path)
+        {
             string text = ReadTextOrNull(path);
-            return text != null && GraphJsonValues(text).Any(json => CountHits(json) > 0);
+
+            // No Visual Scripting data in the file: nothing to look at (GraphJsonValues would find none).
+            if (text == null || text.IndexOf(JsonKey, StringComparison.Ordinal) < 0)
+            {
+                return false;
+            }
+
+            return GraphJsonValues(text).Any(json => MayNeedMigration(json) && CountHits(json) > 0);
+        }
+
+        private static string[] renameLiterals;
+
+        /// <summary>The literals a rule of <see cref="CountHits"/> cannot fire without, besides the old brand itself.</summary>
+        private static string[] RenameLiterals
+            => renameLiterals ??= LiteralMap.Select(e => e.oldValue)
+                .Concat(EnvironmentsMap.Select(e => e.oldValue))
+                .Concat(TypeRuleLiterals)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+
+        /// <summary>
+        /// A cheap, conservative test that runs before the rules: false only when <see cref="CountHits"/> is certain to
+        /// find nothing in <paramref name="text"/>. Every rule starts from a literal of the tables (or from the old
+        /// brand, for the two namespace rules), and a rule that cannot fire first leaves the text for the next one as it
+        /// was; the two passes at the end need the old utilities namespace (<see cref="SupplementUtilitiesUsing"/>, in
+        /// <see cref="TypeRuleLiterals"/>) or an assembly-qualified name of ours (<see cref="AssemblyQualifiedName"/>).
+        /// </summary>
+        private static bool MayNeedMigration(string text)
+        {
+            if (text.IndexOf(OldBrand, StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            foreach (string literal in RenameLiterals)
+            {
+                if (text.IndexOf(literal, StringComparison.Ordinal) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return text.IndexOf("Version=", StringComparison.Ordinal) >= 0
+                   && (text.IndexOf(NewBrand + ".", StringComparison.Ordinal) >= 0
+                       || text.IndexOf("SPACS.", StringComparison.Ordinal) >= 0);
         }
 
         private const string JsonKey = "_json: '";
@@ -1450,6 +1545,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         {
             ScanResult scan = new();
             VirtuademyAssemblyReferenceMigrator.ResetCache();
+            bool graphDataFound = false;
 
             try
             {
@@ -1469,6 +1565,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                     if (hits > 0)
                     {
                         scan.Files.Add(new FileEntry { Path = path.Replace('\\', '/'), Hits = hits });
+                        graphDataFound |= VirtuademyRenameMigrator.HasUnmigratedGraphData(path);
                     }
                 }
             }
@@ -1478,6 +1575,13 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                 {
                     EditorUtility.ClearProgressBar();
                 }
+            }
+
+            // A project that retired the save guard and now has files with old graph data (a branch merged in, the
+            // routine's output reverted) is in the state the guard exists for.
+            if (graphDataFound)
+            {
+                VirtuademyUpdateSaveGuard.Rearm();
             }
 
             scan.Pages = VirtuademyPOIPageMigrator.Scan();
@@ -1670,6 +1774,13 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             }
 
             result.NodeLibrary = VirtuademyRenameMigrator.RebuildVisualScriptingUnits();
+
+            // With nothing to re-save the routine is finished here; otherwise the re-save finishes it.
+            if (!VirtuademyUpdateResave.IsPending)
+            {
+                VirtuademyUpdateSaveGuard.RetireIfMigrated();
+            }
+
             return result;
         }
     }

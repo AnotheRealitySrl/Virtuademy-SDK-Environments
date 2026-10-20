@@ -10,6 +10,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+using Virtuademy.SDK.Environments.Installer.Editor;
+
 namespace Virtuademy.BreakingChangeSolvers
 {
     /// <summary>
@@ -302,6 +304,9 @@ namespace Virtuademy.BreakingChangeSolvers
             }
 
             ReopenScenes(pending.ReopenSceneGuids);
+
+            // The routine's last step: if no file with old graph data is left, the save guard has done its job.
+            VirtuademyUpdateSaveGuard.RetireIfMigrated();
 
             LastRun = new Summary { Resaved = resaved, Unchanged = unchanged, Missing = missing };
             LastRun.ToCheck.AddRange(restored);

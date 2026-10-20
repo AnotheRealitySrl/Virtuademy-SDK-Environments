@@ -36,7 +36,16 @@ namespace Virtuademy.SDK.Environments.Editor
             public bool IncludeInBuild { get => includeInBuild; set => includeInBuild = value; }
             public ESupportedPlatform SupportedPlatforms { get => supportedPlatforms; set => supportedPlatforms = value; }
 
-            public string SceneNameFiltered => Regex.Replace(scene.name.ToLower(), alphanumeric_lowercase_string_pattern_negated, string.Empty);
+            /// <summary>
+            /// The scene's name as its folder, zip and environment file name carry it: lower-cased with
+            /// the invariant culture (so a Turkish editor does not turn "I" into "ı", which the filter
+            /// would then drop) and reduced to a-z and 0-9, like <c>PublishedEnvironmentsIndex.Key</c>.
+            /// Empty when the scene has no letter or digit in its name, or no scene is assigned;
+            /// <see cref="EnvironmentsBuild.BuildAndZip"/> refuses such scenes.
+            /// </summary>
+            public string SceneNameFiltered => scene == null
+                ? string.Empty
+                : Regex.Replace(scene.name.ToLowerInvariant(), alphanumeric_lowercase_string_pattern_negated, string.Empty);
 
             public HashSet<BuildTarget> GetRequiredBuildTargets()
             {

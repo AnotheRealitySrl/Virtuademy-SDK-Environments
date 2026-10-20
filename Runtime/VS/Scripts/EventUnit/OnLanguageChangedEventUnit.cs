@@ -64,11 +64,9 @@ namespace Virtuademy.SDK.Environments.VisualScripting
 
         protected override void Subscribe(Action<string> handler)
         {
-            if (!IVirtuademyGameplay.Current.Localization.IsAvailable)
-            {
-                return;
-            }
-
+            // Subscribed even when the localization system is not up yet: the graph instantiates
+            // once, so returning here (as this did) left the node deaf for the whole session.
+            // The API keeps the handler and starts listening to the system once it is there.
             IVirtuademyGameplay.Current.Localization.LanguageChanged += handler;
         }
 

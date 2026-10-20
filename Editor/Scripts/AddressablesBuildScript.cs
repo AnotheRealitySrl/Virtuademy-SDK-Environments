@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Build;
 using UnityEditor.AddressableAssets.Settings;
 
@@ -69,7 +70,14 @@ namespace Virtuademy.SDK.Environments.Editor
 
         public static bool BuildAddressables()
         {
-            GetSettingsObject(settings_asset);
+            if (GetSettingsObject(settings_asset) == null)
+                return false;
+
+            // Addressables builds the settings registered as the project's default, not the asset loaded above. A
+            // project whose settings asset is not registered (EditorBuildSettings has no config object for it) made
+            // every build fail with "Addressable Asset Settings does not exist": register it.
+            if (AddressableAssetSettingsDefaultObject.Settings != settings)
+                AddressableAssetSettingsDefaultObject.Settings = settings;
 
             if (AssetDatabase.LoadAssetAtPath<ScriptableObject>(build_script) is not IDataBuilder builderScript)
             {
@@ -84,16 +92,49 @@ namespace Virtuademy.SDK.Environments.Editor
             return BuildAddressableContent();
         }
 
+        /// <summary>
+        /// Builds the Addressables for Android, WebGL and Windows in turn. Stops at the first target
+        /// that cannot be switched to or fails to build, and switches back to the editor's original
+        /// build target whatever happens: it ignored both results before, so a failed platform left
+        /// a previous build's output in place and the editor on whichever target came last.
+        /// </summary>
         public static void BuildAddressablesForAllPlatforms()
         {
-            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
-            BuildAddressables();
+            (BuildTargetGroup group, BuildTarget target)[] targets =
+            {
+                (BuildTargetGroup.Android, BuildTarget.Android),
+                (BuildTargetGroup.WebGL, BuildTarget.WebGL),
+                (BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64),
+            };
 
-            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WebGL, BuildTarget.WebGL);
-            BuildAddressables();
+            BuildTarget originalTarget = EditorUserBuildSettings.activeBuildTarget;
+            BuildTargetGroup originalGroup = BuildPipeline.GetBuildTargetGroup(originalTarget);
 
-            EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64);
-            BuildAddressables();
+            try
+            {
+                foreach ((BuildTargetGroup group, BuildTarget target) in targets)
+                {
+                    if (!EditorUserBuildSettings.SwitchActiveBuildTarget(group, target))
+                    {
+                        Debug.LogError($"[AddressablesManagement] Could not switch the active build target to {target}: the remaining platforms were not built.");
+                        return;
+                    }
+
+                    if (!BuildAddressables())
+                    {
+                        Debug.LogError($"[AddressablesManagement] The Addressables build failed for {target} (see the errors above): the remaining platforms were not built.");
+                        return;
+                    }
+                }
+            }
+            finally
+            {
+                if (EditorUserBuildSettings.activeBuildTarget != originalTarget
+                    && !EditorUserBuildSettings.SwitchActiveBuildTarget(originalGroup, originalTarget))
+                {
+                    Debug.LogWarning($"[AddressablesManagement] Could not switch the active build target back to {originalTarget}.");
+                }
+            }
         }
     }
 }

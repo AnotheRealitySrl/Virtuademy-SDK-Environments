@@ -57,8 +57,9 @@ namespace Virtuademy.Environments.ScriptingApi
         /// straight from the editor, where <see cref="Translate"/> hands the key back unchanged.
         /// </summary>
         /// <remarks>
-        /// Node: <c>Virtuademy Localization: On Language Changed</c>, which subscribes only when this
-        /// is true.
+        /// Node: <c>Virtuademy Localization: On Language Changed</c> subscribes to
+        /// <see cref="LanguageChanged"/> whatever this says, since the system may come up after
+        /// the graph does.
         /// </remarks>
         bool IsAvailable { get; }
 }

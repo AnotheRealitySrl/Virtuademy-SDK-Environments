@@ -33,7 +33,13 @@ namespace Virtuademy.SDK.Environments.Tasks
             rpcManagerInterface.AddJoinRoomEvent(Init);
         }
 
-
+        private void OnDestroy()
+        {
+            // AddJoinRoomEvent subscribes to OnInitRoom: unsubscribe through the event, so a
+            // destroyed setter is not called back on the next room join.
+            if (rpcManagerInterface != null)
+                rpcManagerInterface.OnInitRoom -= Init;
+        }
 
         private void Init(int id)
         {
@@ -50,6 +56,13 @@ namespace Virtuademy.SDK.Environments.Tasks
                     targetNode = task.Node;
                     break;
                 }
+            }
+
+            if (targetNode == null)
+            {
+                if (id != -1)
+                    Debug.LogWarning($"[TaskVirtuademyStepSetter] No task with id {id} in the scene: the task state of the room is not restored.");
+                return;
             }
 
             TaskNode newNode = targetNode;
