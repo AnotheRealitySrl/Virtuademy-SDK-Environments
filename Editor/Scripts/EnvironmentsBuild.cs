@@ -31,6 +31,12 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>A platform folder has no catalog file.</summary>
         BinaryCatalog,
+
+        /// <summary>
+        /// A component of the scenes' content has a script that compiles into a <c>*-firstpass</c> assembly (it sits
+        /// under <c>Assets/Plugins</c> or <c>Assets/Standard Assets</c>), which the app does not have: nothing was built.
+        /// </summary>
+        FirstpassScripts,
     }
 
     /// <summary>A scene as <see cref="EnvironmentsBuild.BuildAndZip"/> built it.</summary>
@@ -54,11 +60,14 @@ namespace Virtuademy.SDK.Environments.Editor
     {
         public EnvironmentsBuildFailure Failure;
 
-        /// <summary>For <see cref="EnvironmentsBuildFailure.MissingModule"/>, the text the window's dialog shows.</summary>
+        /// <summary>For <see cref="EnvironmentsBuildFailure.MissingModule"/> and <see cref="EnvironmentsBuildFailure.FirstpassScripts"/>, the text the window's dialog shows.</summary>
         public string Message;
 
         /// <summary>For <see cref="EnvironmentsBuildFailure.MissingModule"/>, one entry per scene: its name and the modules it lacks.</summary>
         public List<string> MissingModules = new();
+
+        /// <summary>For <see cref="EnvironmentsBuildFailure.FirstpassScripts"/>, every component found; <see cref="Message"/> explains and lists the first ones.</summary>
+        public List<FirstpassComponent> FirstpassComponents = new();
 
         public List<EnvironmentsBuiltScene> Scenes = new();
 
@@ -204,7 +213,8 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <summary>
         /// Builds addressables for all platforms and creates zip files. Does NOT upload — used by
         /// both "Build Addressables" and "Build &amp; Deploy" in the window, and by the command line.
-        /// Refuses before anything is built when a scene needs a build module that is not installed.
+        /// Refuses before anything is built when a scene needs a build module that is not installed, or when
+        /// its content has a component whose script the app cannot bind (<see cref="EnvironmentsScriptCheck"/>).
         /// </summary>
         /// <param name="scenes">The scenes to build: normally <see cref="IncludedScenes"/>, or some of them.</param>
         public static EnvironmentsBuildResult BuildAndZip(IReadOnlyList<SceneConfiguration> scenes)
@@ -238,6 +248,21 @@ namespace Virtuademy.SDK.Environments.Editor
                     "then retry.";
                 result.MissingModules = lines;
                 result.Failure = EnvironmentsBuildFailure.MissingModule;
+                return result;
+            }
+            // ─────────────────────────────────────────────────────────────────────────
+
+            // ── Pre-flight: scripts in a firstpass assembly, which the app does not have ─
+            List<FirstpassComponent> firstpassComponents = EnvironmentsScriptCheck.FindFirstpassComponents(scenes);
+
+            if (firstpassComponents.Count > 0)
+            {
+                result.FirstpassComponents = firstpassComponents;
+                result.Message = EnvironmentsScriptCheck.Describe(firstpassComponents);
+                result.Failure = EnvironmentsBuildFailure.FirstpassScripts;
+
+                // The dialog and the report carry the first ones; the Console has every component.
+                Debug.LogError("[AddressablesManagement] " + EnvironmentsScriptCheck.Describe(firstpassComponents, int.MaxValue));
                 return result;
             }
             // ─────────────────────────────────────────────────────────────────────────

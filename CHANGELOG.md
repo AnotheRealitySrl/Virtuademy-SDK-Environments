@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+#### Added
+- **The build refuses an environment whose scripts compile into `Assembly-CSharp-firstpass`.** A component binds in
+  the app only if the app has a class with the same assembly, namespace and name, and the app has no
+  `Assembly-CSharp-firstpass` (nor `Assembly-UnityScript-firstpass` or `Assembly-CSharp-Editor-firstpass`): scripts
+  under a creator's `Assets/Plugins` or `Assets/Standard Assets` compile into it, so each of their components
+  arrived in the app as a missing script (seen with the SALSA add-ons `Amplitude` and `AmplitudeSALSA`, which the app
+  holds in `Assembly-CSharp`). `EnvironmentsBuild.BuildAndZip`, behind **Build Addressables** and **Build & Deploy**
+  in the window and `EnvironmentsCli`'s `build` and `deploy -vdBuild`, now reads the included scenes' dependencies
+  before it builds, and stops with a dialog and a Console error that name every such component (scene or prefab,
+  GameObject path, type, script) and say how to fix it: move the plugin's runtime scripts, with their `.meta` files,
+  out of those folders to a normal one (the vendor's own folder, for example), which compiles into `Assembly-CSharp`.
+  In the command line it is `ExitBuildFailed` with `build.failure` `FirstpassScripts`, and the components in
+  `build.firstpassComponents`. Warrants a minor bump.
+
 #### Changed
 - **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
   Virtuademy app ships. A creator project now gets them with the SDK, at the app's versions, so the NavMesh, rig

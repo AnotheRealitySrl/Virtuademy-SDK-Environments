@@ -48,7 +48,10 @@ namespace Virtuademy.SDK.Environments.Editor
     /// build, where it is already published.</description></item>
     /// <item><description><c>build [-vdScenes a,b]</c>: what <b>Build Addressables</b> does, interpreted scripts
     /// included: refuses an unconfigured project, compiles and verifies the interpreted DLL, builds every platform
-    /// each included scene needs and zips them into <c>ServerData</c>. <c>-vdScenes</c> limits it to some of the
+    /// each included scene needs and zips them into <c>ServerData</c>. Before anything is built it refuses a project
+    /// whose scenes use a component with a script in a <c>*-firstpass</c> assembly (under <c>Assets/Plugins</c> or
+    /// <c>Assets/Standard Assets</c>), which the app cannot bind: <see cref="ExitBuildFailed"/>, with the components in
+    /// the report's <c>build.firstpassComponents</c>. <c>-vdScenes</c> limits it to some of the
     /// included scenes (by scene name).</description></item>
     /// <item><description><c>preview (-vdWorlds &lt;ids&gt; | -vdTenant) [-vdExpectTenant &lt;label&gt;] [-vdScenes a,b]</c>:
     /// what a deploy there would add and update, per scene. Read-only. <c>-vdExpectTenant</c> is checked when given.</description></item>
@@ -127,7 +130,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <summary>No scene is included in the build, the project has no scene list, or <c>-vdScenes</c> names a scene that is not included.</summary>
         public const int ExitNothingToBuild = 13;
 
-        /// <summary>The build failed: a missing build module, a missing platform folder or catalog.</summary>
+        /// <summary>The build failed: a missing build module, a script in a firstpass assembly the app does not have, a missing platform folder or catalog.</summary>
         public const int ExitBuildFailed = 14;
 
         /// <summary>The interpreted scripts did not pass the local or the server verification.</summary>
@@ -969,6 +972,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 { "success", result.Success },
                 { "failure", result.Failure.ToString() },
                 { "message", result.Message },
+                { "firstpassComponents", result.FirstpassComponents },
                 { "scenes", result.Scenes },
                 { "scriptsAssembly", result.ScriptsAssembly },
                 { "scriptsArchive", result.ScriptsArchive },

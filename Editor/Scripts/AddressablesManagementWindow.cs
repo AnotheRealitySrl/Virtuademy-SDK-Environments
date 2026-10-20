@@ -29,6 +29,7 @@ namespace Virtuademy.SDK.Environments.Editor
             FolderMissing,
             BinaryCatalog,
             MissingModule,
+            FirstpassScripts,
         }
 
         [SerializeField] private VisualTreeAsset m_VisualTreeAsset = default;
@@ -1301,10 +1302,13 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (result.Failure == EnvironmentsBuildFailure.MissingModule)
                 EditorUtility.DisplayDialog("Missing Build Modules", result.Message, "OK");
+            else if (result.Failure == EnvironmentsBuildFailure.FirstpassScripts)
+                EditorUtility.DisplayDialog("Scripts the app cannot load", result.Message, "OK");
 
             buildResult = result.Failure switch
             {
                 EnvironmentsBuildFailure.MissingModule => EBuildError.MissingModule,
+                EnvironmentsBuildFailure.FirstpassScripts => EBuildError.FirstpassScripts,
                 EnvironmentsBuildFailure.FolderMissing => EBuildError.FolderMissing,
                 EnvironmentsBuildFailure.BinaryCatalog => EBuildError.BinaryCatalog,
                 _ => EBuildError.None,
