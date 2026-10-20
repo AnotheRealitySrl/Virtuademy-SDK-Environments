@@ -2,10 +2,31 @@
 
 ## Unreleased
 
-Minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
+The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
-### Fixed
+#### Added
+- **The build refuses an environment whose scripts compile into `Assembly-CSharp-firstpass`.** A component binds in
+  the app only if the app has a class with the same assembly, namespace and name, and the app has no
+  `Assembly-CSharp-firstpass` (nor `Assembly-UnityScript-firstpass` or `Assembly-CSharp-Editor-firstpass`): scripts
+  under a creator's `Assets/Plugins` or `Assets/Standard Assets` compile into it, so each of their components
+  arrived in the app as a missing script (seen with the SALSA add-ons `Amplitude` and `AmplitudeSALSA`, which the app
+  holds in `Assembly-CSharp`). `EnvironmentsBuild.BuildAndZip`, behind **Build Addressables** and **Build & Deploy**
+  in the window and `EnvironmentsCli`'s `build` and `deploy -vdBuild`, now reads the included scenes' dependencies
+  before it builds, and stops with a dialog and a Console error that name every such component (scene or prefab,
+  GameObject path, type, script) and say how to fix it: move the plugin's runtime scripts, with their `.meta` files,
+  out of those folders to a normal one (the vendor's own folder, for example), which compiles into `Assembly-CSharp`.
+  In the command line it is `ExitBuildFailed` with `build.failure` `FirstpassScripts`, and the components in
+  `build.firstpassComponents`. Warrants a minor bump.
+
+#### Changed
+- **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
+  Virtuademy app ships. A creator project now gets them with the SDK, at the app's versions, so the NavMesh, rig
+  and spline components of an environment carry the fields the app reads. A project that lists one of them at
+  another version in its own manifest keeps that version: a direct entry wins over a dependency. Animation
+  Rigging brings Burst with it. Warrants a minor bump.
+
+#### Fixed
 - **Build: a failed build no longer zips and deploys a previous run's output.** `EnvironmentsBuild.BuildAndZip`
   checks the build-target switch and the Addressables build result, empties each scene's platform folders and
   old zip before building, and restores the Addressables settings and the original active build target in

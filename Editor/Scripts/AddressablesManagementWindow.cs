@@ -29,6 +29,7 @@ namespace Virtuademy.SDK.Environments.Editor
             FolderMissing,
             BinaryCatalog,
             MissingModule,
+            FirstpassScripts,
             BuildFailed,
             InvalidSceneNames,
         }
@@ -1318,6 +1319,8 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (result.Failure == EnvironmentsBuildFailure.MissingModule)
                 EditorUtility.DisplayDialog("Missing Build Modules", result.Message, "OK");
+            else if (result.Failure == EnvironmentsBuildFailure.FirstpassScripts)
+                EditorUtility.DisplayDialog("Scripts the app cannot load", result.Message, "OK");
             else if (result.Failure == EnvironmentsBuildFailure.InvalidSceneNames)
                 EditorUtility.DisplayDialog("Scene names", result.Message, "OK");
             else if (result.Failure == EnvironmentsBuildFailure.BuildFailed)
@@ -1326,6 +1329,7 @@ namespace Virtuademy.SDK.Environments.Editor
             buildResult = result.Failure switch
             {
                 EnvironmentsBuildFailure.MissingModule => EBuildError.MissingModule,
+                EnvironmentsBuildFailure.FirstpassScripts => EBuildError.FirstpassScripts,
                 EnvironmentsBuildFailure.FolderMissing => EBuildError.FolderMissing,
                 EnvironmentsBuildFailure.BinaryCatalog => EBuildError.BinaryCatalog,
                 EnvironmentsBuildFailure.BuildFailed => EBuildError.BuildFailed,
