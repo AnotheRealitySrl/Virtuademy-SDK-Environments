@@ -1,5 +1,14 @@
 # Release notes
 
+## Unreleased
+
+#### Changed
+- **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
+  Virtuademy app ships. A creator project now gets them with the SDK, at the app's versions, so the NavMesh, rig
+  and spline components of an environment carry the fields the app reads. A project that lists one of them at
+  another version in its own manifest keeps that version: a direct entry wins over a dependency. Animation
+  Rigging brings Burst with it. Warrants a minor bump.
+
 ## v10.0.0
 
 ### Added to this release on 2026-10-14 (tag moved)
