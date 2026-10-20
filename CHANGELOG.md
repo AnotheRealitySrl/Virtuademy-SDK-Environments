@@ -1,5 +1,46 @@
 # Release notes
 
+## Unreleased
+
+Minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
+classes kept as `[Obsolete]` shells. No public member removed or renamed.
+
+### Fixed
+- **Build: a failed build no longer zips and deploys a previous run's output.** `EnvironmentsBuild.BuildAndZip`
+  checks the build-target switch and the Addressables build result, empties each scene's platform folders and
+  old zip before building, and restores the Addressables settings and the original active build target in
+  `finally`. A failure is reported as `EnvironmentsBuildFailure.BuildFailed` with a message.
+- **Build: scene names are validated first.** A scene whose filtered name is empty (a name with no a-z or 0-9,
+  such as a non-Latin one) or shared with another selected scene aborts the build with
+  `EnvironmentsBuildFailure.InvalidSceneNames` before anything is touched. The empty name made the stale-folder
+  cleanup act on `ServerData` itself and delete other scenes' builds. `SceneNameFiltered` lower-cases with the
+  invariant culture.
+- **Build: a project whose Addressables settings are not registered as the default builds again.** Addressables builds
+  the settings `EditorBuildSettings` names, and the SDK loads them by path: with no registration every scene failed
+  with "Addressable Asset Settings does not exist" (silently until the result was checked). `BuildAddressables`
+  registers the settings it builds, and returns false when the project has none.
+- `AddressablesBuildScript.BuildAddressablesForAllPlatforms` stops at the first platform that cannot be switched to or
+  fails to build, and switches back to the original build target; it ignored both results.
+- Deploy: the window's build and deploy buttons are re-enabled when an operation throws. The zip upload streams
+  from disk with a 30-minute timeout instead of reading the whole file into memory under a 100 s one.
+- **The update-routine save guard no longer reads and regex-scans every saved scene and prefab forever.** A
+  literal prefilter skips files that cannot match, results are cached by path, time and size, and the guard
+  retires once the v2026.5 -> v2026.6 routine has completed: the routine writes
+  `ProjectSettings/VirtuademyUpdateRoutine-v2026.6.txt` when no file under `Assets/` still carries old graph
+  data, and a later scan that finds some deletes it again. A run that finds nothing to change (a project migrated
+  before) completes the routine too, from the command line or by opening the window.
+- Script define symbols are set by one `[InitializeOnLoad]` class, `EnvironmentsScriptDefineSymbols`, which
+  writes a build-target group only when its symbols differ. The six classes that each rewrote every group on
+  every domain reload are `[Obsolete]` constant holders now. The symbols set are unchanged.
+- `SpawnableObjectPlaceholder`: no error-level trace on every validate, one debounced `SaveAssets` and only when
+  the spawn list changed, inspector edits recorded with Undo and guarded against missing references. The file
+  is UTF-8.
+- `TaskVirtuademyStepSetter`: an unknown task id from the room no longer throws, and the join-room listener is
+  removed when the setter is destroyed.
+- The "On Owner Changed" event unit removes its graph instances from its static registries when they are
+  uninstantiated. "On Language Changed" subscribes even when the localization system is not up yet; it never
+  fired when the graph started first.
+
 ## v10.0.0
 
 ### Added to this release on 2026-10-14 (tag moved)

@@ -730,6 +730,13 @@ namespace Virtuademy.BreakingChangeSolvers
             }
             bool problems = report.ContainsKey("problems");
 
+            // The routine is complete when nothing is left: that includes a launch that found nothing to change in a
+            // project migrated before, which never reaches the end of Apply where the save guard is retired.
+            if (!leftWork && !problems && !VirtuademyUpdateResave.IsPending)
+            {
+                VirtuademyUpdateSaveGuard.RetireIfMigrated();
+            }
+
             int code = problems ? ExitProblems
                 : !leftWork ? ExitDone
                 : changedSomething ? ExitRelaunch

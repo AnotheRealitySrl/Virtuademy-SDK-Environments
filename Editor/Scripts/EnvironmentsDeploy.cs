@@ -226,6 +226,12 @@ namespace Virtuademy.SDK.Environments.Editor
     {
         private static readonly HttpClient httpClient = new();
 
+        /// <summary>How long one zip upload may take before it is given up. The default 100 s ends an upload of a large zip on a slow line.</summary>
+        private static readonly TimeSpan upload_timeout = TimeSpan.FromMinutes(30);
+
+        /// <summary>Apart from <see cref="httpClient"/> so that the long timeout does not apply to the API calls.</summary>
+        private static readonly HttpClient uploadClient = new() { Timeout = upload_timeout };
+
         private static readonly string[] deploy_roles = { "TenantManager", "EnvironmentManager", "Owner" };
 
         #region Worlds
@@ -946,13 +952,14 @@ namespace Virtuademy.SDK.Environments.Editor
             uriBuilder.Path = uriBuilder.Path.TrimEnd('/') + "/" + fileName;
             Uri uploadUri = uriBuilder.Uri;
 
-            byte[] fileBytes = File.ReadAllBytes(filePath);
-            var content = new ByteArrayContent(fileBytes);
-            content.Headers.Add("x-ms-blob-type", "BlockBlob");
-
             try
             {
-                HttpResponseMessage response = await httpClient.PutAsync(uploadUri, content);
+                // Streamed from disk: a scene zip can be hundreds of megabytes, and none of it is held in memory.
+                using FileStream file = File.OpenRead(filePath);
+                using var content = new StreamContent(file);
+                content.Headers.Add("x-ms-blob-type", "BlockBlob");
+
+                HttpResponseMessage response = await uploadClient.PutAsync(uploadUri, content);
                 if (response.IsSuccessStatusCode)
                 {
                     Debug.Log($"[AddressablesManagement] Upload completed: {fileName}");

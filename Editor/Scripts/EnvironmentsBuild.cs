@@ -31,6 +31,12 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>A platform folder has no catalog file.</summary>
         BinaryCatalog,
+
+        /// <summary>The build target could not be switched, or Addressables reported an error building a scene.</summary>
+        BuildFailed,
+
+        /// <summary>A selected scene's name is empty once filtered, or two scenes share the same filtered name.</summary>
+        InvalidSceneNames,
     }
 
     /// <summary>A scene as <see cref="EnvironmentsBuild.BuildAndZip"/> built it.</summary>
@@ -54,7 +60,7 @@ namespace Virtuademy.SDK.Environments.Editor
     {
         public EnvironmentsBuildFailure Failure;
 
-        /// <summary>For <see cref="EnvironmentsBuildFailure.MissingModule"/>, the text the window's dialog shows.</summary>
+        /// <summary>For every failure that has more to say than its name (<see cref="EnvironmentsBuildFailure.MissingModule"/>, <see cref="EnvironmentsBuildFailure.BuildFailed"/>, <see cref="EnvironmentsBuildFailure.InvalidSceneNames"/>), the text the window's dialog shows.</summary>
         public string Message;
 
         /// <summary>For <see cref="EnvironmentsBuildFailure.MissingModule"/>, one entry per scene: its name and the modules it lacks.</summary>
@@ -210,6 +216,20 @@ namespace Virtuademy.SDK.Environments.Editor
         public static EnvironmentsBuildResult BuildAndZip(IReadOnlyList<SceneConfiguration> scenes)
         {
             EnvironmentsBuildResult result = new();
+
+            // ── Pre-flight: every scene needs its own, non-empty folder name ─────────
+            // The folder, the zip and the environment's file name all come from the filtered name:
+            // an empty one would point the cleanup below at ServerData itself, and two scenes
+            // sharing one would overwrite each other's build. Nothing has been touched yet.
+            string invalidNames = ValidateSceneNames(scenes);
+            if (invalidNames != null)
+            {
+                result.Message = invalidNames;
+                result.Failure = EnvironmentsBuildFailure.InvalidSceneNames;
+                Debug.LogError("[AddressablesManagement] " + invalidNames);
+                return result;
+            }
+
             AddressableAssetSettings settings = AddressablesConfiguration.GetOrCreateSettings();
 
             // ── Pre-flight: check that all required build modules are installed ──────
@@ -242,28 +262,17 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             // ─────────────────────────────────────────────────────────────────────────
 
-            // ── Clean up stale platform folders ──────────────────────────────────────
-            // Delete any platform subfolder that is no longer required for a scene so
-            // it does not end up in the zip and get imported on the server.
+            // ── Start from an empty output ───────────────────────────────────────────
+            // Whatever a previous run left in a scene's platform folders (or as its zip) goes before
+            // the build: the check below only looks that files exist, so a stale folder would pass
+            // it after a build that wrote nothing, and be zipped and deployed.
             foreach (var scene in scenes)
             {
-                string sceneFolderPath = Path.Combine(OutputFolder, scene.SceneNameFiltered);
-                if (!Directory.Exists(sceneFolderPath)) continue;
+                RemovePlatformFolders(scene, keepRequired: false);
 
-                var requiredFolderNames = new HashSet<string>(
-                    scene.GetRequiredBuildTargets().Select(t => t.ToString()),
-                    StringComparer.OrdinalIgnoreCase
-                );
-
-                foreach (string subfolder in Directory.GetDirectories(sceneFolderPath))
-                {
-                    string folderName = Path.GetFileName(subfolder);
-                    if (!requiredFolderNames.Contains(folderName))
-                    {
-                        Directory.Delete(subfolder, true);
-                        Debug.Log($"[AddressablesManagement] Removed stale platform folder: {subfolder}");
-                    }
-                }
+                string staleZip = ZipPathOf(scene);
+                if (File.Exists(staleZip))
+                    File.Delete(staleZip);
             }
             // ─────────────────────────────────────────────────────────────────────────
 
@@ -275,15 +284,50 @@ namespace Virtuademy.SDK.Environments.Editor
                     allTargets.Add(target);
             }
 
-            // Build for each required platform
-            foreach (BuildTarget target in allTargets)
+            // The build switches the active build target and borrows the Addressables settings:
+            // both are put back whatever happens, so a failed build leaves the project as it was.
+            BuildTarget originalTarget = EditorUserBuildSettings.activeBuildTarget;
+            BuildTargetGroup originalGroup = BuildPipeline.GetBuildTargetGroup(originalTarget);
+
+            try
             {
-                BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
-                EditorUserBuildSettings.SwitchActiveBuildTarget(group, target);
-                BuildAddressablesForSelectedPlatform(settings, scenes);
+                // Build for each required platform
+                foreach (BuildTarget target in allTargets)
+                {
+                    BuildTargetGroup group = BuildPipeline.GetBuildTargetGroup(target);
+                    if (!EditorUserBuildSettings.SwitchActiveBuildTarget(group, target))
+                    {
+                        result.Message = $"Unity could not switch the active build target to {target}. Nothing was zipped.";
+                        result.Failure = EnvironmentsBuildFailure.BuildFailed;
+                        break;
+                    }
+
+                    string buildError = BuildAddressablesForSelectedPlatform(settings, scenes, target);
+                    if (buildError != null)
+                    {
+                        result.Message = buildError;
+                        result.Failure = EnvironmentsBuildFailure.BuildFailed;
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                if (EditorUserBuildSettings.activeBuildTarget != originalTarget
+                    && !EditorUserBuildSettings.SwitchActiveBuildTarget(originalGroup, originalTarget))
+                {
+                    Debug.LogWarning($"[AddressablesManagement] Could not switch the active build target back to {originalTarget}.");
+                }
             }
 
-            result.Failure = CheckBuildResult(scenes);
+            if (result.Failure == EnvironmentsBuildFailure.None)
+            {
+                // A target is built for every scene, so a scene that does not need it got a folder for it too.
+                foreach (var scene in scenes)
+                    RemovePlatformFolders(scene, keepRequired: true);
+
+                result.Failure = CheckBuildResult(scenes);
+            }
 
             if (result.Failure == EnvironmentsBuildFailure.None)
             {
@@ -310,40 +354,129 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             else
             {
-                Debug.LogError("[AddressablesManagement] Build failed. Check errors above.");
+                Debug.LogError("[AddressablesManagement] " + (result.Failure == EnvironmentsBuildFailure.BuildFailed
+                    ? result.Message
+                    : "Build failed. Check errors above."));
             }
 
             return result;
         }
 
-        private static void BuildAddressablesForSelectedPlatform(AddressableAssetSettings settings, IReadOnlyList<SceneConfiguration> scenes)
+        /// <summary>
+        /// Every selected scene must have a filtered name that is not empty and that no other selected
+        /// scene shares. Returns null when they all do, otherwise the text that names the offenders.
+        /// </summary>
+        internal static string ValidateSceneNames(IReadOnlyList<SceneConfiguration> scenes)
+        {
+            List<string> lines = new();
+
+            foreach (SceneConfiguration scene in scenes.Where(s => string.IsNullOrEmpty(s.SceneNameFiltered)))
+            {
+                lines.Add($"• \"{scene.Scene?.name}\": no letter (a-z) or digit is left in the name once it is lower-cased and filtered, so it has no folder name to build into.");
+            }
+
+            foreach (IGrouping<string, SceneConfiguration> group in scenes
+                         .Where(s => !string.IsNullOrEmpty(s.SceneNameFiltered))
+                         .GroupBy(s => s.SceneNameFiltered)
+                         .Where(g => g.Count() > 1))
+            {
+                string names = string.Join(", ", group.Select(s => $"\"{s.Scene.name}\""));
+                lines.Add($"• {names}: all become \"{group.Key}\" and would overwrite each other's build.");
+            }
+
+            if (lines.Count == 0)
+                return null;
+
+            return "These scenes cannot be built:\n\n" + string.Join("\n", lines) +
+                   "\n\nRename them so that each name keeps at least one letter or digit (a-z, 0-9) and differs " +
+                   "from the others once the other characters are dropped. Nothing was built.";
+        }
+
+        /// <summary>
+        /// Deletes platform sub-folders of a scene's <c>ServerData</c> folder: all of them, or with
+        /// <paramref name="keepRequired"/> only the ones the scene no longer needs, so they do not end up in
+        /// the zip and get imported on the server.
+        /// </summary>
+        private static void RemovePlatformFolders(SceneConfiguration scene, bool keepRequired)
+        {
+            string name = scene.SceneNameFiltered;
+
+            // Never act on the output folder itself: an empty name would make this ServerData.
+            if (string.IsNullOrEmpty(name))
+                return;
+
+            string sceneFolderPath = Path.Combine(OutputFolder, name);
+            if (!Directory.Exists(sceneFolderPath)) return;
+
+            var requiredFolderNames = new HashSet<string>(
+                keepRequired ? scene.GetRequiredBuildTargets().Select(t => t.ToString()) : Enumerable.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase
+            );
+
+            foreach (string subfolder in Directory.GetDirectories(sceneFolderPath))
+            {
+                string folderName = Path.GetFileName(subfolder);
+                if (!requiredFolderNames.Contains(folderName))
+                {
+                    Directory.Delete(subfolder, true);
+                    Debug.Log($"[AddressablesManagement] Removed {(keepRequired ? "unneeded" : "stale")} platform folder: {subfolder}");
+                }
+            }
+        }
+
+        /// <summary>Builds every scene for the active build target. Returns null, or what went wrong.</summary>
+        private static string BuildAddressablesForSelectedPlatform(AddressableAssetSettings settings, IReadOnlyList<SceneConfiguration> scenes, BuildTarget target)
         {
             AddressableAssetGroup assetGroup = settings.DefaultGroup;
             foreach (AddressableAssetEntry entry in assetGroup.entries.Where(x => x.IsScene).ToList())
                 settings.RemoveAssetEntry(entry.guid);
 
             foreach (var scene in scenes)
-                BuildAddressablesForTargetGroup(settings, scene);
+            {
+                string error = BuildAddressablesForTargetGroup(settings, scene, target);
+                if (error != null)
+                    return error;
+            }
+
+            return null;
         }
 
-        private static void BuildAddressablesForTargetGroup(AddressableAssetSettings settings, SceneConfiguration configuration)
+        /// <summary>Builds one scene's Addressables for the active build target. Returns null, or what went wrong.</summary>
+        private static string BuildAddressablesForTargetGroup(AddressableAssetSettings settings, SceneConfiguration configuration, BuildTarget target)
         {
             AddressableAssetGroup assetGroup = settings.DefaultGroup;
 
             AssetDatabase.TryGetGUIDAndLocalFileIdentifier(configuration.Scene, out string guid, out long _);
-            AddressableAssetEntry addressableEntry = settings.CreateOrMoveEntry(guid, assetGroup);
+            AddressableAssetEntry addressableEntry = string.IsNullOrEmpty(guid) ? null : settings.CreateOrMoveEntry(guid, assetGroup);
+            if (addressableEntry == null)
+                return $"Addressables could not register the scene \"{configuration.Scene.name}\". Nothing was zipped.";
 
-            string sceneNameFiltered = configuration.SceneNameFiltered;
-            addressableEntry.SetAddress(sceneNameFiltered);
+            string originalPlayerVersion = settings.OverridePlayerVersion;
+            string originalBuiltInNaming = settings.BuiltInBundleCustomNaming;
+            string originalMonoScriptNaming = settings.MonoScriptBundleCustomNaming;
 
-            settings.OverridePlayerVersion = sceneNameFiltered;
-            settings.BuiltInBundleCustomNaming = settings.OverridePlayerVersion;
-            settings.MonoScriptBundleCustomNaming = settings.OverridePlayerVersion;
+            try
+            {
+                string sceneNameFiltered = configuration.SceneNameFiltered;
+                addressableEntry.SetAddress(sceneNameFiltered);
 
-            AddressablesBuildScript.BuildAddressables();
+                settings.OverridePlayerVersion = sceneNameFiltered;
+                settings.BuiltInBundleCustomNaming = settings.OverridePlayerVersion;
+                settings.MonoScriptBundleCustomNaming = settings.OverridePlayerVersion;
 
-            settings.RemoveAssetEntry(guid);
-            settings.OverridePlayerVersion = string.Empty;
+                // False when Addressables reported an error (it is logged above) or the build script is missing.
+                if (!AddressablesBuildScript.BuildAddressables())
+                    return $"Addressables failed building \"{configuration.Scene.name}\" for {target} (see the errors above). Nothing was zipped.";
+
+                return null;
+            }
+            finally
+            {
+                settings.RemoveAssetEntry(guid);
+                settings.OverridePlayerVersion = originalPlayerVersion;
+                settings.BuiltInBundleCustomNaming = originalBuiltInNaming;
+                settings.MonoScriptBundleCustomNaming = originalMonoScriptNaming;
+            }
         }
 
         private static EnvironmentsBuildFailure CheckBuildResult(IReadOnlyList<SceneConfiguration> scenes)

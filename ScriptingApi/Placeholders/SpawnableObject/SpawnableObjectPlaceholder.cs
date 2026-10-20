@@ -1,4 +1,5 @@
 using Virtuademy.Environments.ScriptingApi.Placeholders;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 #if UNITY_EDITOR
@@ -83,27 +84,28 @@ namespace Virtuademy.SDK.Environments
             SceneComponentPlaceholderBase[] placeholders = GetComponentsInChildren<SceneComponentPlaceholderBase>();
             foreach (var p in placeholders)
             {
-                p.AutomaticSetup = false;
+                if (p.AutomaticSetup)
+                {
+                    Undo.RecordObject(p, "Update Spawnable Object");
+                    p.AutomaticSetup = false;
+                }
             }
-            if (!isCopy)
+            if (!isCopy && !AutomaticSetup)
             {
+                Undo.RecordObject(this, "Update Spawnable Object");
                 AutomaticSetup = true;
             }
 
             if (rightHandPivot == null)
             {
-                GameObject rightPivotGO = new GameObject("RightHandPivot");
-                rightPivotGO.transform.parent = transform;
-                rightPivotGO.transform.localPosition = Vector3.zero;
-                rightHandPivot = rightPivotGO.transform;
+                Undo.RecordObject(this, "Create Hand Pivot");
+                rightHandPivot = CreatePivot("RightHandPivot");
             }
 
             if (leftHandPivot == null)
             {
-                GameObject leftPivotGO = new GameObject("LeftHandPivot");
-                leftPivotGO.transform.parent = transform;
-                leftPivotGO.transform.localPosition = Vector3.zero;
-                leftHandPivot = leftPivotGO.transform;
+                Undo.RecordObject(this, "Create Hand Pivot");
+                leftHandPivot = CreatePivot("LeftHandPivot");
             }
 
             // Check if we're in Prefab Mode (isolated editing view)
@@ -118,11 +120,7 @@ namespace Virtuademy.SDK.Environments
                                    && !PrefabUtility.IsPartOfPrefabAsset(gameObject)
                                     && !isInPrefabMode; // <-- critical exclusion
 
-            Debug.LogError($"OnValidate called — IsPartOfPrefabAsset: {PrefabUtility.IsPartOfPrefabAsset(gameObject)}, " +
-              $"IsPersistent: {EditorUtility.IsPersistent(gameObject)}, " +
-              $"name: {gameObject.name}", gameObject);
-
-            //Check whether or not I am a prefab and I am in prefab mode 
+            //Check whether or not I am a prefab and I am in prefab mode
             if (isActualPrefabAsset || isInPrefabMode)
             {
                 SpawnableObjectListData spawnList = LoadOrCreateData();
@@ -130,33 +128,45 @@ namespace Virtuademy.SDK.Environments
 
                 // Resolve the actual prefab asset, not the staging copy
                 GameObject prefabAsset = isInPrefabMode
-                    ? AssetDatabase.LoadAssetAtPath<GameObject>(
-                        PrefabStageUtility.GetCurrentPrefabStage().assetPath)
+                    ? AssetDatabase.LoadAssetAtPath<GameObject>(prefabStage.assetPath)
                     : gameObject;
+                if (prefabAsset == null) return;
+
+                spawnList.spawnableObjectList ??= new List<GameObject>();
+                bool listChanged = false;
 
                 // Dedup first
-                spawnList.spawnableObjectList = spawnList.spawnableObjectList
+                List<GameObject> deduplicated = spawnList.spawnableObjectList
                     .Where(obj => obj != null)
                     .GroupBy(obj => AssetDatabase.GetAssetPath(obj))
                     .Select(g => g.First())
                     .ToList();
+                if (!deduplicated.SequenceEqual(spawnList.spawnableObjectList))
+                {
+                    spawnList.spawnableObjectList = deduplicated;
+                    listChanged = true;
+                }
 
                 // Add the real asset reference
+                int countBefore = spawnList.spawnableObjectList.Count;
                 int index = spawnList.AddToList(prefabAsset);
-                indexSpawnReference = index;
-                listToUse = 0;
+                listChanged |= spawnList.spawnableObjectList.Count != countBefore;
 
-                EditorUtility.SetDirty(this);
-                EditorUtility.SetDirty(spawnList);
-                EditorApplication.delayCall += () =>
+                if (indexSpawnReference != index || listToUse != 0)
+                {
+                    indexSpawnReference = index;
+                    listToUse = 0;
+                    EditorUtility.SetDirty(this);
+                }
+
+                if (listChanged)
                 {
                     EditorUtility.SetDirty(spawnList);
-                    AssetDatabase.SaveAssets();
-                };
+                    ScheduleSaveAssets();
+                }
             }
             else if (isSceneInstance)
             {
-                Debug.LogError("Not in prefab mode");
                 //Not in prefab mode, search for the object "SpawnableObjectsHolder" and add the item to the go.
                 GameObject spawnableObjectsHolder = GameObject.Find("SpawnableObjectsHolder");
                 if (spawnableObjectsHolder == null)
@@ -166,22 +176,55 @@ namespace Virtuademy.SDK.Environments
                 }
 
                 SpawnableObjectListReference spawnListReference = spawnableObjectsHolder.GetComponent<SpawnableObjectListReference>();
-                int index = spawnListReference.AddSceneObjectToList(this);
-                Debug.LogError("Setting index to " + index, gameObject);
-                indexSpawnReference = index;
-                listToUse = 1;
-
-                EditorUtility.SetDirty(this);
-                EditorUtility.SetDirty(spawnListReference);
-                EditorApplication.delayCall += () =>
+                if (spawnListReference == null)
                 {
-                    if (spawnListReference != null)
-                        EditorUtility.SetDirty(spawnListReference);
-                    AssetDatabase.SaveAssets();
-                };
+                    spawnListReference = spawnableObjectsHolder.AddComponent<SpawnableObjectListReference>();
+                }
 
+                int countBefore = spawnListReference.sceneSpawnableObjectList.Count;
+                int index = spawnListReference.AddSceneObjectToList(this);
 
+                if (indexSpawnReference != index || listToUse != 1)
+                {
+                    indexSpawnReference = index;
+                    listToUse = 1;
+                    EditorUtility.SetDirty(this);
+                }
+
+                // Scene data: it is saved with the scene, so there is no asset to save here.
+                if (spawnListReference.sceneSpawnableObjectList.Count != countBefore)
+                {
+                    EditorUtility.SetDirty(spawnListReference);
+                }
             }
+        }
+
+        private static bool saveAssetsScheduled;
+
+        /// <summary>Saves the assets once, after the validations of this editor tick, however many placeholders asked.</summary>
+        private static void ScheduleSaveAssets()
+        {
+            if (saveAssetsScheduled)
+            {
+                return;
+            }
+
+            saveAssetsScheduled = true;
+            EditorApplication.delayCall += () =>
+            {
+                saveAssetsScheduled = false;
+                AssetDatabase.SaveAssets();
+            };
+        }
+
+        private Transform CreatePivot(string pivotName)
+        {
+            GameObject pivotGO = new GameObject(pivotName);
+            Undo.RegisterCreatedObjectUndo(pivotGO, "Create Hand Pivot");
+            pivotGO.transform.parent = transform;
+            pivotGO.transform.localPosition = Vector3.zero;
+            EditorUtility.SetDirty(this);
+            return pivotGO.transform;
         }
 
         private static SpawnableObjectListData LoadOrCreateData()
@@ -223,8 +266,16 @@ namespace Virtuademy.SDK.Environments
             if (hand == null)
             {
                 var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null || parentTransform == null)
+                {
+                    Debug.LogWarning($"Cannot show the hand reference: {(prefab == null ? "prefab not found at " + path : "the hand pivot does not exist yet")}.", this);
+                    return;
+                }
+
                 hand = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parentTransform);
+                Undo.RegisterCreatedObjectUndo(hand, "Show Hand Reference");
                 hand.transform.localPosition = Vector3.zero;
+                Undo.RecordObject(this, "Show Hand Reference");
                 if (handType == 0)
                 {
                     LeftHandReference = hand;
@@ -233,29 +284,40 @@ namespace Virtuademy.SDK.Environments
                 {
                     RightHandReference = hand;
                 }
-                   
+
                 EditorUtility.SetDirty(this);
             }
             else
             {
-                DestroyImmediate(hand.gameObject);
+                Undo.DestroyObjectImmediate(hand.gameObject);
                 hand = null;
             }
         }
 
         public void SetPositionLeftHand()
         {
-            if (leftHandPivot != null)
+            if (!symmetricHandPositioning || leftHandPivot == null || rightHandPivot == null)
             {
-                //leftSpawnPositionOffset = LeftHandReference.transform;
-                if (symmetricHandPositioning)
-                {
-                    leftHandPivot.transform.localPosition = new Vector3(-rightHandPivot.transform.localPosition.x, rightHandPivot.transform.localPosition.y, rightHandPivot.transform.localPosition.z);
-                    Vector3 rightRotation = rightHandPivot.transform.localEulerAngles;
-                    leftHandPivot.transform.localEulerAngles = new Vector3(rightRotation.x, -rightRotation.y, -rightRotation.z);
-                }
+                return;
             }
 
+            //leftSpawnPositionOffset = LeftHandReference.transform;
+            Vector3 rightPosition = rightHandPivot.localPosition;
+            Vector3 rightRotation = rightHandPivot.localEulerAngles;
+            Vector3 leftPosition = new Vector3(-rightPosition.x, rightPosition.y, rightPosition.z);
+            Vector3 leftRotation = new Vector3(rightRotation.x, -rightRotation.y, -rightRotation.z);
+
+            // The inspector calls this on every repaint: the pivot is touched (and recorded for Undo) only when it
+            // is not already the mirror of the right one.
+            if (leftHandPivot.localPosition == leftPosition
+                && Quaternion.Angle(leftHandPivot.localRotation, Quaternion.Euler(leftRotation)) < 0.001f)
+            {
+                return;
+            }
+
+            Undo.RecordObject(leftHandPivot, "Mirror Left Hand Pivot");
+            leftHandPivot.localPosition = leftPosition;
+            leftHandPivot.localEulerAngles = leftRotation;
         }
 
         /*public void SetPositionRightHand()

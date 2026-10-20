@@ -62,6 +62,24 @@ namespace Virtuademy.SDK.Environments.VisualScripting
             return new EventHook(eventName);
         }
 
+        public override void Uninstantiate(GraphReference instance)
+        {
+            base.Uninstantiate(instance);
+
+            // Static registries: without this every graph instance ever run stayed in them
+            // (and kept its GameObject alive) for the rest of the session, as
+            // OnSceneUnloadEventUnit already avoids.
+            instances.Remove(instance);
+            // A reference comparison: the GameObject may already be destroyed, and it is still the key.
+            GameObject owner = instance.gameObject;
+            if (!ReferenceEquals(owner, null) && graphReferences.TryGetValue(owner, out List<GraphReference> references))
+            {
+                references.Remove(instance);
+                if (references.Count == 0)
+                    graphReferences.Remove(owner);
+            }
+        }
+
         protected override void Definition()
         {
             base.Definition();
