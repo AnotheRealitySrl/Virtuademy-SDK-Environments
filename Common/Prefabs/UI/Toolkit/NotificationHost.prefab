@@ -1,0 +1,129 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1264046655511219826
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3660050523615277061}
+  - component: {fileID: 4969198319999918662}
+  - component: {fileID: 7060031350585748680}
+  - component: {fileID: 8114391914974408495}
+  - component: {fileID: 3520656038112376435}
+  - component: {fileID: 2844230162614518656}
+  m_Layer: 5
+  m_Name: NotificationHost
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3660050523615277061
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1264046655511219826}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &4969198319999918662
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1264046655511219826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 19102, guid: 0000000000000000e000000000000000, type: 0}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.dll::UnityEngine.UIElements.UIDocument
+  m_PanelSettings: {fileID: 11400000, guid: 6945dfd24a9145bbacfe071fb50b1ebd, type: 2}
+  m_ParentUI: {fileID: 0}
+  sourceAsset: {fileID: 9197481963319205126, guid: 5617ce316b96455fa498388f8059d19e, type: 3}
+  m_SortingOrder: 140
+  m_Position: 0
+  m_WorldSpaceSizeMode: 1
+  m_WorldSpaceWidth: 1400
+  m_WorldSpaceHeight: 900
+  m_PivotReferenceSize: 0
+  m_Pivot: 0
+  m_WorldSpaceCollider: {fileID: 0}
+--- !u!114 &7060031350585748680
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1264046655511219826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82d66f336a1247608f364f81bcb9ea14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.UIKit.NotificationHost
+  document: {fileID: 4969198319999918662}
+  toastTemplate: {fileID: 9197481963319205126, guid: 7cb11e7a4e54418b8001789972d8372e, type: 3}
+  popupTemplate: {fileID: 9197481963319205126, guid: 933475aaa76d4730ac4c9312ea241a0f, type: 3}
+  defaultToastSeconds: 3
+  maxToasts: 3
+  defaultButtonLabel: OK
+  isApplicationFallback: 0
+--- !u!114 &8114391914974408495
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1264046655511219826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66f9e2a9f99a45afb0dfc3665d75b50d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.UIKit.ThemedDocument
+  document: {fileID: 4969198319999918662}
+--- !u!114 &3520656038112376435
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1264046655511219826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: febb0e8a84c04de98e59b3dc7aa95246, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.UIKit.SafeFrame
+  document: {fileID: 4969198319999918662}
+  targetElementName: 
+  taskHud: 0
+  margin: 16
+--- !u!114 &2844230162614518656
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1264046655511219826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5a0d0703c49437c85175f837075e597, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.UIKit.OverlayPanelPlacement
+  screenPanelSettings: {fileID: 11400000, guid: 6945dfd24a9145bbacfe071fb50b1ebd, type: 2}
+  worldPanelSettings: {fileID: 11400000, guid: 395a867d243e41bf997bbeaaef826fa8, type: 2}
+  vrSize: {x: 1400, y: 900}
+  vrDistance: 1.5
+  vrHeightOffset: -0.1
+  vrFollowHead: 1
+  followAngle: 30
+  followSpeed: 3

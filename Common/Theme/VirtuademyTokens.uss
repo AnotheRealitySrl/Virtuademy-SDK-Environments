@@ -1,0 +1,44 @@
+/* Generated from VirtuademyTheme.asset by Virtuademy/UI/Generate theme tokens. Do not edit by hand:
+   change the asset and generate again.
+
+   The Virtuademy theme tokens. Every SDK panel imports this sheet first and reads its colours,
+   type scale, radii and spacing from these variables. Override a variable on a panel's own root
+   to restyle that panel; the tenant's colours, when the application publishes them, are applied
+   at runtime by ThemedDocument on top of these values. */
+
+:root, .vd-root {
+    --vd-color-surface: rgba(18, 20, 26, 0.922);
+    --vd-color-surface-raised: rgb(36, 40, 50);
+    --vd-color-border: rgba(255, 255, 255, 0.122);
+    --vd-color-text: rgb(255, 255, 255);
+    --vd-color-text-secondary: rgb(184, 188, 198);
+    --vd-color-action: rgb(0, 110, 245);
+    --vd-color-on-action: rgb(255, 255, 255);
+    --vd-color-success: rgb(0, 195, 138);
+    --vd-color-warning: rgb(219, 127, 60);
+    --vd-color-error: rgb(209, 72, 88);
+    --vd-color-info: rgb(90, 169, 255);
+    --vd-color-scrim: rgba(0, 0, 0, 0.6);
+
+    --vd-font-regular: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-Regular.ttf?fileID=12800000&guid=e77099ee2358c6c40bc8f4dc48c8b53c&type=3#Poppins-Regular");
+    --vd-font-semibold: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-SemiBold.ttf?fileID=12800000&guid=df5aace61b6141f29b117102ae71fd94&type=3#Poppins-SemiBold");
+    --vd-font-bold: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
+
+    --vd-font-size-caption: 22px;
+    --vd-font-size-body: 28px;
+    --vd-font-size-subtitle: 34px;
+    --vd-font-size-title: 44px;
+    --vd-font-size-display: 60px;
+
+    --vd-radius-s: 8px;
+    --vd-radius-m: 16px;
+    --vd-radius-l: 28px;
+
+    --vd-space-xs: 4px;
+    --vd-space-s: 8px;
+    --vd-space-m: 16px;
+    --vd-space-l: 24px;
+    --vd-space-xl: 40px;
+
+    --vd-border-width: 2px;
+}

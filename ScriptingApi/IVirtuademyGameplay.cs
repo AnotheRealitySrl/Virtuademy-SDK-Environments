@@ -13,7 +13,7 @@ namespace Virtuademy.Environments.ScriptingApi
     /// <b>The other half of the surface.</b> <see cref="IVirtuademyFramework"/> carries what only
     /// the platform knows — the session, the saved values, the analytics. Everything here the
     /// player owns: fading the view, the help panel, the active language, which device this is,
-    /// and the world itself.
+    /// the toasts and popups drawn over the world, and the world itself.
     /// </para>
     /// <para>
     /// <b>The device group is here on purpose</b>, though it looks like a platform fact. It exists
@@ -90,5 +90,8 @@ namespace Virtuademy.Environments.ScriptingApi
 
         /// <summary>Which kind of device this is running on.</summary>
         IPlatformApi Platform { get; }
+
+        /// <summary>Toasts, popups and the colours of the theme.</summary>
+        IUIApi UI { get; }
     }
 }

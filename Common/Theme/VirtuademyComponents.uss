@@ -1,0 +1,520 @@
+/* The Virtuademy SDK panel components. Import VirtuademyTokens.uss first: every value below is a
+   token. Class names follow BEM: vd-<block>, vd-<block>__<element>, vd-<block>--<variant>.
+
+   Colours that come from a role are also listed in ThemeTokens.ComponentRules, so the tenant
+   palette reaches them at runtime: keep the two in step. Hover and press states change scale and
+   borders, not the background, because a published tenant colour is an inline style and would
+   hide a :hover background anyway. */
+
+/* ---------------------------------------------------------------- root and text */
+
+.vd-root {
+    -unity-font-definition: var(--vd-font-regular);
+    font-size: var(--vd-font-size-body);
+    color: var(--vd-color-text);
+}
+
+.vd-display {
+    -unity-font-definition: var(--vd-font-bold);
+    font-size: var(--vd-font-size-display);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+.vd-title {
+    -unity-font-definition: var(--vd-font-bold);
+    font-size: var(--vd-font-size-title);
+    white-space: normal;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: var(--vd-space-s);
+    margin-left: 0;
+    padding: 0;
+}
+
+.vd-subtitle {
+    -unity-font-definition: var(--vd-font-semibold);
+    font-size: var(--vd-font-size-subtitle);
+    white-space: normal;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: var(--vd-space-s);
+    margin-left: 0;
+    padding: 0;
+}
+
+.vd-body {
+    font-size: var(--vd-font-size-body);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+.vd-caption {
+    font-size: var(--vd-font-size-caption);
+    color: var(--vd-color-text-secondary);
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+/* ---------------------------------------------------------------- panel */
+
+.vd-panel {
+    flex-direction: column;
+    background-color: var(--vd-color-surface);
+    border-width: var(--vd-border-width);
+    border-color: var(--vd-color-border);
+    border-radius: var(--vd-radius-l);
+    padding: var(--vd-space-xl);
+}
+
+/* Widths: S for a hint or a label, M for a description or a popup, L for a list or a summary. */
+.vd-panel--s { width: 640px; }
+.vd-panel--m { width: 960px; }
+.vd-panel--l { width: 1280px; }
+
+/* Role variants: an accent bar on the left and the role colour on the header icon. */
+.vd-panel--hint,
+.vd-panel--warning,
+.vd-panel--error,
+.vd-panel--success {
+    border-left-width: 12px;
+}
+.vd-panel--hint { border-left-color: var(--vd-color-info); }
+.vd-panel--warning { border-left-color: var(--vd-color-warning); }
+.vd-panel--error { border-left-color: var(--vd-color-error); }
+.vd-panel--success { border-left-color: var(--vd-color-success); }
+
+.vd-panel__header {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: var(--vd-space-m);
+}
+
+.vd-panel__header-text {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.vd-panel__icon {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    border-radius: 32px;
+    margin-right: var(--vd-space-l);
+    align-items: center;
+    justify-content: center;
+    background-color: var(--vd-color-surface-raised);
+}
+.vd-panel--hint .vd-panel__icon { background-color: var(--vd-color-info); }
+.vd-panel--warning .vd-panel__icon { background-color: var(--vd-color-warning); }
+.vd-panel--error .vd-panel__icon { background-color: var(--vd-color-error); }
+.vd-panel--success .vd-panel__icon { background-color: var(--vd-color-success); }
+
+/* The glyph inside the icon ("i", "!", "?"), drawn as text so no sprite is needed. */
+.vd-panel__icon-glyph {
+    -unity-font-definition: var(--vd-font-bold);
+    font-size: var(--vd-font-size-subtitle);
+    color: var(--vd-color-on-action);
+    -unity-text-align: middle-center;
+    margin: 0;
+    padding: 0;
+}
+
+.vd-panel__content {
+    flex-direction: column;
+    flex-shrink: 1;
+}
+
+.vd-panel__actions {
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: var(--vd-space-xl);
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+.vd-button {
+    min-height: 80px;
+    min-width: 200px;
+    padding-top: 0;
+    padding-right: var(--vd-space-xl);
+    padding-bottom: 0;
+    padding-left: var(--vd-space-xl);
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: var(--vd-space-m);
+    border-width: var(--vd-border-width);
+    border-color: rgba(0, 0, 0, 0);
+    border-radius: var(--vd-radius-m);
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--vd-color-text);
+    -unity-font-definition: var(--vd-font-semibold);
+    font-size: var(--vd-font-size-body);
+    -unity-text-align: middle-center;
+    white-space: nowrap;
+    transition-property: scale, opacity;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+}
+
+.vd-button:hover { scale: 1.04 1.04; }
+.vd-button:active { scale: 0.97 0.97; }
+.vd-button:disabled { opacity: 0.4; scale: 1 1; }
+
+/* The default runtime theme recolours .unity-button on hover and press: repeat each variant's
+   colours on those states so the SDK look holds. */
+.vd-button--primary,
+.vd-button--primary:hover,
+.vd-button--primary:active,
+.vd-button--primary:focus {
+    background-color: var(--vd-color-action);
+    border-color: var(--vd-color-action);
+    color: var(--vd-color-on-action);
+}
+
+.vd-button--secondary,
+.vd-button--secondary:hover,
+.vd-button--secondary:active,
+.vd-button--secondary:focus {
+    background-color: rgba(0, 0, 0, 0);
+    border-color: var(--vd-color-action);
+    color: var(--vd-color-action);
+}
+
+.vd-button--ghost,
+.vd-button--ghost:active,
+.vd-button--ghost:focus {
+    background-color: rgba(0, 0, 0, 0);
+    border-color: rgba(0, 0, 0, 0);
+    color: var(--vd-color-text-secondary);
+}
+
+.vd-button--ghost:hover {
+    background-color: rgba(0, 0, 0, 0);
+    border-color: rgba(0, 0, 0, 0);
+    color: var(--vd-color-text);
+}
+
+/* ---------------------------------------------------------------- check mark and cross */
+
+.vd-check,
+.vd-cross {
+    width: 160px;
+    height: 160px;
+    border-radius: 80px;
+    border-width: 8px;
+    border-color: var(--vd-color-on-action);
+    align-items: center;
+    justify-content: center;
+    transition-property: scale;
+    transition-duration: 0.2s;
+    transition-timing-function: ease-out-back;
+}
+.vd-check { background-color: var(--vd-color-success); }
+.vd-cross { background-color: var(--vd-color-error); }
+
+.vd-check__mark {
+    width: 36px;
+    height: 72px;
+    margin-top: -16px;
+    border-right-width: 14px;
+    border-bottom-width: 14px;
+    border-color: var(--vd-color-on-action);
+    rotate: 45deg;
+}
+
+.vd-cross__bar {
+    position: absolute;
+    width: 84px;
+    height: 14px;
+    border-radius: 7px;
+    background-color: var(--vd-color-on-action);
+    rotate: 45deg;
+}
+.vd-cross__bar--b { rotate: -45deg; }
+
+/* ---------------------------------------------------------------- list */
+
+.vd-list {
+    flex-direction: column;
+}
+
+.vd-list__item {
+    flex-direction: row;
+    align-items: center;
+    padding-top: var(--vd-space-m);
+    padding-right: var(--vd-space-l);
+    padding-bottom: var(--vd-space-m);
+    padding-left: var(--vd-space-l);
+    margin-bottom: var(--vd-space-s);
+    border-radius: var(--vd-radius-s);
+    border-left-width: 6px;
+    border-left-color: rgba(0, 0, 0, 0);
+    background-color: var(--vd-color-surface-raised);
+}
+.vd-list__item--current { border-left-color: var(--vd-color-action); }
+.vd-list__item--done .vd-list__text { color: var(--vd-color-text-secondary); }
+
+.vd-list__marker {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 18px;
+    border-width: 3px;
+    border-color: var(--vd-color-text-secondary);
+    margin-right: var(--vd-space-m);
+}
+.vd-list__marker--done {
+    background-color: var(--vd-color-success);
+    border-color: var(--vd-color-success);
+}
+
+.vd-list__text {
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+/* ---------------------------------------------------------------- progress */
+
+.vd-progress {
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: var(--vd-color-surface-raised);
+}
+
+.vd-progress__fill {
+    height: 100%;
+    width: 0;
+    background-color: var(--vd-color-action);
+}
+
+/* ---------------------------------------------------------------- HUD (counter and hint) */
+
+.vd-hud {
+    flex-direction: column;
+    align-items: stretch;
+    width: 440px;
+    padding: var(--vd-space-l);
+    border-radius: var(--vd-radius-m);
+    background-color: var(--vd-color-surface);
+    transition-property: opacity, translate;
+    transition-duration: 0.3s;
+    transition-timing-function: ease-out;
+}
+
+.vd-hud--hidden {
+    opacity: 0;
+    translate: 40px 0;
+}
+
+.vd-hud__row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vd-hud__counter {
+    -unity-font-definition: var(--vd-font-bold);
+    font-size: var(--vd-font-size-subtitle);
+    margin: 0;
+    padding: 0;
+}
+
+.vd-hud__hint {
+    margin-top: var(--vd-space-m);
+    padding: var(--vd-space-m);
+    border-radius: var(--vd-radius-s);
+    border-left-width: 6px;
+    border-left-color: var(--vd-color-info);
+    background-color: var(--vd-color-surface-raised);
+}
+
+.vd-hud .vd-button {
+    min-height: 56px;
+    min-width: 0;
+    margin-top: var(--vd-space-m);
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 0;
+    font-size: var(--vd-font-size-caption);
+}
+
+/* ---------------------------------------------------------------- label (hover, world label) */
+
+.vd-label {
+    padding-top: var(--vd-space-s);
+    padding-right: var(--vd-space-l);
+    padding-bottom: var(--vd-space-s);
+    padding-left: var(--vd-space-l);
+    border-radius: var(--vd-radius-s);
+    background-color: var(--vd-color-surface);
+    -unity-font-definition: var(--vd-font-semibold);
+    font-size: var(--vd-font-size-body);
+    -unity-text-align: middle-center;
+    white-space: normal;
+}
+
+/* ---------------------------------------------------------------- toast */
+
+.vd-toast-stack {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: var(--vd-space-xl);
+}
+
+.vd-toast {
+    flex-direction: row;
+    align-items: center;
+    min-width: 480px;
+    max-width: 960px;
+    margin-top: var(--vd-space-s);
+    padding-top: var(--vd-space-m);
+    padding-right: var(--vd-space-l);
+    padding-bottom: var(--vd-space-m);
+    padding-left: var(--vd-space-l);
+    border-radius: var(--vd-radius-m);
+    border-left-width: 10px;
+    border-left-color: var(--vd-color-info);
+    background-color: var(--vd-color-surface);
+    opacity: 0;
+    translate: 0 24px;
+    transition-property: opacity, translate;
+    transition-duration: 0.25s;
+    transition-timing-function: ease-out;
+}
+
+.vd-toast--visible {
+    opacity: 1;
+    translate: 0 0;
+}
+
+.vd-toast--info { border-left-color: var(--vd-color-info); }
+.vd-toast--success { border-left-color: var(--vd-color-success); }
+.vd-toast--warning { border-left-color: var(--vd-color-warning); }
+.vd-toast--error { border-left-color: var(--vd-color-error); }
+
+.vd-toast__text {
+    flex-shrink: 1;
+    white-space: normal;
+    margin: 0;
+    padding: 0;
+}
+
+/* ---------------------------------------------------------------- popup */
+
+.vd-popup-scrim {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--vd-color-scrim);
+}
+
+.vd-popup {
+    width: 960px;
+    max-width: 92%;
+}
+
+/* ---------------------------------------------------------------- choice panel */
+
+.vd-choice__options {
+    flex-direction: column;
+    margin-top: var(--vd-space-m);
+}
+
+.vd-choice__option,
+.vd-choice__option:hover,
+.vd-choice__option:active,
+.vd-choice__option:focus {
+    justify-content: center;
+    -unity-text-align: middle-left;
+    white-space: normal;
+    min-height: 88px;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: var(--vd-space-s);
+    margin-left: 0;
+    padding-top: var(--vd-space-m);
+    padding-right: var(--vd-space-l);
+    padding-bottom: var(--vd-space-m);
+    padding-left: var(--vd-space-l);
+    border-width: var(--vd-border-width);
+    border-color: rgba(0, 0, 0, 0);
+    border-radius: var(--vd-radius-m);
+    background-color: var(--vd-color-surface-raised);
+    color: var(--vd-color-text);
+    -unity-font-definition: var(--vd-font-regular);
+    font-size: var(--vd-font-size-body);
+}
+
+.vd-choice__option:hover { border-color: var(--vd-color-border); }
+.vd-choice__option--selected,
+.vd-choice__option--selected:hover { border-color: var(--vd-color-action); }
+
+/* ---------------------------------------------------------------- safe frame */
+
+/* The element SafeFrame insets: put screen panels inside it, never over it. */
+.vd-safe-frame {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+/* ---------------------------------------------------------------- role utilities */
+
+.vd-bg-surface { background-color: var(--vd-color-surface); }
+.vd-bg-surface-raised { background-color: var(--vd-color-surface-raised); }
+.vd-bg-border { background-color: var(--vd-color-border); }
+.vd-bg-text { background-color: var(--vd-color-text); }
+.vd-bg-text-secondary { background-color: var(--vd-color-text-secondary); }
+.vd-bg-action { background-color: var(--vd-color-action); }
+.vd-bg-on-action { background-color: var(--vd-color-on-action); }
+.vd-bg-success { background-color: var(--vd-color-success); }
+.vd-bg-warning { background-color: var(--vd-color-warning); }
+.vd-bg-error { background-color: var(--vd-color-error); }
+.vd-bg-info { background-color: var(--vd-color-info); }
+.vd-bg-scrim { background-color: var(--vd-color-scrim); }
+.vd-text-surface { color: var(--vd-color-surface); -unity-background-image-tint-color: var(--vd-color-surface); }
+.vd-text-surface-raised { color: var(--vd-color-surface-raised); -unity-background-image-tint-color: var(--vd-color-surface-raised); }
+.vd-text-border { color: var(--vd-color-border); -unity-background-image-tint-color: var(--vd-color-border); }
+.vd-text-text { color: var(--vd-color-text); -unity-background-image-tint-color: var(--vd-color-text); }
+.vd-text-text-secondary { color: var(--vd-color-text-secondary); -unity-background-image-tint-color: var(--vd-color-text-secondary); }
+.vd-text-action { color: var(--vd-color-action); -unity-background-image-tint-color: var(--vd-color-action); }
+.vd-text-on-action { color: var(--vd-color-on-action); -unity-background-image-tint-color: var(--vd-color-on-action); }
+.vd-text-success { color: var(--vd-color-success); -unity-background-image-tint-color: var(--vd-color-success); }
+.vd-text-warning { color: var(--vd-color-warning); -unity-background-image-tint-color: var(--vd-color-warning); }
+.vd-text-error { color: var(--vd-color-error); -unity-background-image-tint-color: var(--vd-color-error); }
+.vd-text-info { color: var(--vd-color-info); -unity-background-image-tint-color: var(--vd-color-info); }
+.vd-text-scrim { color: var(--vd-color-scrim); -unity-background-image-tint-color: var(--vd-color-scrim); }
+.vd-border-surface { border-color: var(--vd-color-surface); }
+.vd-border-surface-raised { border-color: var(--vd-color-surface-raised); }
+.vd-border-border { border-color: var(--vd-color-border); }
+.vd-border-text { border-color: var(--vd-color-text); }
+.vd-border-text-secondary { border-color: var(--vd-color-text-secondary); }
+.vd-border-action { border-color: var(--vd-color-action); }
+.vd-border-on-action { border-color: var(--vd-color-on-action); }
+.vd-border-success { border-color: var(--vd-color-success); }
+.vd-border-warning { border-color: var(--vd-color-warning); }
+.vd-border-error { border-color: var(--vd-color-error); }
+.vd-border-info { border-color: var(--vd-color-info); }
+.vd-border-scrim { border-color: var(--vd-color-scrim); }
