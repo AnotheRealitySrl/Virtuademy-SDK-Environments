@@ -9,3 +9,7 @@ using System.Runtime.CompilerServices;
 // contracts belong to the application, along with SM and the world systems, while the surface ships
 // to creators. A creator installs this surface; they do not install what answers it.
 [assembly: InternalsVisibleTo("Virtuademy.Worlds.ScriptingApiBackend")]
+
+// The application's interaction core raises the interaction events of InteractablePlaceholder
+// (IInteractableEventSink). Internal so that a script cannot raise them.
+[assembly: InternalsVisibleTo("Virtuademy.Worlds.Interaction")]
