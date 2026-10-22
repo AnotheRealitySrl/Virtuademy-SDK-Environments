@@ -12,10 +12,10 @@
     justify-content: center;
     overflow: hidden;
     background-color: rgb(255, 255, 255);
-    border-left-color: rgb(58, 127, 255);
-    border-right-color: rgb(58, 127, 255);
-    border-top-color: rgb(58, 127, 255);
-    border-bottom-color: rgb(58, 127, 255);
+    border-left-color: var(--vd-color-action, rgb(0, 110, 245));
+    border-right-color: var(--vd-color-action, rgb(0, 110, 245));
+    border-top-color: var(--vd-color-action, rgb(0, 110, 245));
+    border-bottom-color: var(--vd-color-action, rgb(0, 110, 245));
     border-left-width: 20px;
     border-right-width: 20px;
     border-top-width: 20px;
@@ -42,7 +42,7 @@
     width: 46px;
     height: 46px;
     -unity-background-scale-mode: scale-to-fit;
-    -unity-background-image-tint-color: rgb(58, 127, 255);
+    -unity-background-image-tint-color: var(--vd-color-action, rgb(0, 110, 245));
     background-image: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Prefabs/UI/TogglesExamples/Graphics/Arrow.png?fileID=2800000&guid=ae15ed0187d59aa42a5d7544288be705&type=3#Arrow");
     rotate: 0;
     translate: 5px 0;
@@ -55,7 +55,7 @@
     opacity: 0;
     overflow: hidden;
     white-space: nowrap;
-    color: rgb(58, 127, 255);
+    color: var(--vd-color-action, rgb(0, 110, 245));
     font-size: 28px;
     -unity-font-style: bold;
     -unity-text-align: middle-left;
@@ -68,10 +68,10 @@
 .home-button:active,
 .home-button:focus {
     background-color: rgb(255, 255, 255);
-    border-left-color: rgb(58, 127, 255);
-    border-right-color: rgb(58, 127, 255);
-    border-top-color: rgb(58, 127, 255);
-    border-bottom-color: rgb(58, 127, 255);
+    border-left-color: var(--vd-color-action, rgb(0, 110, 245));
+    border-right-color: var(--vd-color-action, rgb(0, 110, 245));
+    border-top-color: var(--vd-color-action, rgb(0, 110, 245));
+    border-bottom-color: var(--vd-color-action, rgb(0, 110, 245));
 }
 
 .home-button:hover {

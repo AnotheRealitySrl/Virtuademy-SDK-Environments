@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <!-- The popup, cloned by NotificationHost into its popup-layer. The scrim is pickable (modal);
+         the buttons are created in actions. No styles of its own: the host document imports them. -->
+    <ui:VisualElement name="scrim" class="vd-popup-scrim">
+        <ui:VisualElement name="popup" class="vd-panel vd-popup" picking-mode="Ignore">
+            <ui:Label name="title" text="Title" class="vd-title" picking-mode="Ignore" />
+            <ui:Label name="body" text="Text" class="vd-body" picking-mode="Ignore" />
+            <ui:VisualElement name="actions" class="vd-panel__actions" picking-mode="Ignore" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

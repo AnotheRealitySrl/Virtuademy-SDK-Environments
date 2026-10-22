@@ -4,7 +4,7 @@
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background-color: rgba(20, 22, 28, 0.85);
+    background-color: var(--vd-color-surface, rgba(18, 20, 26, 0.922));
     border-radius: 16px;
     right: auto;
     left: 0;
@@ -17,8 +17,8 @@
     padding-top: 16px;
     padding-bottom: 16px;
     font-size: 28px;
-    color: rgb(255, 255, 255);
-    background-color: rgb(56, 122, 255);
+    color: var(--vd-color-on-action, rgb(255, 255, 255));
+    background-color: var(--vd-color-action, rgb(0, 110, 245));
     border-width: 0;
     border-radius: 12px;
     transform-origin: center;
@@ -29,7 +29,7 @@
 
 .wsb-button:hover {
     scale: 1.2 1.2;
-    background-color: rgb(80, 140, 255);
+    background-color: var(--vd-color-action, rgb(0, 110, 245));
 }
 
 .wsb-button:active {
