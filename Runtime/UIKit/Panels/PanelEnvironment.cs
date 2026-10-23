@@ -54,6 +54,26 @@ namespace Virtuademy.SDK.Environments.UIKit
         }
 
         /// <summary>
+        /// Whether the application's help panel (its tutorial) is open, opening or closing. False
+        /// outside the application or when it has no help panel.
+        /// </summary>
+        public static bool IsHelpOpen
+        {
+            get
+            {
+                try
+                {
+                    return IVirtuademyGameplay.IsAvailable && IVirtuademyGameplay.Current.Help.IsAvailable
+                           && IVirtuademyGameplay.Current.Help.IsOpen;
+                }
+                catch (Exception)
+                {
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
         /// The text to show for a localization key with a fallback: the translation when the
         /// environment's Localization File has one, else <paramref name="fallback"/>. An empty key
         /// means "no localization": the fallback is shown as written.

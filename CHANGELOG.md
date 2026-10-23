@@ -57,7 +57,20 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   input (0: whichever is open, as before).
   In VR, `OverlayPanelPlacement` sizes the document's root to its VR size itself (the popup laid its text out one
   letter per line and the HUD piled up its rows: the root had no size) and has a sideways offset: the HUD floats
-  0.75 m to the right and lower, the popups in front and centred.
+  0.9 m to the right and 0.55 m lower, the popups in front and centred. In VR an overlay's colliders are on only while
+  it has something to press (`OverlayPanelPlacement.BlocksRay`: the notification host while a popup is open, the HUD
+  while its hint button shows): the controller ray hits triggers on the UI layer, so the host's collider, 1.4 x 0.9 m
+  in front of the user, caught the ray meant for the application's tutorial panel behind it.
+- **`IHelpApi.IsOpen` and `IHelpApi.Opened`**, next to `Closed`, and the nodes `Virtuademy Tutorial: Is Tutorial Open`
+  and `On Tutorial Opened`. They follow the application's help (tutorial) state, which it opens by itself on a first
+  visit and which keeps the user from moving. In VR the HUD and the notification host hide, and let the ray through,
+  while it is open (`OverlayPanelPlacement.vrHideWhileHelpOpen`, on by default). The application's implementation
+  watches the state instead of the system's events, which it clears at every scene setup: `Closed` no longer goes
+  silent after the first environment.
+- **`IVirtuademyGameplay.Tablet` (`ITabletApi`)**: `IsAvailable`, `IsOpen`, `Opened`, `Closed` for the application's tablet
+  (desktop and VR; none on mobile), read-only, and the nodes `Virtuademy Tablet: Is Tablet Open`, `On Tablet Opened`
+  and `On Tablet Closed`. The SDK's overlays do not react to it. Adding a member to `IVirtuademyGameplay` breaks any
+  other implementation of it (the application's is the only one).
 - **`ILocalizationApi.TranslateOr(key, fallback)`** and the node `Virtuademy Localization: Translate Or`: the
   fallback instead of the raw key when the Localization File has no translation.
 - **`SafeFrame`** keeps a screen panel clear of the application's reserved zones (`ReservedScreenZones`: top bar,

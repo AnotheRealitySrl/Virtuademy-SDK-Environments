@@ -136,6 +136,17 @@ namespace Virtuademy.SDK.Environments.UIKit
             base.OnDisable();
         }
 
+        private OverlayPanelPlacement placement;
+
+        private void Awake()
+        {
+            // Toasts take no clicks: in VR the host lets the ray through until a popup opens.
+            if (TryGetComponent(out placement))
+            {
+                placement.BlocksRay = false;
+            }
+        }
+
         protected override bool BindTo(VisualElement root)
         {
             toastStack = root.Q<VisualElement>("toast-stack");
@@ -302,6 +313,10 @@ namespace Virtuademy.SDK.Environments.UIKit
             popupLayer.Add(popup);
             openPopup = popup;
             openPopupId = id;
+            if (placement != null)
+            {
+                placement.BlocksRay = true;
+            }
             openPopupHandler = onClosed;
             ThemeApplier.Apply(popup);
             // One frame later, so the fade runs from the hidden state.
@@ -344,6 +359,10 @@ namespace Virtuademy.SDK.Environments.UIKit
             VisualElement closing = openPopup;
             openPopup = null;
             openPopupId = 0;
+            if (placement != null)
+            {
+                placement.BlocksRay = false;
+            }
             FadeOutAndRemove(closing);
             PopupClosedHandler handler = openPopupHandler;
             openPopupHandler = null;

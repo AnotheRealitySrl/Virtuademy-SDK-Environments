@@ -65,9 +65,12 @@ namespace Virtuademy.SDK.Environments.UIKit
         public int Count => count;
         public int MaxCount => maxCount;
 
+        private OverlayPanelPlacement placement;
+
         private void Awake()
         {
             visible = visibleOnStart;
+            TryGetComponent(out placement);
         }
 
         protected override bool BindTo(VisualElement root)
@@ -224,6 +227,11 @@ namespace Virtuademy.SDK.Environments.UIKit
                 string label = hintButtonLabel.Resolve();
                 hintButton.text = label;
                 hintButton.style.display = string.IsNullOrEmpty(label) ? DisplayStyle.None : DisplayStyle.Flex;
+            }
+            if (placement != null)
+            {
+                // In VR the HUD takes the ray only while it has a button to press.
+                placement.BlocksRay = visible && hintButton != null && hintButton.style.display != DisplayStyle.None;
             }
             if (counterTitle != null)
             {

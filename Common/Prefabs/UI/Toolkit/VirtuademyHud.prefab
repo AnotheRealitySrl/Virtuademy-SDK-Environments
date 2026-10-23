@@ -130,8 +130,8 @@ MonoBehaviour:
   worldPanelSettings: {fileID: 11400000, guid: 395a867d243e41bf997bbeaaef826fa8, type: 2}
   vrSize: {x: 520, y: 380}
   vrDistance: 1.6
-  vrHeightOffset: -0.25
-  vrSideOffset: 0.75
+  vrHeightOffset: -0.55
+  vrSideOffset: 0.9
   vrFollowHead: 1
   followAngle: 30
   followSpeed: 3
