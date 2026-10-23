@@ -64,9 +64,29 @@ namespace Virtuademy.Environments.ScriptingApi
         void ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed,
                        bool closeOnOutsideClick);
 
-        /// <summary>Closes the open popup, if any, reporting -1 to its handler.</summary>
-        /// <remarks>Node: <c>Virtuademy UI: Close Popup</c>.</remarks>
+        /// <summary>
+        /// The same, closing by itself after <paramref name="autoCloseSeconds"/> (0 or less: never),
+        /// and returning the popup's id for <see cref="ClosePopup(int)"/>; 0 when nothing could draw
+        /// it (its handler has already heard -1).
+        /// </summary>
+        /// <remarks>
+        /// Use these two instead of a delay followed by <see cref="ClosePopup()"/>: the timer and the
+        /// id belong to this popup, so neither can close a popup opened after it. A popup closed by
+        /// the timer reports -1. Node: <c>Virtuademy UI: Show Popup</c> (Auto Close Seconds, Popup Id).
+        /// </remarks>
+        int ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed,
+                      bool closeOnOutsideClick, float autoCloseSeconds);
+
+        /// <summary>Closes the open popup, whichever it is, reporting -1 to its handler.</summary>
+        /// <remarks>Node: <c>Virtuademy UI: Close Popup</c> (Popup Id 0).</remarks>
         void ClosePopup();
+
+        /// <summary>
+        /// Closes the popup <paramref name="popupId"/> (from <c>ShowPopup</c>), reporting -1. Does
+        /// nothing when that popup is already closed or another popup has replaced it.
+        /// </summary>
+        /// <remarks>Node: <c>Virtuademy UI: Close Popup</c> (Popup Id).</remarks>
+        void ClosePopup(int popupId);
 
         /// <summary>Whether a popup is open.</summary>
         bool IsPopupOpen { get; }

@@ -60,6 +60,10 @@ namespace Virtuademy.SDK.Environments.UIKit
             "decide for itself (IUIApi.ShowPopup with closeOnOutsideClick, the node's input).")]
         private bool closePopupOnOutsideClick;
 
+        [SerializeField, Min(0f), Tooltip("Seconds after which a popup closes by itself (reporting -1) when " +
+            "the call does not say; 0: never. The timer belongs to its popup and never closes a later one.")]
+        private float popupAutoCloseSeconds;
+
         [SerializeField, HideInInspector, Tooltip("Set on the application's copy: a host in the scene wins over it.")]
         private bool isApplicationFallback;
 
@@ -78,6 +82,11 @@ namespace Virtuademy.SDK.Environments.UIKit
         private readonly List<VisualElement> toasts = new();
         private VisualElement openPopup;
         private PopupClosedHandler openPopupHandler;
+        private int openPopupId;
+        // Static: ids are unique across hosts, so an id never names another host's popup.
+        private static int lastPopupId;
+        private readonly HashSet<int> pendingPopups = new();
+        private readonly HashSet<int> cancelledPopups = new();
         private readonly Queue<System.Action> pending = new();
 
         /// <summary>
@@ -122,6 +131,8 @@ namespace Virtuademy.SDK.Environments.UIKit
         {
             hosts.Remove(this);
             pending.Clear();
+            pendingPopups.Clear();
+            cancelledPopups.Clear();
             base.OnDisable();
         }
 
@@ -206,7 +217,7 @@ namespace Virtuademy.SDK.Environments.UIKit
 
         /// <summary>Shows the popup. See <c>IUIApi.ShowPopup</c>; outside clicks follow <see cref="ClosePopupOnOutsideClick"/>.</summary>
         public void ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed = null)
-            => ShowPopup(title, text, buttons, onClosed, closePopupOnOutsideClick);
+            => ShowPopup(title, text, buttons, onClosed, closePopupOnOutsideClick, popupAutoCloseSeconds);
 
         /// <summary>
         /// Shows the popup. With <paramref name="closeOnOutsideClick"/>, a click or tap on the scrim
@@ -214,10 +225,35 @@ namespace Virtuademy.SDK.Environments.UIKit
         /// </summary>
         public void ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed,
                               bool closeOnOutsideClick)
+            => ShowPopup(title, text, buttons, onClosed, closeOnOutsideClick, popupAutoCloseSeconds);
+
+        /// <summary>
+        /// Shows the popup and returns its id, for <see cref="ClosePopup(int)"/>. With
+        /// <paramref name="autoCloseSeconds"/> above zero it closes by itself after that long,
+        /// reporting -1. The timer belongs to this popup: it dies with it, so it can never close a
+        /// popup opened later.
+        /// </summary>
+        public int ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed,
+                             bool closeOnOutsideClick, float autoCloseSeconds)
         {
+            int id = ++lastPopupId;
             if (!IsBound)
             {
-                pending.Enqueue(() => ShowPopup(title, text, buttons, onClosed, closeOnOutsideClick));
+                pending.Enqueue(() => Open(id, title, text, buttons, onClosed, closeOnOutsideClick, autoCloseSeconds));
+                pendingPopups.Add(id);
+                return id;
+            }
+            Open(id, title, text, buttons, onClosed, closeOnOutsideClick, autoCloseSeconds);
+            return id;
+        }
+
+        private void Open(int id, string title, string text, string[] buttons, PopupClosedHandler onClosed,
+                          bool closeOnOutsideClick, float autoCloseSeconds)
+        {
+            // A popup closed by id before the host could draw it is answered and never drawn.
+            if (pendingPopups.Remove(id) && cancelledPopups.Remove(id))
+            {
+                onClosed?.Invoke(-1);
                 return;
             }
 
@@ -244,9 +280,9 @@ namespace Virtuademy.SDK.Environments.UIKit
             {
                 popup.RegisterCallback<ClickEvent>(evt =>
                 {
-                    if (evt.target == popup && openPopup == popup)
+                    if (evt.target == popup)
                     {
-                        ClosePopup(-1);
+                        Close(id, -1);
                     }
                 });
             }
@@ -257,7 +293,7 @@ namespace Virtuademy.SDK.Environments.UIKit
             for (int i = 0; i < count; i++)
             {
                 int index = i;
-                var button = new Button(() => ClosePopup(index)) { text = labels[i] };
+                var button = new Button(() => Close(id, index)) { text = labels[i] };
                 button.AddToClassList("vd-button");
                 button.AddToClassList(i == count - 1 ? "vd-button--primary" : "vd-button--secondary");
                 actions?.Add(button);
@@ -265,24 +301,49 @@ namespace Virtuademy.SDK.Environments.UIKit
 
             popupLayer.Add(popup);
             openPopup = popup;
+            openPopupId = id;
             openPopupHandler = onClosed;
             ThemeApplier.Apply(popup);
             // One frame later, so the fade runs from the hidden state.
             popup.schedule.Execute(() => popup.AddToClassList(PopupVisibleClass)).StartingIn(16);
+            if (autoCloseSeconds > 0f)
+            {
+                // Scheduled on this popup's element and checked against its id: once the popup is
+                // gone, the timer either never runs or finds another id and does nothing.
+                popup.schedule.Execute(() => Close(id, -1)).StartingIn((long)(autoCloseSeconds * 1000f));
+            }
             onPopupOpened.Invoke(title);
         }
 
-        /// <summary>Closes the open popup, reporting -1.</summary>
-        public void ClosePopup() => ClosePopup(-1);
+        /// <summary>Closes the open popup, whichever it is, reporting -1.</summary>
+        public void ClosePopup() => Close(openPopupId, -1);
 
-        private void ClosePopup(int index)
+        /// <summary>
+        /// Closes the popup <paramref name="popupId"/> (from <c>ShowPopup</c>), reporting -1. Does
+        /// nothing when that popup is already closed or another one has replaced it.
+        /// </summary>
+        public void ClosePopup(int popupId)
         {
-            if (openPopup == null)
+            if (pendingPopups.Contains(popupId))
+            {
+                cancelledPopups.Add(popupId);
+                return;
+            }
+            Close(popupId, -1);
+        }
+
+        /// <summary>The id of the open popup; 0 when none is open.</summary>
+        public int OpenPopupId => openPopup != null ? openPopupId : 0;
+
+        private void Close(int id, int index)
+        {
+            if (openPopup == null || id != openPopupId)
             {
                 return;
             }
             VisualElement closing = openPopup;
             openPopup = null;
+            openPopupId = 0;
             FadeOutAndRemove(closing);
             PopupClosedHandler handler = openPopupHandler;
             openPopupHandler = null;
@@ -361,6 +422,10 @@ namespace Virtuademy.SDK.Environments.UIKit
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetForDomainReloadOff() => hosts.Clear();
+        private static void ResetForDomainReloadOff()
+        {
+            hosts.Clear();
+            lastPopupId = 0;
+        }
     }
 }

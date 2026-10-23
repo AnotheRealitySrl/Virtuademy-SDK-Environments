@@ -78,6 +78,7 @@ MonoBehaviour:
   maxToasts: 3
   defaultButtonLabel: OK
   closePopupOnOutsideClick: 0
+  popupAutoCloseSeconds: 0
   isApplicationFallback: 0
 --- !u!114 &8114391914974408495
 MonoBehaviour:

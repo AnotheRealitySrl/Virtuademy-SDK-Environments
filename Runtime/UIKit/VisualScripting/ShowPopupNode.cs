@@ -34,6 +34,12 @@ namespace Virtuademy.SDK.Environments.VisualScripting
         /// <summary>A click or tap outside the popup closes it (ButtonIndex -1). Off by default.</summary>
         [DoNotSerialize] public ValueInput CloseOnOutsideClick { get; private set; }
 
+        /// <summary>Seconds before the popup closes by itself (ButtonIndex -1); 0: never.</summary>
+        [DoNotSerialize] public ValueInput AutoCloseSeconds { get; private set; }
+
+        /// <summary>This popup's id, for Close Popup; set before Shown runs.</summary>
+        [DoNotSerialize] public ValueOutput PopupId { get; private set; }
+
         [DoNotSerialize, PortLabelHidden] public ControlInput InputTrigger { get; private set; }
 
         /// <summary>Runs as soon as the popup is shown.</summary>
@@ -53,17 +59,20 @@ namespace Virtuademy.SDK.Environments.VisualScripting
             Button2 = ValueInput<string>(nameof(Button2), string.Empty);
             Button3 = ValueInput<string>(nameof(Button3), string.Empty);
             CloseOnOutsideClick = ValueInput(nameof(CloseOnOutsideClick), false);
+            AutoCloseSeconds = ValueInput(nameof(AutoCloseSeconds), 0f);
 
             InputTrigger = ControlInputCoroutine(nameof(InputTrigger), Run);
             Shown = ControlOutput(nameof(Shown));
             Closed = ControlOutput(nameof(Closed));
             ButtonIndex = ValueOutput<int>(nameof(ButtonIndex));
+            PopupId = ValueOutput<int>(nameof(PopupId));
 
             Requirement(Title, InputTrigger);
             Requirement(Text, InputTrigger);
             Succession(InputTrigger, Shown);
             Succession(InputTrigger, Closed);
             Assignment(InputTrigger, ButtonIndex);
+            Assignment(InputTrigger, PopupId);
         }
 
         private IEnumerator Run(Flow flow)
@@ -78,15 +87,19 @@ namespace Virtuademy.SDK.Environments.VisualScripting
                 }
             }
 
+            // Locals of this run: the handler below is this popup's, so Closed and ButtonIndex always
+            // answer for the popup this run opened, never for a later one (which closes this one
+            // first, with -1).
             bool closed = false;
             int index = -1;
-            IVirtuademyGameplay.Current.UI.ShowPopup(flow.GetValue<string>(Title), flow.GetValue<string>(Text),
+            int id = IVirtuademyGameplay.Current.UI.ShowPopup(flow.GetValue<string>(Title), flow.GetValue<string>(Text),
                 labels.ToArray(), i =>
                 {
                     index = i;
                     closed = true;
-                }, flow.GetValue<bool>(CloseOnOutsideClick));
+                }, flow.GetValue<bool>(CloseOnOutsideClick), flow.GetValue<float>(AutoCloseSeconds));
 
+            flow.SetValue(PopupId, id);
             yield return Shown;
 
             while (!closed)
