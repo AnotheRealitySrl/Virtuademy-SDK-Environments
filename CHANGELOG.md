@@ -55,6 +55,9 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   `ClosePopup()` did), and `ClosePopup(int id)` closes only that popup; `NotificationHost.popupAutoCloseSeconds` is
   the default (0: never). Nodes: Show Popup has Auto Close Seconds and a Popup Id output, Close Popup a Popup Id
   input (0: whichever is open, as before).
+  In VR, `OverlayPanelPlacement` sizes the document's root to its VR size itself (the popup laid its text out one
+  letter per line and the HUD piled up its rows: the root had no size) and has a sideways offset: the HUD floats
+  0.75 m to the right and lower, the popups in front and centred.
 - **`ILocalizationApi.TranslateOr(key, fallback)`** and the node `Virtuademy Localization: Translate Or`: the
   fallback instead of the raw key when the Localization File has no translation.
 - **`SafeFrame`** keeps a screen panel clear of the application's reserved zones (`ReservedScreenZones`: top bar,
