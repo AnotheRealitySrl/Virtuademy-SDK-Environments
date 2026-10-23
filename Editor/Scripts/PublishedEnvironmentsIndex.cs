@@ -59,6 +59,9 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <summary>The worlds the index was built for, in the order the API listed them.</summary>
         public static IReadOnlyList<(int Id, string Label)> Worlds => lastWorlds;
 
+        // The connection the last full refresh was for: a refresh after a deploy asks the same platform.
+        private static string lastConnection;
+
         public static string Key(string sceneName) => sceneName == null ? null : filter.Replace(sceneName.ToLowerInvariant(), string.Empty);
 
         public static IReadOnlyList<Entry> Get(string key)
@@ -67,9 +70,11 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>Rebuilds the index for the given worlds (every world the account can see, not only the deployable ones).</summary>
-        public static async Task RefreshAsync(IEnumerable<(int Id, string Label)> worlds)
+        /// <param name="connectionKey">The connection the worlds belong to; null is the project's active one, read once here.</param>
+        public static async Task RefreshAsync(IEnumerable<(int Id, string Label)> worlds, string connectionKey = null)
         {
             lastWorlds = worlds?.ToList() ?? new List<(int, string)>();
+            lastConnection = connectionKey ?? ProjectConnections.ActiveKey;
             await RefreshAsync();
         }
 
@@ -77,7 +82,8 @@ namespace Virtuademy.SDK.Environments.Editor
         public static async Task RefreshAsync()
         {
             if (IsLoading) return;
-            string apiUrl = EditorApiEndpoint.ApplicationApiUrl;
+            string connectionKey = lastConnection ?? ProjectConnections.ActiveKey;
+            string apiUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
             if (string.IsNullOrEmpty(apiUrl)) return;
 
             int started = generation;
@@ -88,7 +94,7 @@ namespace Virtuademy.SDK.Environments.Editor
             {
                 foreach ((int id, string label) in lastWorlds)
                 {
-                    List<EnvironmentDto> envs = await GetAsync<List<EnvironmentDto>>($"{apiUrl}/worlds/{id}/environments?api-version={api_version}");
+                    List<EnvironmentDto> envs = await GetAsync<List<EnvironmentDto>>(connectionKey, $"{apiUrl}/worlds/{id}/environments?api-version={api_version}");
                     if (started != generation) return;
                     if (envs == null) continue;
                     foreach (EnvironmentDto env in envs)
@@ -98,7 +104,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     }
                 }
 
-                List<EnvironmentDto> tenantEnvs = await GetAsync<List<EnvironmentDto>>($"{apiUrl}/tenants/environments?api-version={api_version}");
+                List<EnvironmentDto> tenantEnvs = await GetAsync<List<EnvironmentDto>>(connectionKey, $"{apiUrl}/tenants/environments?api-version={api_version}");
 
                 // Cleared (logout) while the requests were in flight: what came back belongs to the old session.
                 if (started != generation) return;
@@ -184,9 +190,9 @@ namespace Virtuademy.SDK.Environments.Editor
             });
         }
 
-        private static async Task<T> GetAsync<T>(string url) where T : class
+        private static async Task<T> GetAsync<T>(string connectionKey, string url) where T : class
         {
-            HttpResponseMessage response = await EditorSessionManager.SendAuthorizedAsync(
+            HttpResponseMessage response = await EditorSessionManager.SendAuthorizedAsync(connectionKey,
                 () => new HttpRequestMessage(HttpMethod.Get, url), httpClient, allowInteractive: false);
             if (response == null || !response.IsSuccessStatusCode) return null;
             return JsonConvert.DeserializeObject<T>(await response.Content.ReadAsStringAsync());

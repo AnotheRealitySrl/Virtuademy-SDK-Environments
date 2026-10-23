@@ -42,11 +42,13 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             public string Error;
         }
 
-        public static async Task<Result> VerifyAsync(byte[] dll, string fileName)
+        /// <param name="connectionKey">The connection to verify on; null is the project's active one, read once here.</param>
+        public static async Task<Result> VerifyAsync(byte[] dll, string fileName, string connectionKey = null)
         {
-            string baseUrl = EditorApiEndpoint.ApplicationApiUrl;
+            connectionKey ??= ProjectConnections.ActiveKey;
+            string baseUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
 
-            if (string.IsNullOrEmpty(baseUrl) || !EditorLoginState.HasSession)
+            if (string.IsNullOrEmpty(baseUrl) || ConnectionStore.Get(connectionKey)?.HasSession != true)
             {
                 return new Result
                 {
@@ -78,7 +80,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                     return new HttpRequestMessage(HttpMethod.Post, url) { Content = form };
                 }
 
-                using HttpResponseMessage resp = await EditorSessionManager.SendAuthorizedAsync(BuildRequest, client);
+                using HttpResponseMessage resp = await EditorSessionManager.SendAuthorizedAsync(connectionKey, BuildRequest, client);
 
                 if (resp == null)
                 {

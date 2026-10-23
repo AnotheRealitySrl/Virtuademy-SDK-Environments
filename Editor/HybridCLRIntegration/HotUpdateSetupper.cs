@@ -1,3 +1,5 @@
+using Virtuademy.SDK.TenantConfiguration.Editor;
+
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -916,8 +918,9 @@ $@"{{
         /// false so the caller can block the addressables build (fail-closed). A project with no
         /// interpreted scripts passes straight through: there is no code to let in.
         /// </summary>
-        public static async Task<bool> CompileVerifyAsync()
+        public static async Task<bool> CompileVerifyAsync(string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             BundleIsCurrent = false;
 
             // Before the setup check: a project that interprets nothing does not need the
@@ -954,7 +957,7 @@ $@"{{
             // 1) The whitelist comes first: it is needed to verify, and it takes part in the
             //    publish marker below, so a policy that changed has to be in hand before deciding
             //    whether there is anything to do.
-            HotUpdatePolicyFetcher.FetchResult fetch = await HotUpdatePolicyFetcher.FetchAsync();
+            HotUpdatePolicyFetcher.FetchResult fetch = await HotUpdatePolicyFetcher.FetchAsync(connectionKey);
             if (!fetch.Ok)
             {
                 Debug.LogError("[HotUpdateSecurity] Policy unavailable — build blocked (fail-closed). " + fetch.Error);
@@ -1024,7 +1027,7 @@ $@"{{
 
             // 7) SERVER check (authoritative). Block on rejection OR if it can't complete.
             byte[] bytes = File.ReadAllBytes(dllPath);
-            HotUpdateServerVerifier.Result server = await HotUpdateServerVerifier.VerifyAsync(bytes, Path.GetFileName(dllPath));
+            HotUpdateServerVerifier.Result server = await HotUpdateServerVerifier.VerifyAsync(bytes, Path.GetFileName(dllPath), connectionKey);
 
             if (!server.Reachable)
             {

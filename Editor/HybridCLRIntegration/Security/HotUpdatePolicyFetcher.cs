@@ -46,17 +46,17 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
 
         /// <summary>Full policy URL = the logged-in tenant's Application API URL + the fixed
         /// path, or null when not logged in / no URL in the tenant config.</summary>
-        public static string ResolvePolicyUrl()
+        public static string ResolvePolicyUrl(string connectionKey = null)
         {
-            string baseUrl = EditorApiEndpoint.ApplicationApiUrl;
+            string baseUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey ?? ProjectConnections.ActiveKey);
             return string.IsNullOrEmpty(baseUrl) ? null : baseUrl.TrimEnd('/') + PolicyPath;
         }
 
         /// <summary>Fetch fresh from the network; on failure fall back to the cached copy;
         /// if neither is available, fail-closed (Policy == null).</summary>
-        public static async Task<FetchResult> FetchAsync()
+        public static async Task<FetchResult> FetchAsync(string connectionKey = null)
         {
-            string url = ResolvePolicyUrl();
+            string url = ResolvePolicyUrl(connectionKey);
 
             // 1) Network (fresh) — only if we could resolve a host (i.e. logged in).
             if (!string.IsNullOrEmpty(url))
