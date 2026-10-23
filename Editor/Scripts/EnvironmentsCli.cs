@@ -44,6 +44,23 @@ namespace Virtuademy.SDK.Environments.Editor
     /// in, and never prints the file's content. The file holds the app's secret: when the project is in a git work
     /// tree and git does not ignore where it would land, the command exits with <see cref="ExitSecretNotIgnored"/>
     /// and writes nothing, unless <c>-vdAllowTracked</c> says the file is meant to be tracked.</description></item>
+    /// <item><description><c>login [-vdConnection &lt;connection&gt; | -vdApp &lt;app&gt; [-vdEnv &lt;key&gt;]] [-vdNoBrowser] [-vdLoginTimeoutSeconds &lt;n&gt;]</c>:
+    /// logs in to a connection of the per-user store (ADR 0037), or, with <c>-vdApp</c>, to the connection of one of
+    /// the project's configuration files (the app is the file's name up to its first dot, the environment a key
+    /// inside it), which is added to the store when it is not there yet. It is the one command that wants a
+    /// browser: it prints <c>AUTH_URL &lt;url&gt;</c> as soon as it has it, opens the system browser unless
+    /// <c>-vdNoBrowser</c> says somebody else will (the URL is then the way in), and gives up
+    /// <c>-vdLoginTimeoutSeconds</c> (180 by default) after the URL is issued, with <see cref="ExitLoginTimeout"/>.
+    /// With <c>-vdResultFile</c> the URL is also written to the result file at once, as <c>state: awaiting-browser</c>.
+    /// The editor must not have the project open: see "Batch or open editor" below.</description></item>
+    /// <item><description><c>logout [-vdConnection &lt;connection&gt;]</c>: ends the connection's session. The Azure account
+    /// stays in the token cache when another connection uses it.</description></item>
+    /// <item><description><c>connections</c>: every connection of the store, with whether its session is valid and
+    /// which one the project uses. Needs no network. The same list, without any secret, is in the store's status file
+    /// (<c>%LOCALAPPDATA%\Virtuademy\SDK\status.json</c>), which can be read without starting Unity.</description></item>
+    /// <item><description><c>whoami [-vdConnection &lt;connection&gt;]</c>: one connection (the project's active one when none is
+    /// named): tenant, environment, user, role and when the token expires, never the token. Exits with
+    /// <see cref="ExitLoginRequired"/> when there is no session. Also readable from the status file.</description></item>
     /// <item><description><c>worlds</c>: the worlds the login can deploy to, and for every scene included in the
     /// build, where it is already published.</description></item>
     /// <item><description><c>build [-vdScenes a,b]</c>: what <b>Build Addressables</b> does, interpreted scripts
@@ -66,19 +83,30 @@ namespace Virtuademy.SDK.Environments.Editor
     /// without them.</description></item>
     /// </list>
     /// <para>
-    /// <b>Where a command talks to.</b> Every command that calls the platform (<c>worlds</c>, <c>preview</c>,
-    /// <c>deploy</c>) first checks that the Application API it will call, which the editor reads from the generated
-    /// <c>PlatformEndpoints</c> asset before it looks at the login, is on the same host as the one the logged-in
-    /// tenant's configuration names; when it is not, it exits with <see cref="ExitApiHostMismatch"/> and sends
-    /// nothing (the token would go to another platform). The REPORT of those three commands carries a
-    /// <c>target</c> object: the tenant label, its environment and both hosts.
+    /// <b>Where a command talks to.</b> The commands that call the platform (<c>worlds</c>, <c>preview</c>,
+    /// <c>deploy</c>) work on the project's active connection, the one the window's selection or the first login chose, read
+    /// <b>once when the run starts</b> (<c>targetKey</c>): every request of the run goes to it, whatever the active connection
+    /// becomes meanwhile. They take its Application API address from the tenant that connection reported at login, never from
+    /// the project's generated <c>PlatformEndpoints</c> asset: a token is sent to the host of the connection it belongs to.
+    /// <c>-vdConnection &lt;connection&gt;</c> (on those three) names the connection the caller means and exits with
+    /// <see cref="ExitTargetMismatch"/> when it is not the active one. The REPORT
+    /// of those three commands carries a <c>target</c> object: the connection, the tenant label, its environment and
+    /// the API host.
+    /// </para>
+    /// <para>
+    /// <b>Batch or open editor.</b> Unity refuses to open a project that another editor has open, so these commands
+    /// run in batch mode only while the project is closed (<c>Temp/UnityLockfile</c> is absent or not held). With the
+    /// editor open, a script drops a request file in <c>UserSettings/Virtuademy/requests/</c> instead and the
+    /// editor answers it (<c>login</c>, <c>logout</c> and <c>status</c> only; see <c>EditorRequestPump</c> in
+    /// <c>Virtuademy-SDK-Core</c>). The two run the same code and give the same answer.
     /// </para>
     /// <para>
     /// <b>Sessions.</b> Commands that call the platform renew an expired session silently, and when that is not
-    /// possible they exit with <see cref="ExitLoginRequired"/>: <b>batch mode never starts an interactive login</b>
-    /// (<see cref="EditorSessionManager.InteractiveLoginAllowed"/>). Log in once from
-    /// <b>Virtuademy &gt; Addressables management</b> (or <b>Available Tenants</b>); the session and its renewal
-    /// are stored per machine. <c>build</c> needs a session only for a project that has interpreted scripts: the
+    /// possible they exit with <see cref="ExitLoginRequired"/>: <b>batch mode never starts an interactive login on
+    /// its own</b> (<see cref="EditorSessionManager.InteractiveLoginAllowed"/>); the <c>login</c> command is how it is
+    /// asked for. Log in once with it, or from <b>Virtuademy &gt; Available Tenants</b>; the session and its renewal
+    /// are stored per OS user, outside the project, and shared by every project and process of that user.
+    /// <c>build</c> needs a session only for a project that has interpreted scripts: the
     /// authoritative verification is the server's, and without a session it cannot run, so such a build is
     /// refused (fail-closed), as it is in the window — unless the scripts are unchanged since they were last
     /// published, which skips the compile and the verification. A project without interpreted scripts builds
@@ -105,7 +133,9 @@ namespace Virtuademy.SDK.Environments.Editor
     /// </para>
     /// <para>
     /// Every run ends with a <c>[EnvironmentsCli] REPORT</c> line: one JSON object with the command's result,
-    /// followed by <c>[EnvironmentsCli] EXIT &lt;code&gt;</c>. Nothing secret goes into it or into the log: no
+    /// followed by <c>[EnvironmentsCli] EXIT &lt;code&gt;</c>. Unity's standard output carries the whole editor log, so
+    /// <c>-vdResultFile &lt;path&gt;</c> (any command) also writes the REPORT, and only it, to that file, with
+    /// <c>state: done</c>; a script reads the file instead of the log. Nothing secret goes into it or into the log: no
     /// token, no upload link, nothing from the configuration file. In a deploy report, <c>importsStarted</c>
     /// counts the imports the platform accepted: it answers "started", and the import runs on the platform
     /// afterwards, so it is not a count of live environments.
@@ -121,7 +151,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         public const int ExitBadArguments = 10;
 
-        /// <summary>There is no session, or it expired and could not be renewed silently. Log in from the Addressables management window.</summary>
+        /// <summary>There is no session, or it expired and could not be renewed silently. Log in with the login command or from Virtuademy &gt; Available Tenants.</summary>
         public const int ExitLoginRequired = 11;
 
         /// <summary>The project's Addressables are not configured the way the SDK needs (a build would fail at the end).</summary>
@@ -163,8 +193,27 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <summary><c>deploy</c> without <c>-vdExpectTenant</c>, or the logged-in tenant is not the one it names.</summary>
         public const int ExitTenantNotConfirmed = 24;
 
-        /// <summary>The Application API the command would call is on another host than the logged-in tenant's configuration names.</summary>
+        /// <summary>
+        /// No longer returned, and reserved: the Application API address of the project's generated asset was on another host than the
+        /// login's. The address comes from the connection since ADR 0037, so that case cannot happen. Scripts written for earlier versions
+        /// read 25 with that meaning, so the number is not reused.
+        /// </summary>
         public const int ExitApiHostMismatch = 25;
+
+        /// <summary>The connection a command names is not in the store, or the name fits several. <c>connections</c> lists them.</summary>
+        public const int ExitConnectionUnknown = 26;
+
+        /// <summary><c>login</c> was not finished in the browser in time. The URL had been printed.</summary>
+        public const int ExitLoginTimeout = 27;
+
+        /// <summary><c>login</c> failed: the platform, Azure or the auth configuration refused (the log says which).</summary>
+        public const int ExitLoginFailed = 28;
+
+        /// <summary><c>login</c> in batch mode where the store cannot be written (no encryption on this OS yet): the session would die with the process.</summary>
+        public const int ExitStoreNotPersistent = 29;
+
+        /// <summary>Target mismatch: <c>-vdConnection</c> names a connection that is not the project's active one. Nothing was built or sent.</summary>
+        public const int ExitTargetMismatch = 30;
 
         private const string log_prefix = "[EnvironmentsCli] ";
         private const int default_timeout_minutes = 60;
@@ -176,19 +225,24 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             { "status", new string[0] },
             { "session", new[] { "-vdRenew" } },
+            { "login", new[] { "-vdConnection", "-vdApp", "-vdEnv", "-vdNoBrowser", "-vdLoginTimeoutSeconds" } },
+            { "logout", new[] { "-vdConnection" } },
+            { "connections", new string[0] },
+            { "whoami", new[] { "-vdConnection" } },
             { "tenant-config", new[] { "-vdConfigFile", "-vdEnv", "-vdConfigFolder", "-vdAllowTracked" } },
-            { "worlds", new string[0] },
+            { "worlds", new[] { "-vdConnection" } },
             { "build", new[] { "-vdScenes" } },
-            { "preview", new[] { "-vdWorlds", "-vdTenant", "-vdScenes", "-vdExpectTenant" } },
-            { "deploy", new[] { "-vdWorlds", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdScenes", "-vdExpectTenant" } },
+            { "preview", new[] { "-vdWorlds", "-vdTenant", "-vdScenes", "-vdExpectTenant", "-vdConnection" } },
+            { "deploy", new[] { "-vdWorlds", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdScenes", "-vdExpectTenant", "-vdConnection" } },
         };
 
-        private static readonly string[] flag_options = { "-vdRenew", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdAllowTracked" };
+        private static readonly string[] flag_options = { "-vdRenew", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdAllowTracked", "-vdNoBrowser" };
 
         // Every option that takes a value, the two every command reads included.
         private static readonly string[] value_options =
         {
-            "-vdCommand", "-vdTimeoutMinutes", "-vdConfigFile", "-vdEnv", "-vdConfigFolder", "-vdScenes", "-vdWorlds", "-vdExpectTenant",
+            "-vdCommand", "-vdTimeoutMinutes", "-vdResultFile", "-vdConfigFile", "-vdEnv", "-vdConfigFolder", "-vdScenes", "-vdWorlds", "-vdExpectTenant",
+            "-vdConnection", "-vdApp", "-vdLoginTimeoutSeconds",
         };
 
         // Unity's own options that take a value: the token after one is Unity's, not a stray value of ours.
@@ -208,6 +262,15 @@ namespace Virtuademy.SDK.Environments.Editor
         private static bool finished;
         private static DateTime deadlineUtc;
         private static int timeoutMinutes;
+
+        // The exit code the run ends with, set from any thread and acted on in EditorApplication.update: the editor is
+        // asked to exit from its own loop, which is what a run without -quit has to do after an await.
+        private static volatile int pendingExit = int.MinValue;
+        private static string resultFile;
+
+        // The connection this run works on: the project's active one, read once when the run starts. Every request of the
+        // run goes to it, whatever the project's active connection becomes while the run is going (ADR 0037).
+        private static string targetKey;
 
         // True from the moment a deploy starts sending: the deadline then stops it between steps instead of ending the run.
         private static bool deployActive;
@@ -230,7 +293,9 @@ namespace Virtuademy.SDK.Environments.Editor
 
             timeoutMinutes = minutes;
             deadlineUtc = DateTime.UtcNow.AddMinutes(minutes);
+            resultFile = GetArgument(args, "-vdResultFile");
             EditorApplication.update += CheckTimeout;
+            EditorApplication.update += ExitWhenFinished;
 
             _ = RunAsync(args);
         }
@@ -299,6 +364,12 @@ namespace Virtuademy.SDK.Environments.Editor
             try
             {
                 Debug.Log(log_prefix + "REPORT " + JsonConvert.SerializeObject(report, report_settings));
+
+                if (!string.IsNullOrEmpty(resultFile))
+                {
+                    report["state"] = "done";
+                    WriteResultFile(JsonConvert.SerializeObject(report, Formatting.Indented, report_settings));
+                }
             }
             catch (Exception ex)
             {
@@ -306,7 +377,35 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             Debug.Log($"{log_prefix}EXIT {code} ({Describe(code)})");
+            pendingExit = code;
+        }
+
+        /// <summary>Ends the editor from its update loop, once the run has finished (see <see cref="pendingExit"/>).</summary>
+        private static void ExitWhenFinished()
+        {
+            if (pendingExit == int.MinValue)
+                return;
+
+            int code = pendingExit;
+            pendingExit = int.MinValue;
+            EditorApplication.update -= ExitWhenFinished;
             EditorApplication.Exit(code);
+        }
+
+        /// <summary>The result file is replaced whole, so a script that reads it never meets half of it.</summary>
+        private static void WriteResultFile(string json)
+        {
+            string path = Path.GetFullPath(resultFile);
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+
+            string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            File.WriteAllText(temp, json, new System.Text.UTF8Encoding(false));
+
+            // Swapped in, never deleted first: a reader meets the old file or the new one.
+            if (File.Exists(path))
+                File.Replace(temp, path, null);
+            else
+                File.Move(temp, path);
         }
 
         #region Arguments
@@ -323,6 +422,10 @@ namespace Virtuademy.SDK.Environments.Editor
             public string Env;
             public string Scenes;
             public string ExpectTenant;
+            public string Connection;
+            public string App;
+            public bool NoBrowser;
+            public int? LoginTimeoutSeconds;
             public List<int> Worlds;
         }
 
@@ -432,7 +535,7 @@ namespace Virtuademy.SDK.Environments.Editor
             // a default the caller did not choose (a deploy without -vdDryRun, say).
             foreach (string arg in flags.Concat(values.Keys))
             {
-                if (arg == "-vdCommand" || arg == "-vdTimeoutMinutes")
+                if (arg == "-vdCommand" || arg == "-vdTimeoutMinutes" || arg == "-vdResultFile")
                     continue;
 
                 if (!allowed.Contains(arg))
@@ -454,12 +557,32 @@ namespace Virtuademy.SDK.Environments.Editor
             options.Build = flags.Contains("-vdBuild");
             options.DryRun = flags.Contains("-vdDryRun");
             options.AllowTracked = flags.Contains("-vdAllowTracked");
+            options.NoBrowser = flags.Contains("-vdNoBrowser");
 
             options.ConfigFile = Value("-vdConfigFile");
             options.ConfigFolder = Value("-vdConfigFolder");
             options.Env = Value("-vdEnv");
             options.Scenes = Value("-vdScenes");
             options.ExpectTenant = Value("-vdExpectTenant")?.Trim();
+            options.Connection = Value("-vdConnection")?.Trim();
+            options.App = Value("-vdApp")?.Trim();
+
+            if (values.TryGetValue("-vdLoginTimeoutSeconds", out string loginTimeout))
+            {
+                if (!(int.TryParse(loginTimeout, out int seconds) && seconds > 0))
+                {
+                    error = $"-vdLoginTimeoutSeconds takes a positive number of seconds: '{loginTimeout}' is not one.";
+                    return false;
+                }
+
+                options.LoginTimeoutSeconds = seconds;
+            }
+
+            if (command == "login" && options.Connection != null && options.App != null)
+            {
+                error = "login takes -vdConnection or -vdApp, not both.";
+                return false;
+            }
 
             if (values.ContainsKey("-vdExpectTenant") && string.IsNullOrEmpty(options.ExpectTenant))
             {
@@ -488,6 +611,12 @@ namespace Virtuademy.SDK.Environments.Editor
                     error = "-vdWorlds names no world.";
                     return false;
                 }
+            }
+
+            if (command == "login" && options.Env != null && options.App == null)
+            {
+                error = "-vdEnv names an environment of a configuration file: give the file's app with -vdApp.";
+                return false;
             }
 
             if (command == "tenant-config" && string.IsNullOrEmpty(options.ConfigFile))
@@ -527,12 +656,19 @@ namespace Virtuademy.SDK.Environments.Editor
                 return ExitBadArguments;
             }
 
+            targetKey = EditorLoginState.ActiveConnectionKey;
+
             switch (command)
             {
                 case "status": return Status();
                 case "session": return await SessionAsync(options);
+                case "login":
+                case "logout":
+                case "connections":
+                case "whoami":
+                    return await ConnectionCommandAsync(options);
                 case "tenant-config": return TenantConfig(options);
-                case "worlds": return await WorldsAsync();
+                case "worlds": return await WorldsAsync(options);
                 case "build": return await BuildAsync(options);
                 case "preview": return await PreviewAsync(options);
                 default: return await DeployAsync(options);
@@ -593,6 +729,71 @@ namespace Virtuademy.SDK.Environments.Editor
             return code;
         }
 
+        /// <summary>
+        /// <c>login</c>, <c>logout</c>, <c>connections</c> and <c>whoami</c>: the same code the open editor runs for a
+        /// request file (<see cref="ConnectionCommands"/>), with the REPORT as the answer.
+        /// </summary>
+        private static async Task<int> ConnectionCommandAsync(Options options)
+        {
+            ConnectionCommandRequest request = new()
+            {
+                Command = command,
+                Connection = options.Connection,
+                App = options.App,
+                Env = options.Env,
+                NoBrowser = options.NoBrowser,
+                LoginTimeoutSeconds = options.LoginTimeoutSeconds,
+            };
+
+            ConnectionCommandResult result = await ConnectionCommands.ExecuteAsync(request, WriteProgress);
+
+            foreach (KeyValuePair<string, object> field in result.Fields)
+                report[field.Key] = field.Value;
+
+            report["result"] = result.Status;
+            if (result.Error != null)
+            {
+                report["error"] = result.Error;
+                Debug.LogError(log_prefix + result.Error);
+            }
+
+            return result.Status switch
+            {
+                "done" => ExitDone,
+                "login-required" => ExitLoginRequired,
+                "connection-unknown" => ExitConnectionUnknown,
+                "login-timeout" => ExitLoginTimeout,
+                "bad-request" => ExitBadArguments,
+                "store-not-persistent" => ExitStoreNotPersistent,
+                _ => ExitLoginFailed,
+            };
+        }
+
+        /// <summary>
+        /// A login waiting for the browser tells whoever started it, before it ends: the URL goes to the log and,
+        /// with <c>-vdResultFile</c>, to the file as <c>state: awaiting-browser</c>, which the final REPORT replaces.
+        /// </summary>
+        private static void WriteProgress(Dictionary<string, object> progress)
+        {
+            Debug.Log($"{log_prefix}AUTH_URL {progress["authUrl"]}");
+
+            if (string.IsNullOrEmpty(resultFile))
+                return;
+
+            try
+            {
+                Dictionary<string, object> state = new() { { "command", command } };
+                foreach (KeyValuePair<string, object> field in progress)
+                    state[field.Key] = field.Value;
+
+                WriteResultFile(JsonConvert.SerializeObject(state, Formatting.Indented, report_settings));
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning(log_prefix + "The progress could not be written to the result file: " + ex.Message);
+            }
+        }
+
         private static int TenantConfig(Options options)
         {
             try
@@ -613,7 +814,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     { "replacedExisting", result.ReplacedExisting },
                 };
                 Debug.Log($"{log_prefix}tenant-config: {result.AssetPath} ({result.App} / {result.Env}) is selected. " +
-                          "Log in from Virtuademy > Addressables management to use it.");
+                          "Log in with -vdCommand login (or from Virtuademy > Available Tenants) to use it.");
                 return ExitDone;
             }
             catch (AppConfigurationImporter.SecretNotIgnoredException ex)
@@ -632,17 +833,17 @@ namespace Virtuademy.SDK.Environments.Editor
             }
         }
 
-        private static async Task<int> WorldsAsync()
+        private static async Task<int> WorldsAsync(Options options)
         {
             int code = await RequireSessionAsync();
             if (code != ExitDone)
                 return code;
 
-            code = ConfirmTarget(null, required: false);
+            code = ConfirmTarget(options.Connection, null, required: false);
             if (code != ExitDone)
                 return code;
 
-            WorldListResult listing = await EnvironmentsDeploy.LoadWorldsAsync();
+            WorldListResult listing = await EnvironmentsDeploy.LoadWorldsAsync(connectionKey: targetKey);
             if (listing.Status != WorldListStatus.Ok)
                 return WorldListFailed(listing);
 
@@ -652,10 +853,10 @@ namespace Virtuademy.SDK.Environments.Editor
                 { "label", w.Label },
                 { "canDeploy", listing.Deployable.Any(d => d.Id == w.Id) },
             }).ToList();
-            report["tenantManager"] = EditorLoginState.IsTenantManager;
+            report["tenantManager"] = ConnectionStore.Get(targetKey)?.IsTenantManager ?? false;
 
             // Where each scene is already published: the index the window's rows read.
-            await PublishedEnvironmentsIndex.RefreshAsync(listing.Visible.Select(w => (w.Id, w.Label)));
+            await PublishedEnvironmentsIndex.RefreshAsync(listing.Visible.Select(w => (w.Id, w.Label)), targetKey);
             report["publishedKnown"] = PublishedEnvironmentsIndex.HasData;
             report["tenantLevelVisible"] = PublishedEnvironmentsIndex.HasData && !PublishedEnvironmentsIndex.TenantUnknown;
 
@@ -696,7 +897,7 @@ namespace Virtuademy.SDK.Environments.Editor
             if (code != ExitDone)
                 return code;
 
-            code = ConfirmTarget(options.ExpectTenant, required: false);
+            code = ConfirmTarget(options.Connection, options.ExpectTenant, required: false);
             if (code != ExitDone)
                 return code;
 
@@ -706,7 +907,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             WorldListResult listing = targets.Listing;
 
-            await PublishedEnvironmentsIndex.RefreshAsync(listing.Visible.Select(w => (w.Id, w.Label)));
+            await PublishedEnvironmentsIndex.RefreshAsync(listing.Visible.Select(w => (w.Id, w.Label)), targetKey);
             if (!PublishedEnvironmentsIndex.HasData)
             {
                 string message = "What is already published could not be read from the platform.";
@@ -751,7 +952,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 return code;
 
             // Before the build and before any request that carries the token: which tenant, which platform.
-            code = ConfirmTarget(options.ExpectTenant, required: true);
+            code = ConfirmTarget(options.Connection, options.ExpectTenant, required: true);
             if (code != ExitDone)
                 return code;
 
@@ -823,8 +1024,8 @@ namespace Virtuademy.SDK.Environments.Editor
             try
             {
                 deployed = options.Tenant
-                    ? await EnvironmentsDeploy.DeployToTenantAsync(names, observer)
-                    : await EnvironmentsDeploy.DeployToWorldsAsync(options.Worlds, listing.Deployable, names, observer);
+                    ? await EnvironmentsDeploy.DeployToTenantAsync(names, observer, targetKey)
+                    : await EnvironmentsDeploy.DeployToWorldsAsync(options.Worlds, listing.Deployable, names, observer, targetKey);
             }
             finally
             {
@@ -936,7 +1137,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 return AddressablesNotConfigured();
 
             bool hasScripts = EnvironmentsBuild.HasInterpretedScripts;
-            bool verified = await EnvironmentsBuild.VerifyInterpretedScriptsAsync();
+            bool verified = await EnvironmentsBuild.VerifyInterpretedScriptsAsync(targetKey);
 
             report["interpreter"] = new Dictionary<string, object>
             {
@@ -997,16 +1198,16 @@ namespace Virtuademy.SDK.Environments.Editor
             return ExitDone;
         }
 
-        private const string LoginInstruction = "Log in from Virtuademy > Addressables management (the Login button), then run the command again.";
+        private const string LoginInstruction = "Log in with -vdCommand login (or from Virtuademy > Available Tenants, the Login button), then run the command again.";
 
         /// <summary>Silent renewal only; false when the session cannot be used. Says nothing.</summary>
         private static async Task<bool> TryRenewSessionAsync()
         {
             report["session"] = DescribeSession();
-            if (!EditorLoginState.HasSession)
+            if (ConnectionStore.Get(targetKey)?.HasSession != true)
                 return false;
 
-            bool usable = await EditorSessionManager.EnsureValidTokenAsync(allowInteractive: false);
+            bool usable = await EditorSessionManager.EnsureValidTokenAsync(targetKey, allowInteractive: false);
             report["session"] = DescribeSession();
             return usable;
         }
@@ -1017,7 +1218,7 @@ namespace Virtuademy.SDK.Environments.Editor
             if (await TryRenewSessionAsync())
                 return ExitDone;
 
-            string message = !EditorLoginState.HasSession
+            string message = ConnectionStore.Get(targetKey)?.HasSession != true
                 ? "Not logged in. " + LoginInstruction
                 : "The session expired and could not be renewed silently. " + LoginInstruction;
             Debug.LogError(log_prefix + message);
@@ -1030,25 +1231,50 @@ namespace Virtuademy.SDK.Environments.Editor
         /// against (in the REPORT, before anything is sent), and refuses when that is not what the caller
         /// named or what the login belongs to. <paramref name="expectTenant"/> is compared case-insensitively with
         /// the logged-in tenant's label; <paramref name="required"/> turns a missing one into a refusal (deploy).
-        /// Then the host of the Application API the command will call, which the editor takes from the generated
-        /// <c>PlatformEndpoints</c> asset before the login, has to be the one the logged-in tenant's configuration
-        /// names: the token is only for that one.
+        /// The Application API the command calls is the one the project's active connection's tenant reported at login
+        /// (<see cref="EditorApiEndpoint"/>), so the token cannot go to another platform than its own.
         /// </summary>
-        private static int ConfirmTarget(string expectTenant, bool required)
+        private static int ConfirmTarget(string connection, string expectTenant, bool required)
         {
-            Tenant tenant = EditorLoginState.CurrentTenant;
+            ConnectionRecord record = ConnectionStore.Get(targetKey);
+            Tenant tenant = record?.Tenant;
             string label = tenant?.Label;
-            string callHost = HostOf(EditorApiEndpoint.ApplicationApiUrl);
-            string tenantHost = HostOf(tenant?.Config?.ApplicationApiUrl);
+            string callHost = HostOf(EditorApiEndpoint.ApplicationApiUrlOf(targetKey));
 
             report["target"] = new Dictionary<string, object>
             {
+                { "connection", targetKey },
+                { "configApiHost", HostOf(record?.ConfigApiBaseUrl) },
                 { "tenant", label },
                 { "env", tenant?.Env.ToString() },
                 { "apiHost", callHost },
-                { "tenantConfigApiHost", tenantHost },
                 { "expectedTenant", expectTenant },
+                { "expectedConnection", connection },
             };
+
+            // A connection named on the command line has to be the one the run works on: the project's active one.
+            // The key carries the Configuration-API host, so this is the label-and-host check for a tenant that two
+            // instances may both call "Acme".
+            if (!string.IsNullOrEmpty(connection))
+            {
+                ConnectionRecord named = ConnectionStore.Find(connection, out string findError);
+                if (named == null)
+                {
+                    Debug.LogError(log_prefix + findError);
+                    report["error"] = findError;
+                    return ExitConnectionUnknown;
+                }
+
+                if (!string.Equals(named.Key, targetKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    string message = $"-vdConnection names '{named.Key}' ({named.TenantLabel}), but the project's active connection is " +
+                                     $"'{targetKey ?? "none"}' ({label}). Nothing was built or sent. Make the one you mean the project's by selecting its " +
+                                     "configuration file in Virtuademy > Available Tenants, or name the active one.";
+                    Debug.LogError(log_prefix + message);
+                    report["error"] = message;
+                    return ExitTargetMismatch;
+                }
+            }
 
             string session = $"This session is logged in to tenant '{label}' ({tenant?.Env}), API {callHost ?? "unknown"}.";
 
@@ -1064,21 +1290,10 @@ namespace Virtuademy.SDK.Environments.Editor
             if (expectTenant != null && !string.Equals(expectTenant, label, StringComparison.OrdinalIgnoreCase))
             {
                 string message = $"-vdExpectTenant says '{expectTenant}', but this session is logged in to '{label}'. Nothing was built or sent. " +
-                                 "Log in to the right tenant from Virtuademy > Addressables management, or correct the label.";
+                                 "Log in to the right tenant (-vdCommand login, or Virtuademy > Available Tenants), or correct the label.";
                 Debug.LogError(log_prefix + message);
                 report["error"] = message;
                 return ExitTenantNotConfirmed;
-            }
-
-            if (callHost != null && !string.Equals(callHost, tenantHost, StringComparison.OrdinalIgnoreCase))
-            {
-                string message = $"The Application API this command would call is {callHost} (the generated PlatformEndpoints asset), " +
-                                 $"but the logged-in tenant '{label}' is configured for {tenantHost ?? "no application API"}: the token would go " +
-                                 "to another platform. Nothing was built or sent. Switch the tenant from Virtuademy > Available Tenants " +
-                                 "so the project's generated configuration matches the login.";
-                Debug.LogError(log_prefix + message);
-                report["error"] = message;
-                return ExitApiHostMismatch;
             }
 
             Debug.Log($"{log_prefix}target: tenant '{label}' ({tenant?.Env}), API {callHost ?? "unknown"}.");
@@ -1099,7 +1314,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (options.Tenant)
             {
-                if (!EditorLoginState.IsTenantManager)
+                if (ConnectionStore.Get(targetKey)?.IsTenantManager != true)
                 {
                     string message = "Deploying at tenant level needs a TenantManager login; this one is not.";
                     Debug.LogError(log_prefix + message);
@@ -1111,7 +1326,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 return (ExitDone, listing);
             }
 
-            listing = await EnvironmentsDeploy.LoadWorldsAsync();
+            listing = await EnvironmentsDeploy.LoadWorldsAsync(connectionKey: targetKey);
             if (listing.Status != WorldListStatus.Ok)
                 return (WorldListFailed(listing), listing);
 
@@ -1146,6 +1361,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             return new Dictionary<string, object>
             {
+                { "connection", EditorLoginState.ActiveConnectionKey },
                 { "loggedIn", EditorLoginState.IsLoggedIn },
                 { "tenant", EditorLoginState.CurrentTenant?.Label },
                 { "app", string.IsNullOrEmpty(EditorLoginState.LoggedInApp) ? null : EditorLoginState.LoggedInApp },
@@ -1182,6 +1398,11 @@ namespace Virtuademy.SDK.Environments.Editor
             ExitSecretNotIgnored => "configuration file would not be ignored by git",
             ExitTenantNotConfirmed => "tenant not confirmed",
             ExitApiHostMismatch => "API host does not match the logged-in tenant",
+            ExitTargetMismatch => "target mismatch: the connection named is not the project's active one",
+            ExitConnectionUnknown => "connection unknown",
+            ExitLoginTimeout => "login timed out",
+            ExitLoginFailed => "login failed",
+            ExitStoreNotPersistent => "connection store not persistent on this OS",
             _ => "unknown",
         };
 

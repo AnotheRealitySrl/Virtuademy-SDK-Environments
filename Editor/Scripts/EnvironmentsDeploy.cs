@@ -244,14 +244,17 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <param name="progress">Told what the call is doing ("Checking permissions...").</param>
         /// <param name="onListed">Called with every visible world as soon as the listing arrives, before the roles are
         /// read: the window starts its "where is it published" lookup there.</param>
+        /// <param name="connectionKey">The connection to list for; null is the project's active one, read once here.</param>
         public static async Task<WorldListResult> LoadWorldsAsync(Action<string> progress = null,
-                                                                  Action<IReadOnlyList<PublishableWorld>> onListed = null)
+                                                                  Action<IReadOnlyList<PublishableWorld>> onListed = null,
+                                                                  string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             WorldListResult result = new();
 
             try
             {
-                string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrl;
+                string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
                 if (string.IsNullOrEmpty(applicationApiUrl))
                 {
                     result.Status = WorldListStatus.NoApiUrl;
@@ -261,7 +264,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 string apiUrl = $"{applicationApiUrl}/worlds?api-version=2";
 
-                var response = await EditorSessionManager.SendAuthorizedAsync(
+                var response = await EditorSessionManager.SendAuthorizedAsync(connectionKey, 
                     () => new HttpRequestMessage(HttpMethod.Get, apiUrl), httpClient, allowInteractive: false);
 
                 if (response == null)
@@ -292,7 +295,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     try
                     {
                         string rolesUrl = $"{applicationApiUrl}/worlds/{world.Id}/users/my/roles?api-version=2";
-                        var rolesResponse = await EditorSessionManager.SendAuthorizedAsync(
+                        var rolesResponse = await EditorSessionManager.SendAuthorizedAsync(connectionKey, 
                             () => new HttpRequestMessage(HttpMethod.Get, rolesUrl), httpClient, allowInteractive: false);
 
                         if (rolesResponse == null)
@@ -383,14 +386,18 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <param name="worlds">Where their labels are read from; an id not in it is labelled by the id.</param>
         /// <param name="scenes">The scenes' <see cref="SceneConfiguration.SceneNameFiltered"/> names, whose zips are in the output folder.</param>
         public static async Task<DeployReport> DeployToWorldsAsync(IReadOnlyList<int> worldIds, IReadOnlyList<PublishableWorld> worlds,
-                                                                   IReadOnlyList<string> scenes, DeployObserver observer = null)
+                                                                   IReadOnlyList<string> scenes, DeployObserver observer = null,
+                                                                   string connectionKey = null)
         {
+            // One connection for the whole deploy: the project's active one can change while it runs (the window's
+            // selection, a login), and a token must not follow it to another tenant's host.
+            connectionKey ??= ProjectConnections.ActiveKey;
             DeployReport report = new();
             observer?.Started?.Invoke(report);
             void Fail(string message) { report.Problems++; (observer?.Error ?? (m => Debug.LogError(m)))(message); }
             bool StopBefore(string step) => ShouldStop(report, observer, step);
 
-            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrl;
+            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
             if (string.IsNullOrEmpty(applicationApiUrl))
             {
                 report.Fatal = "No application API URL available.";
@@ -402,7 +409,7 @@ namespace Virtuademy.SDK.Environments.Editor
             // the first call: the renewal can need an interactive login, and that is far less
             // disruptive here than halfway through a multi-world deploy. Every call below still
             // re-checks on its own — this deploy can outlive the token it starts with.
-            if (!await EditorSessionManager.EnsureValidTokenAsync())
+            if (!await EditorSessionManager.EnsureValidTokenAsync(connectionKey))
             {
                 report.Fatal = "Could not establish a valid session. Nothing was deployed.";
                 Fail(report.Fatal);
@@ -434,7 +441,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                     observer?.Progress?.Invoke(progressPrefix, "Getting upload link...", (float)w / totalWorlds);
 
-                    string uploadLink = await GetUploadLinkForWorld(applicationApiUrl, worldId);
+                    string uploadLink = await GetUploadLinkForWorld(applicationApiUrl, worldId, connectionKey);
                     if (string.IsNullOrEmpty(uploadLink))
                     {
                         target.Failure = "failed to get upload link";
@@ -444,7 +451,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                     target.UploadLinkObtained = true;
 
-                    bool useFtp = EditorLoginState.CurrentTenant?.Env == Env.Sandbox;
+                    bool useFtp = ConnectionStore.Get(connectionKey)?.Tenant?.Env == Env.Sandbox;
                     FtpUploadConfig ftpConfig = null;
 
                     if (useFtp)
@@ -470,7 +477,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     // Before the scenes: the archive import resolves the assembly each scene zip
                     // declares, so the assembly has to be registered when the first scene arrives.
                     target.Assemblies = await ImportDeclaredAssembliesAsync(
-                        applicationApiUrl, worldId, worldLabel, scenes, uploadLink, useFtp, ftpConfig, progressPrefix, observer, Fail, StopBefore);
+                        connectionKey, applicationApiUrl, worldId, worldLabel, scenes, uploadLink, useFtp, ftpConfig, progressPrefix, observer, Fail, StopBefore);
 
                     // The ones the platform did not take: not the ones with no bundle to send, which the
                     // scenes may still import against if the assembly is already registered.
@@ -529,7 +536,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                         observer?.Progress?.Invoke(progressPrefix, $"Importing {scene} ({s + 1}/{scenes.Count})...", progress);
 
-                        bool imported = await ImportSceneToWorld(applicationApiUrl, worldId, scene);
+                        bool imported = await ImportSceneToWorld(applicationApiUrl, worldId, scene, connectionKey);
                         outcome.ImportStarted = imported;
                         if (imported)
                         {
@@ -543,7 +550,7 @@ namespace Virtuademy.SDK.Environments.Editor
                         }
                     }
 
-                    await LinkDeclaredAssembliesAsync(applicationApiUrl, worldLabel, worldId, importedScenes, target, Fail, StopBefore);
+                    await LinkDeclaredAssembliesAsync(connectionKey, applicationApiUrl, worldLabel, worldId, importedScenes, target, Fail, StopBefore);
 
                     if (report.Stopped != null)
                     {
@@ -568,14 +575,16 @@ namespace Virtuademy.SDK.Environments.Editor
         /// scripts, and the assembly is neither uploaded nor linked. Stops between scenes on
         /// <see cref="DeployObserver.StopReason"/>, like <see cref="DeployToWorldsAsync"/>.
         /// </summary>
-        public static async Task<DeployReport> DeployToTenantAsync(IReadOnlyList<string> scenes, DeployObserver observer = null)
+        public static async Task<DeployReport> DeployToTenantAsync(IReadOnlyList<string> scenes, DeployObserver observer = null,
+                                                                   string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             DeployReport report = new();
             observer?.Started?.Invoke(report);
             void Fail(string message) { report.Problems++; (observer?.Error ?? (m => Debug.LogError(m)))(message); }
             bool StopBefore(string step) => ShouldStop(report, observer, step);
 
-            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrl;
+            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
             if (string.IsNullOrEmpty(applicationApiUrl))
             {
                 report.Fatal = "Tenant: no application API URL available.";
@@ -584,7 +593,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             // See DeployToWorldsAsync: renew before the uploads, not on the first failure.
-            if (!await EditorSessionManager.EnsureValidTokenAsync())
+            if (!await EditorSessionManager.EnsureValidTokenAsync(connectionKey))
             {
                 report.Fatal = "Tenant: could not establish a valid session. Nothing was deployed.";
                 Fail(report.Fatal);
@@ -605,7 +614,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 observer?.Progress?.Invoke("Deploy to Tenant", "Getting upload link...", 0f);
 
-                string uploadLink = await GetTenantUploadLink(applicationApiUrl);
+                string uploadLink = await GetTenantUploadLink(applicationApiUrl, connectionKey);
                 if (string.IsNullOrEmpty(uploadLink))
                 {
                     target.Failure = "failed to get upload link";
@@ -615,7 +624,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 target.UploadLinkObtained = true;
 
-                bool useFtp = EditorLoginState.CurrentTenant?.Env == Env.Sandbox;
+                bool useFtp = ConnectionStore.Get(connectionKey)?.Tenant?.Env == Env.Sandbox;
                 FtpUploadConfig ftpConfig = null;
 
                 if (useFtp)
@@ -678,7 +687,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                     observer?.Progress?.Invoke("Deploy to Tenant", $"Importing {scene} ({s + 1}/{scenes.Count})...", progress);
 
-                    bool imported = await ImportSceneToTenant(applicationApiUrl, scene);
+                    bool imported = await ImportSceneToTenant(applicationApiUrl, scene, connectionKey);
                     outcome.ImportStarted = imported;
                     if (imported)
                         report.ImportsStarted++;
@@ -747,7 +756,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// can hold back the scenes that need them.
         /// </summary>
         private static async Task<List<AssemblyDeployOutcome>> ImportDeclaredAssembliesAsync(
-            string applicationApiUrl, int worldId, string worldLabel, IReadOnlyList<string> scenes, string uploadLink,
+            string connectionKey, string applicationApiUrl, int worldId, string worldLabel, IReadOnlyList<string> scenes, string uploadLink,
             bool useFtp, FtpUploadConfig ftpConfig, string progressPrefix, DeployObserver observer, Action<string> fail,
             Func<string, bool> stopBefore)
         {
@@ -796,7 +805,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     continue;
                 }
 
-                (bool imported, string reason) = await ImportEnvironmentDll(applicationApiUrl, worldId, Path.GetFileName(zipPath));
+                (bool imported, string reason) = await ImportEnvironmentDll(applicationApiUrl, worldId, Path.GetFileName(zipPath), connectionKey);
                 if (!imported)
                 {
                     outcome.Reason = reason;
@@ -822,7 +831,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// this during the archive import, and repeating it changes nothing; one that predates it
         /// does not, and this is the only call that links its scenes.
         /// </summary>
-        private static async Task LinkDeclaredAssembliesAsync(string applicationApiUrl, string worldLabel, int worldId,
+        private static async Task LinkDeclaredAssembliesAsync(string connectionKey, string applicationApiUrl, string worldLabel, int worldId,
                                                               List<string> scenes, DeployTargetOutcome target, Action<string> fail,
                                                               Func<string, bool> stopBefore)
         {
@@ -848,7 +857,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 SceneDeployOutcome outcome = target.Scenes.FirstOrDefault(o => o.Scene == scene);
 
                 // An empty body clears the link.
-                bool linked = await LinkEnvironmentDll(applicationApiUrl, worldId, scene, assemblyName ?? string.Empty);
+                bool linked = await LinkEnvironmentDll(applicationApiUrl, worldId, scene, assemblyName ?? string.Empty, connectionKey);
                 if (outcome != null)
                     outcome.Linked = linked;
                 if (!linked)
@@ -860,14 +869,15 @@ namespace Virtuademy.SDK.Environments.Editor
 
         #region API calls
 
-        public static async Task<string> GetUploadLinkForWorld(string applicationApiUrl, int worldId)
+        public static async Task<string> GetUploadLinkForWorld(string applicationApiUrl, int worldId, string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/upload-link?api-version=2";
 
             HttpResponseMessage response;
             try
             {
-                response = await EditorSessionManager.SendAuthorizedAsync(
+                response = await EditorSessionManager.SendAuthorizedAsync(connectionKey, 
                     () => new HttpRequestMessage(HttpMethod.Get, apiUrl), httpClient);
             }
             catch (Exception ex)
@@ -895,14 +905,15 @@ namespace Virtuademy.SDK.Environments.Editor
             return uploadLink;
         }
 
-        public static async Task<bool> ImportSceneToWorld(string applicationApiUrl, int worldId, string zipName)
+        public static async Task<bool> ImportSceneToWorld(string applicationApiUrl, int worldId, string zipName, string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environments/archives/import?api-version=2";
 
             HttpResponseMessage response;
             try
             {
-                response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Post, apiUrl)
+                response = await EditorSessionManager.SendAuthorizedAsync(connectionKey, () => new HttpRequestMessage(HttpMethod.Post, apiUrl)
                 {
                     Content = new StringContent($"\"{zipName + ".zip"}\"", Encoding.UTF8, "application/json")
                 }, httpClient);
@@ -1069,13 +1080,14 @@ namespace Virtuademy.SDK.Environments.Editor
             }
         }
 
-        public static async Task<string> GetTenantUploadLink(string applicationApiUrl)
+        public static async Task<string> GetTenantUploadLink(string applicationApiUrl, string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             string apiUrl = $"{applicationApiUrl}/tenants/environments/upload-link?api-version=2";
 
             try
             {
-                var response = await EditorSessionManager.SendAuthorizedAsync(
+                var response = await EditorSessionManager.SendAuthorizedAsync(connectionKey, 
                     () => new HttpRequestMessage(HttpMethod.Get, apiUrl), httpClient);
 
                 if (response == null)
@@ -1106,13 +1118,14 @@ namespace Virtuademy.SDK.Environments.Editor
         /// Imports the uploaded assembly bundle. On failure, <c>Reason</c> says why in one line, for
         /// the deploy panel; the full response still goes to the Console.
         /// </summary>
-        public static async Task<(bool Ok, string Reason)> ImportEnvironmentDll(string applicationApiUrl, int worldId, string zipName)
+        public static async Task<(bool Ok, string Reason)> ImportEnvironmentDll(string applicationApiUrl, int worldId, string zipName, string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environment-dll/import?api-version=2";
 
             try
             {
-                var response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Post, apiUrl)
+                var response = await EditorSessionManager.SendAuthorizedAsync(connectionKey, () => new HttpRequestMessage(HttpMethod.Post, apiUrl)
                 {
                     Content = new StringContent($"\"{zipName}\"", Encoding.UTF8, "application/json")
                 }, httpClient);
@@ -1182,13 +1195,14 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         public static async Task<bool> LinkEnvironmentDll(string applicationApiUrl, int worldId,
-                                                          string catalogName, string assemblyName)
+                                                          string catalogName, string assemblyName, string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environments/catalog/{catalogName}/environment-dll?api-version=2";
 
             try
             {
-                var response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Put, apiUrl)
+                var response = await EditorSessionManager.SendAuthorizedAsync(connectionKey, () => new HttpRequestMessage(HttpMethod.Put, apiUrl)
                 {
                     Content = new StringContent($"\"{assemblyName}\"", Encoding.UTF8, "application/json")
                 }, httpClient);
@@ -1214,13 +1228,14 @@ namespace Virtuademy.SDK.Environments.Editor
             }
         }
 
-        public static async Task<bool> ImportSceneToTenant(string applicationApiUrl, string zipName)
+        public static async Task<bool> ImportSceneToTenant(string applicationApiUrl, string zipName, string connectionKey = null)
         {
+            connectionKey ??= ProjectConnections.ActiveKey;
             string apiUrl = $"{applicationApiUrl}/tenants/environments/archives/import?api-version=2";
 
             try
             {
-                var response = await EditorSessionManager.SendAuthorizedAsync(() => new HttpRequestMessage(HttpMethod.Post, apiUrl)
+                var response = await EditorSessionManager.SendAuthorizedAsync(connectionKey, () => new HttpRequestMessage(HttpMethod.Post, apiUrl)
                 {
                     Content = new StringContent($"\"{zipName + ".zip"}\"", Encoding.UTF8, "application/json")
                 }, httpClient);
