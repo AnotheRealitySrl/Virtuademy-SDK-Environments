@@ -27,6 +27,17 @@ namespace Virtuademy.SDK.Environments.UIKit
     [AddComponentMenu("Virtuademy/UI/Safe Frame")]
     public class SafeFrame : UIDocumentBinder
     {
+        public enum EArea
+        {
+            /// <summary>Clear of every zone: on mobile a centred column between the joystick and the
+            /// jump button. For content in the middle: toasts, dialogs.</summary>
+            Content = 0,
+
+            /// <summary>Up to the side edges, clear of the bars and of the corner controls. For a
+            /// panel anchored to an edge: the HUD.</summary>
+            Edges = 1,
+        }
+
         public enum ETaskHud
         {
             /// <summary>Keep clear of the task HUD when the scene has a TaskUIPlaceholder.</summary>
@@ -37,6 +48,10 @@ namespace Virtuademy.SDK.Environments.UIKit
 
         [SerializeField, Tooltip("Name of the element to inset. Empty: the first element with the class vd-safe-frame.")]
         private string targetElementName;
+
+        [SerializeField, Tooltip("Content: clear of every zone (a centred column on mobile). Edges: up to the " +
+            "side edges, clear of the bars and the corner controls (for a panel at an edge, like the HUD).")]
+        private EArea area = EArea.Content;
 
         [SerializeField, Tooltip("Also keep clear of the task HUD on desktop and WebGL.")]
         private ETaskHud taskHud = ETaskHud.Auto;
@@ -110,7 +125,7 @@ namespace Virtuademy.SDK.Environments.UIKit
             ReservedScreenZones.Insets reserved;
             if (PanelEnvironment.IsMobile)
             {
-                reserved = ReservedScreenZones.Mobile;
+                reserved = area == EArea.Edges ? ReservedScreenZones.MobileEdges : ReservedScreenZones.Mobile;
             }
             else
             {

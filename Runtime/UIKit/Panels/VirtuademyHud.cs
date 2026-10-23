@@ -26,6 +26,11 @@ namespace Virtuademy.SDK.Environments.UIKit
         [SerializeField, Tooltip("Label of the hint button. Empty text and key: no button.")]
         private VirtuademyPanel.LocalizedText hintButtonLabel = new("Hint");
 
+        [SerializeField, Tooltip("Hint the button shows (a second press hides it). Empty text and key: the " +
+            "button only raises On Hint Requested, for a script or graph that picks the hint itself " +
+            "(DisplayHint, IUIApi.SetHudHint).")]
+        private VirtuademyPanel.LocalizedText hintOnRequest = new("Write the hint of this step in the HUD's Hint On Request field.");
+
         [SerializeField, Min(0)] private int maxCount = 5;
         [SerializeField, Min(0)] private int count;
 
@@ -160,10 +165,32 @@ namespace Virtuademy.SDK.Environments.UIKit
         }
 
         /// <summary>The same as pressing the hint button.</summary>
+        /// <remarks>
+        /// With a <see cref="hintOnRequest"/> text the press shows it, or hides it if it is already
+        /// shown; the events are raised either way, after the hint changed.
+        /// </remarks>
         public void RequestHint()
         {
+            string authored = hintOnRequest.Resolve();
+            if (!string.IsNullOrEmpty(authored))
+            {
+                if (hint == authored)
+                {
+                    HideHint();
+                }
+                else
+                {
+                    DisplayHint(authored);
+                }
+            }
             onHintRequested.Invoke();
             PanelEvents.RaiseButtonPressed(this, 0);
+        }
+
+        /// <summary>Sets the hint the button shows, as written; empty makes the button event-only.</summary>
+        public void SetHintOnRequest(string text)
+        {
+            hintOnRequest = new VirtuademyPanel.LocalizedText(text ?? string.Empty);
         }
 
         /// <summary>The title is the counter label; the text is the hint (empty hides it).</summary>

@@ -78,6 +78,9 @@ MonoBehaviour:
   hintButtonLabel:
     key: 
     text: Hint
+  hintOnRequest:
+    key: 
+    text: Write the hint of this step in the HUD's Hint On Request field.
   maxCount: 5
   count: 0
   visibleOnStart: 1
@@ -108,6 +111,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.UIKit.SafeFrame
   document: {fileID: 7108169959968930158}
   targetElementName: 
+  area: 1
   taskHud: 0
   margin: 16
 --- !u!114 &7298931285252426732

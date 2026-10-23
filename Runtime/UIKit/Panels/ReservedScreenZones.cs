@@ -25,7 +25,10 @@ namespace Virtuademy.SDK.Environments.UIKit
     /// from the bottom-left corner) and the jump button (120 px, bottom right) take the lower
     /// corners, so 400 on each side and 48 at the bottom: a centred column runs down to the bottom
     /// edge between the two. The application shows no task HUD on mobile. The device's own safe
-    /// area (notch, home indicator) is added by <see cref="SafeFrame"/>.</item>
+    /// area (notch, home indicator) is added by <see cref="SafeFrame"/>. That centred column is
+    /// <see cref="Mobile"/>; a panel that belongs at an edge (the HUD) uses <see cref="MobileEdges"/>
+    /// instead: 24 at the sides, 112 at the top, and 384 at the bottom, above the joystick (its top
+    /// is 368 px up) and the jump button.</item>
     /// <item><b>VR</b> has no screen: the task HUD and the tablet are world objects, and an overlay
     /// panel floats in front of the user (<see cref="OverlayPanelPlacement"/>).</item>
     /// </list>
@@ -63,10 +66,12 @@ namespace Virtuademy.SDK.Environments.UIKit
         public static readonly Insets DefaultDesktop = new(96f, 216f, 24f, 24f);
         public static readonly Insets DefaultDesktopTaskHud = new(0f, 0f, 640f, 0f);
         public static readonly Insets DefaultMobile = new(112f, 48f, 400f, 400f);
+        public static readonly Insets DefaultMobileEdges = new(112f, 384f, 24f, 24f);
 
         private static Insets? desktop;
         private static Insets? desktopTaskHud;
         private static Insets? mobile;
+        private static Insets? mobileEdges;
 
         /// <summary>Raised when the application publishes or clears its own values.</summary>
         public static event Action Changed;
@@ -81,13 +86,21 @@ namespace Virtuademy.SDK.Environments.UIKit
         public static Insets Mobile => mobile ?? DefaultMobile;
 
         /// <summary>
+        /// On mobile, what an edge panel keeps clear of: the bars and the corner controls, reaching
+        /// the side edges between them.
+        /// </summary>
+        public static Insets MobileEdges => mobileEdges ?? DefaultMobileEdges;
+
+        /// <summary>
         /// The application's own measure of its zones, replacing the defaults. Null keeps a default.
         /// </summary>
-        public static void Publish(Insets? desktopInsets, Insets? desktopTaskHudInsets, Insets? mobileInsets)
+        public static void Publish(Insets? desktopInsets, Insets? desktopTaskHudInsets, Insets? mobileInsets,
+                                   Insets? mobileEdgesInsets = null)
         {
             desktop = desktopInsets;
             desktopTaskHud = desktopTaskHudInsets;
             mobile = mobileInsets;
+            mobileEdges = mobileEdgesInsets;
             Changed?.Invoke();
         }
 
@@ -97,6 +110,7 @@ namespace Virtuademy.SDK.Environments.UIKit
             desktop = null;
             desktopTaskHud = null;
             mobile = null;
+            mobileEdges = null;
             Changed = null;
         }
     }

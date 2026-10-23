@@ -10,7 +10,8 @@ namespace Virtuademy.SDK.Environments.VisualScripting
     /// <summary>
     /// Shows a popup (<see cref="IUIApi.ShowPopup"/>) and continues twice: at once through
     /// <c>Shown</c>, and when the popup closes through <c>Closed</c>, with the index of the button
-    /// pressed (0 for the first, -1 when it closed without one).
+    /// pressed (0 for the first, -1 when it closed without one, or by a click outside it when
+    /// <c>CloseOnOutsideClick</c> is on).
     /// </summary>
     [UnitTitle("Virtuademy UI: Show Popup")]
     [UnitSurtitle("UI")]
@@ -30,6 +31,9 @@ namespace Virtuademy.SDK.Environments.VisualScripting
         /// <summary>Third button; empty: none.</summary>
         [DoNotSerialize] public ValueInput Button3 { get; private set; }
 
+        /// <summary>A click or tap outside the popup closes it (ButtonIndex -1). Off by default.</summary>
+        [DoNotSerialize] public ValueInput CloseOnOutsideClick { get; private set; }
+
         [DoNotSerialize, PortLabelHidden] public ControlInput InputTrigger { get; private set; }
 
         /// <summary>Runs as soon as the popup is shown.</summary>
@@ -48,6 +52,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting
             Button1 = ValueInput<string>(nameof(Button1), "OK");
             Button2 = ValueInput<string>(nameof(Button2), string.Empty);
             Button3 = ValueInput<string>(nameof(Button3), string.Empty);
+            CloseOnOutsideClick = ValueInput(nameof(CloseOnOutsideClick), false);
 
             InputTrigger = ControlInputCoroutine(nameof(InputTrigger), Run);
             Shown = ControlOutput(nameof(Shown));
@@ -80,7 +85,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting
                 {
                     index = i;
                     closed = true;
-                });
+                }, flow.GetValue<bool>(CloseOnOutsideClick));
 
             yield return Shown;
 

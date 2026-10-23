@@ -81,6 +81,9 @@ namespace Virtuademy.SDK.Environments.UIKit
             public float spaceL;
             public float spaceXL;
             public float borderWidth;
+
+            [Tooltip("Seconds of the fade in and out of popups and toasts.")]
+            public float motionFade;
         }
 
         public static readonly ColorRoles DefaultColors = new()
@@ -121,6 +124,7 @@ namespace Virtuademy.SDK.Environments.UIKit
             spaceL = 24,
             spaceXL = 40,
             borderWidth = 2,
+            motionFade = 0.2f,
         };
 
         [SerializeField] private ColorRoles colors = DefaultColors;

@@ -53,6 +53,17 @@ namespace Virtuademy.Environments.ScriptingApi
         /// <remarks>Node: <c>Virtuademy UI: Show Popup</c>.</remarks>
         void ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed = null);
 
+        /// <summary>
+        /// The same, choosing whether a click or tap outside the popup closes it (reporting -1).
+        /// The shorter overload follows the host's setting, off unless the creator turned it on.
+        /// </summary>
+        /// <remarks>
+        /// An overload rather than a new optional parameter, so scripts compiled against the shorter
+        /// signature keep binding. Node: <c>Virtuademy UI: Show Popup</c> (Close On Outside Click).
+        /// </remarks>
+        void ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed,
+                       bool closeOnOutsideClick);
+
         /// <summary>Closes the open popup, if any, reporting -1 to its handler.</summary>
         /// <remarks>Node: <c>Virtuademy UI: Close Popup</c>.</remarks>
         void ClosePopup();

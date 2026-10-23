@@ -44,6 +44,12 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   (continues on Shown and on Closed with the button index), `Close Popup`, `Get Theme Color`. Drawn by the scene's
   `NotificationHost` when it has one, by the application's otherwise. Adding a member to `IVirtuademyGameplay`
   breaks any other implementation of it (the application's is the only one). Warrants a minor bump.
+  Popups and toasts fade in and out over the theme's `--vd-motion-fade` (0.2 s). A popup can close on a click or
+  tap outside it, reporting -1: `NotificationHost.closePopupOnOutsideClick` (off by default), the `ShowPopup`
+  overload with `closeOnOutsideClick`, and the node's Close On Outside Click input. The HUD's hint button shows its
+  `Hint On Request` text (a second press hides it); with that text empty it only raises On Hint Requested.
+  `SafeFrame.area`: `Content` (centred column on mobile) or `Edges` (to the side edges, clear of the bars and the
+  corner controls); the HUD uses Edges and sits at the top right of the frame.
 - **`ILocalizationApi.TranslateOr(key, fallback)`** and the node `Virtuademy Localization: Translate Or`: the
   fallback instead of the raw key when the Localization File has no translation.
 - **`SafeFrame`** keeps a screen panel clear of the application's reserved zones (`ReservedScreenZones`: top bar,

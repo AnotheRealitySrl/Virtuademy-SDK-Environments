@@ -1,10 +1,11 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Theme/VirtuademyTokens.uss?fileID=7433441132597879392&amp;guid=2c158d41b539451e93fbbc82b1e1a638&amp;type=3#VirtuademyTokens" />
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Theme/VirtuademyComponents.uss?fileID=7433441132597879392&amp;guid=26245ff1b5e44829b3690bcbe38b57a8&amp;type=3#VirtuademyComponents" />
-    <!-- VirtuademyHud: counter, progress, hint and hint button, at the right edge of the safe frame.
+    <!-- VirtuademyHud: counter, progress, hint and hint button, at the top right of the safe frame
+         (its SafeFrame uses the Edges area: below the top bar, at the right edge).
          In VR the whole document becomes a floating panel (OverlayPanelPlacement). -->
     <ui:VisualElement name="root" class="vd-root" picking-mode="Ignore" style="position: absolute; left: 0; right: 0; top: 0; bottom: 0;">
-        <ui:VisualElement name="safe-frame" class="vd-safe-frame" picking-mode="Ignore" style="align-items: flex-end; justify-content: center;">
+        <ui:VisualElement name="safe-frame" class="vd-safe-frame" picking-mode="Ignore" style="align-items: flex-end; justify-content: flex-start;">
             <ui:VisualElement name="hud" class="vd-hud" picking-mode="Ignore">
                 <ui:VisualElement class="vd-hud__row" picking-mode="Ignore">
                     <ui:Label name="counter-label" text="Found" class="vd-subtitle" picking-mode="Ignore" style="margin-bottom: 0;" />

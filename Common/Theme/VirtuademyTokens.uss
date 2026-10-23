@@ -41,4 +41,6 @@
     --vd-space-xl: 40px;
 
     --vd-border-width: 2px;
+
+    --vd-motion-fade: 0.2s;
 }

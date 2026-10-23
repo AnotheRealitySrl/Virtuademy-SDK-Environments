@@ -21,8 +21,9 @@ namespace Virtuademy.SDK.Environments.UIKit
     /// </para>
     /// <para>
     /// Toasts stack at the bottom of the safe frame, newest last, at most <see cref="maxToasts"/>;
-    /// the popup is modal: its scrim takes the clicks that would reach the world. Every text is
-    /// shown as given (pass translated text).
+    /// the popup is modal: its scrim takes the clicks that would reach the world, and closes it when
+    /// <see cref="closePopupOnOutsideClick"/> (or the call) says so. Both fade in and out over the
+    /// theme's <c>--vd-motion-fade</c>. Every text is shown as given (pass translated text).
     /// </para>
     /// </remarks>
     [RequireComponent(typeof(UIDocument))]
@@ -31,7 +32,11 @@ namespace Virtuademy.SDK.Environments.UIKit
     public class NotificationHost : UIDocumentBinder
     {
         private const string VisibleClass = "vd-toast--visible";
-        private const float LeaveSeconds = 0.3f;
+        private const string PopupVisibleClass = "vd-popup-scrim--visible";
+
+        // Used when the stylesheet gives no transition: the fade itself is the theme's
+        // --vd-motion-fade, read back from the resolved style.
+        private const long FallbackFadeMs = 250;
 
         private static readonly List<NotificationHost> hosts = new();
 
@@ -50,6 +55,10 @@ namespace Virtuademy.SDK.Environments.UIKit
 
         [SerializeField, Tooltip("Label of the single button of a popup shown without buttons.")]
         private string defaultButtonLabel = "OK";
+
+        [SerializeField, Tooltip("A click or tap outside the popup closes it, reporting -1. A call can " +
+            "decide for itself (IUIApi.ShowPopup with closeOnOutsideClick, the node's input).")]
+        private bool closePopupOnOutsideClick;
 
         [SerializeField, HideInInspector, Tooltip("Set on the application's copy: a host in the scene wins over it.")]
         private bool isApplicationFallback;
@@ -186,12 +195,29 @@ namespace Virtuademy.SDK.Environments.UIKit
             onToastShown.Invoke(text);
         }
 
-        /// <summary>Shows the popup. See <c>IUIApi.ShowPopup</c>.</summary>
+        /// <summary>
+        /// Whether a click outside the popup closes it, when the call does not say. Off by default.
+        /// </summary>
+        public bool ClosePopupOnOutsideClick
+        {
+            get => closePopupOnOutsideClick;
+            set => closePopupOnOutsideClick = value;
+        }
+
+        /// <summary>Shows the popup. See <c>IUIApi.ShowPopup</c>; outside clicks follow <see cref="ClosePopupOnOutsideClick"/>.</summary>
         public void ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed = null)
+            => ShowPopup(title, text, buttons, onClosed, closePopupOnOutsideClick);
+
+        /// <summary>
+        /// Shows the popup. With <paramref name="closeOnOutsideClick"/>, a click or tap on the scrim
+        /// around it closes it and reports -1.
+        /// </summary>
+        public void ShowPopup(string title, string text, string[] buttons, PopupClosedHandler onClosed,
+                              bool closeOnOutsideClick)
         {
             if (!IsBound)
             {
-                pending.Enqueue(() => ShowPopup(title, text, buttons, onClosed));
+                pending.Enqueue(() => ShowPopup(title, text, buttons, onClosed, closeOnOutsideClick));
                 return;
             }
 
@@ -208,6 +234,22 @@ namespace Virtuademy.SDK.Environments.UIKit
             PanelEnvironment.IgnoreExceptControls(popup);
             // The scrim is what makes the popup modal: pickable, it takes the clicks meant for the world.
             popup.pickingMode = PickingMode.Position;
+            // The panel is pickable too, so a click on its body is not a click on the scrim.
+            VisualElement body = popup.Q<VisualElement>("popup");
+            if (body != null)
+            {
+                body.pickingMode = PickingMode.Position;
+            }
+            if (closeOnOutsideClick)
+            {
+                popup.RegisterCallback<ClickEvent>(evt =>
+                {
+                    if (evt.target == popup && openPopup == popup)
+                    {
+                        ClosePopup(-1);
+                    }
+                });
+            }
 
             VisualElement actions = popup.Q<VisualElement>("actions");
             string[] labels = buttons == null || buttons.Length == 0 ? new[] { defaultButtonLabel } : buttons;
@@ -225,6 +267,8 @@ namespace Virtuademy.SDK.Environments.UIKit
             openPopup = popup;
             openPopupHandler = onClosed;
             ThemeApplier.Apply(popup);
+            // One frame later, so the fade runs from the hidden state.
+            popup.schedule.Execute(() => popup.AddToClassList(PopupVisibleClass)).StartingIn(16);
             onPopupOpened.Invoke(title);
         }
 
@@ -237,8 +281,9 @@ namespace Virtuademy.SDK.Environments.UIKit
             {
                 return;
             }
-            openPopup.RemoveFromHierarchy();
+            VisualElement closing = openPopup;
             openPopup = null;
+            FadeOutAndRemove(closing);
             PopupClosedHandler handler = openPopupHandler;
             openPopupHandler = null;
             handler?.Invoke(index);
@@ -275,7 +320,33 @@ namespace Virtuademy.SDK.Environments.UIKit
                 return;
             }
             toast.RemoveFromClassList(VisibleClass);
-            toast.schedule.Execute(toast.RemoveFromHierarchy).StartingIn((long)(LeaveSeconds * 1000f));
+            toast.schedule.Execute(toast.RemoveFromHierarchy).StartingIn(FadeMs(toast));
+        }
+
+        private static void FadeOutAndRemove(VisualElement popup)
+        {
+            // Nothing in it takes clicks while it fades.
+            popup.pickingMode = PickingMode.Ignore;
+            popup.Query<VisualElement>().ForEach(e => e.pickingMode = PickingMode.Ignore);
+            if (popup.panel == null)
+            {
+                popup.RemoveFromHierarchy();
+                return;
+            }
+            popup.RemoveFromClassList(PopupVisibleClass);
+            popup.schedule.Execute(popup.RemoveFromHierarchy).StartingIn(FadeMs(popup));
+        }
+
+        /// <summary>The longest transition the element's style declares, in milliseconds.</summary>
+        private static long FadeMs(VisualElement element)
+        {
+            float longest = -1f;
+            foreach (TimeValue time in element.resolvedStyle.transitionDuration)
+            {
+                float seconds = time.unit == TimeUnit.Millisecond ? time.value / 1000f : time.value;
+                longest = Mathf.Max(longest, seconds);
+            }
+            return longest < 0f ? FallbackFadeMs : (long)(longest * 1000f) + 16;
         }
 
         private static void SetLabel(VisualElement root, string elementName, string text)
