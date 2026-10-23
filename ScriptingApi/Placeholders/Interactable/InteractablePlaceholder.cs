@@ -52,6 +52,26 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             "until the selection is over and the user is not hovering the object.")]
         private bool lockHoverDuringInteraction = false;
 
+        /// <summary>The VR controllers that can interact with an object.</summary>
+        [Flags]
+        public enum EVRInteractionControllers
+        {
+            Ray = 1,
+            Hands = 2,
+        }
+
+        [SerializeField, Tooltip("VR only: the controllers that can hover, select and interact with this object. " +
+            "A controller left out ignores the object entirely: no ray highlight, no hover, no events, no interaction " +
+            "(a click on it with that controller counts as a click on empty space). " +
+            "Grabbing a manipulable is set on the Manipulable placeholder.")]
+        private EVRInteractionControllers vrControllers = (EVRInteractionControllers)~0;
+
+        /// <summary>
+        /// VR only: the controllers that can hover, select and interact with this object. Read once,
+        /// when the object is set up.
+        /// </summary>
+        public EVRInteractionControllers VRControllers { get => vrControllers; set => vrControllers = value; }
+
 
         public bool LockHoverDuringInteraction
         {
