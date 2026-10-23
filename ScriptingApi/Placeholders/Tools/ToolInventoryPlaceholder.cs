@@ -29,6 +29,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             CursorIcon = 0,
             /// <summary>The tool's 3D model is shown in front of the camera, and the pointer stays visible.</summary>
             Model = 1,
+            /// <summary>Both: the icon follows the pointer and the 3D model is shown in front of the camera.</summary>
+            Both = 2,
         }
 
         [HideInInspector] public EToolLayout inventoryLayout = EToolLayout.Radial; //Hide for now --> Display in the future
@@ -64,7 +66,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public InputAction previousToolAction;
 
         [Header("Held tool on desktop and mobile")]
-        [Tooltip("Cursor Icon: the tool's icon follows the pointer. Model: the tool's 3D model is shown in front of the camera.")]
+        [Tooltip("The default for every tool (a tool can override it with its Held Display). Cursor Icon: the tool's icon "
+                 + "follows the pointer. Model: the tool's 3D model is shown in front of the camera, as if in hand. Both: the two together.")]
         public EHeldToolDisplay heldToolDisplay = EHeldToolDisplay.CursorIcon;
 
         [Tooltip("With Model: where the tool's grip point (its Hold Anchor, or the centre of its model) sits, "
