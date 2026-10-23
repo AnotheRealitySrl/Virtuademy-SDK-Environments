@@ -93,6 +93,8 @@ namespace Virtuademy.SDK.Environments.Editor.UIKit
             css.AppendLine($"    --vd-space-xl: {Px(theme.Sizes.spaceXL)};");
             css.AppendLine();
             css.AppendLine($"    --vd-border-width: {Px(theme.Sizes.borderWidth)};");
+            css.AppendLine();
+            css.AppendLine($"    --vd-motion-fade: {theme.Sizes.motionFade.ToString("0.###", CultureInfo.InvariantCulture)}s;");
             css.AppendLine("}");
             return css.ToString();
         }
