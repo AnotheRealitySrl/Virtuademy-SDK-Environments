@@ -18,7 +18,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
     /// runtime hides the current system and initializes (if needed) and shows the new one.
     /// The fields of both systems are serialized, because either one can be activated at runtime.
     /// </summary>
-    public class InventoryPlaceholder : SpawnableHandlerPlaceholder, INetworkPlaceholder
+    public class InventoryPlaceholder : SpawnableHandlerPlaceholder
     {
         public enum EInventoryMode
         {
@@ -35,9 +35,6 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 
         [SerializeField, Tooltip("Which system is active: none, the tools radial menu or the inventory of pickable items. It can be changed at runtime")]
         private EInventoryMode inventoryMode = EInventoryMode.Inventory;
-
-        // Same serialized name as in SceneComponentPlaceholderNetwork, so InventorySlotPlaceholder data carries over
-        [field: SerializeField] public bool IsNetworked { get; set; }
 
         #region Tools
 

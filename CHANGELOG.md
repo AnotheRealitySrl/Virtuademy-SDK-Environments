@@ -18,6 +18,14 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   out of those folders to a normal one (the vendor's own folder, for example), which compiles into `Assembly-CSharp`.
   In the command line it is `ExitBuildFailed` with `build.failure` `FirstpassScripts`, and the components in
   `build.firstpassComponents`. Warrants a minor bump.
+- **`InventoryPlaceholder`** (`ScriptingApi/Placeholders/Pickable/`), one placeholder for the tools radial menu and the
+  inventory of pickable items, with the fields of `ToolInventoryPlaceholder` and `InventorySlotPlaceholder` (same names)
+  and a selector, `InventoryMode`: `None`, `Tools` or `Inventory`. At scene start the app initializes and shows only
+  the selected system; setting `InventoryMode` at runtime (or editing it in the inspector in Play mode) raises
+  `InventoryModeChanged(previous, current)`, on which the app hides the current system and initializes (the first
+  time) and shows the new one. In VR one controller button will open either UI, hence one system at a time. The two
+  old placeholders stay and keep working. Unlike `InventorySlotPlaceholder` it has no `IsNetworked`: the inventory is
+  per user, and the app's network bridge for it only called the same initialization. Warrants a minor bump.
 
 #### Changed
 - **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
