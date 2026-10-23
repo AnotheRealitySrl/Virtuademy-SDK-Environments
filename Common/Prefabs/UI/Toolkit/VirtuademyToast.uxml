@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
     <!-- One toast, cloned by NotificationHost into its toast-stack. No styles of its own: the host
-         document imports the theme. The severity class is added in code: vd-toast--info, -success,
-         -warning or -error. -->
+         document imports the theme. The severity class is added in code: vd-toast with the modifier info,
+         success, warning or error. -->
     <ui:VisualElement name="toast" class="vd-toast" picking-mode="Ignore">
         <ui:Label name="text" text="Message" class="vd-toast__text vd-body" picking-mode="Ignore" />
     </ui:VisualElement>
