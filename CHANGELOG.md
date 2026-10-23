@@ -50,6 +50,11 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   `Hint On Request` text (a second press hides it); with that text empty it only raises On Hint Requested.
   `SafeFrame.area`: `Content` (centred column on mobile) or `Edges` (to the side edges, clear of the bars and the
   corner controls); the HUD uses Edges and sits at the top right of the frame.
+  Popups close by themselves without a timer of the creator's: `ShowPopup(..., closeOnOutsideClick, autoCloseSeconds)`
+  returns the popup's id, its timer belongs to that popup (it can never close a later one, which a delay followed by
+  `ClosePopup()` did), and `ClosePopup(int id)` closes only that popup; `NotificationHost.popupAutoCloseSeconds` is
+  the default (0: never). Nodes: Show Popup has Auto Close Seconds and a Popup Id output, Close Popup a Popup Id
+  input (0: whichever is open, as before).
 - **`ILocalizationApi.TranslateOr(key, fallback)`** and the node `Virtuademy Localization: Translate Or`: the
   fallback instead of the raw key when the Localization File has no translation.
 - **`SafeFrame`** keeps a screen panel clear of the application's reserved zones (`ReservedScreenZones`: top bar,
