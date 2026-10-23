@@ -9,7 +9,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
         {
             VisualScriptingInteractablePlaceholder visualScriptingPlaceholder = target as VisualScriptingInteractablePlaceholder;
 
-            EditorGUILayout.PropertyField(serializedObject.FindProperty("vrVisualScriptingInteraction"));
+            // The VR controllers an object reacts to are set on its Interactable placeholder.
             EditorGUILayout.PropertyField(serializedObject.FindProperty("interactionsScriptMachine"));
 
             EditorGUILayout.PropertyField(serializedObject.FindProperty("desktopAllowedStates"));
