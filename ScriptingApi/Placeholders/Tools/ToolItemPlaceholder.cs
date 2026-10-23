@@ -21,6 +21,19 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         Hold = 2,
     }
 
+    /// <summary>How the held tool is shown on desktop and mobile. VR always shows the tool itself.</summary>
+    public enum EToolHeldDisplay
+    {
+        /// <summary>What the tool inventory sets for every tool (its Held Tool Display).</summary>
+        AsInventory = 0,
+        /// <summary>The tool's icon follows the pointer.</summary>
+        CursorIcon = 1,
+        /// <summary>The tool's 3D model is shown in front of the camera, as if in hand.</summary>
+        Model = 2,
+        /// <summary>Both: the icon follows the pointer and the 3D model is in front of the camera.</summary>
+        Both = 3,
+    }
+
     /// <summary>A <see cref="UnityEvent"/> carrying the seconds since the previous frame of a held use.</summary>
     [Serializable]
     public class ToolUseHeldEvent : UnityEvent<float> { }
@@ -67,10 +80,18 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [Tooltip("The layers the aim ray can hit.")]
         public LayerMask useLayers = ~0;
 
-        [Tooltip("Optional. A child of this object marking where the hand holds the tool: its position "
-                 + "and rotation become the hand's (VR) or the camera-side grip point (desktop and mobile 3D view). "
+        [Header("Hold")]
+        [Tooltip("Optional. A child of this object marking where the right hand holds the tool: in VR the tool appears "
+                 + "with this point at the hand, ready to be grabbed; on desktop and mobile it is the grip point of the 3D view. "
                  + "Empty keeps the hand pivots of the spawnable object.")]
         public Transform holdAnchor;
+
+        [Tooltip("Optional. The same for the left hand (left-handed players in VR). Empty uses Hold Anchor, "
+                 + "then the left hand pivot of the spawnable object.")]
+        public Transform holdAnchorLeft;
+
+        [Tooltip("How the held tool is shown on desktop and mobile. As Inventory uses the tool inventory's setting.")]
+        public EToolHeldDisplay heldDisplay = EToolHeldDisplay.AsInventory;
 
         [Header("Events")]
         [Tooltip("The player took the tool in hand.")]
