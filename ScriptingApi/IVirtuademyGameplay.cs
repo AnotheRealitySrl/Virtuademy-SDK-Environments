@@ -93,5 +93,8 @@ namespace Virtuademy.Environments.ScriptingApi
 
         /// <summary>Toasts, popups and the colours of the theme.</summary>
         IUIApi UI { get; }
+
+        /// <summary>Whether the application's tablet is open, and when it opens and closes.</summary>
+        ITabletApi Tablet { get; }
     }
 }

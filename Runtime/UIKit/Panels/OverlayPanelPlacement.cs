@@ -64,6 +64,22 @@ namespace Virtuademy.SDK.Environments.UIKit
         /// <summary>Whether the panel is in its VR (world-space) form.</summary>
         public bool IsWorldSpace => vr;
 
+        /// <summary>
+        /// In VR, whether the panel's colliders are on, so the controller ray can hit it. Its owner
+        /// turns it on only while the panel shows something to press (an open popup, the HUD's hint
+        /// button): an overlay that floats in front of the user would otherwise catch the ray meant
+        /// for the application's own panels behind it (the tutorial, the tablet), whose buttons the
+        /// ray reaches through colliders too. On by default for panels whose owner does not say.
+        /// </summary>
+        public bool BlocksRay { get; set; } = true;
+
+        [SerializeField, Tooltip("In VR, hide the panel (and let the ray through) while the application's " +
+            "help panel is open: that panel is where the user must point, and it keeps them from moving " +
+            "until it closes.")]
+        private bool vrHideWhileHelpOpen = true;
+
+        private bool hiddenForHelp;
+
         private void Awake()
         {
             document = GetComponent<UIDocument>();
@@ -97,6 +113,9 @@ namespace Virtuademy.SDK.Environments.UIKit
             }
             // The tree may be rebuilt (panel swap, WorldSpaceUIDocumentRebuilder): keep its root sized.
             ApplyRootSize();
+            hiddenForHelp = vrHideWhileHelpOpen && PanelEnvironment.IsHelpOpen;
+            ApplyHelpVisibility();
+            ApplyColliders();
             if (vrFollowHead)
             {
                 Recentre(false);
@@ -132,6 +151,45 @@ namespace Virtuademy.SDK.Environments.UIKit
                 root.style.height = vrSize.y;
             }
         }
+
+        /// <remarks>
+        /// The document's trigger collider is created and resized by UI Toolkit (the SDK world
+        /// PanelSettings use MatchBoundingBox), so it is switched every frame rather than once: a
+        /// collider created later is caught too.
+        /// </remarks>
+        private void ApplyColliders()
+        {
+            bool on = BlocksRay && !hiddenForHelp;
+            GetComponents(colliders);
+            foreach (Collider c in colliders)
+            {
+                if (c.enabled != on)
+                {
+                    c.enabled = on;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Hides the whole tree while the help panel is open. <c>display: none</c> on the root, not
+        /// on the owner's elements, so it does not fight the owner's own show and hide; the content
+        /// (an open popup, the HUD's count) is all there again when the help closes.
+        /// </summary>
+        private void ApplyHelpVisibility()
+        {
+            VisualElement root = document != null ? document.rootVisualElement : null;
+            if (root == null)
+            {
+                return;
+            }
+            DisplayStyle wanted = hiddenForHelp ? DisplayStyle.None : DisplayStyle.Flex;
+            if (root.style.display != wanted)
+            {
+                root.style.display = wanted;
+            }
+        }
+
+        private readonly System.Collections.Generic.List<Collider> colliders = new();
 
         private void Recentre(bool snap)
         {
