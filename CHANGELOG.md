@@ -23,7 +23,10 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   and a selector, `InventoryMode`: `None`, `Tools` or `Inventory`. At scene start the app initializes and shows only
   the selected system; setting `InventoryMode` at runtime (or editing it in the inspector in Play mode) raises
   `InventoryModeChanged(previous, current)`, on which the app hides the current system and initializes (the first
-  time) and shows the new one. In VR one controller button will open either UI, hence one system at a time. The two
+  time) and shows the new one. In VR one controller button will open either UI, hence one system at a time. The
+  Inventory section also carries the VR panel's settings: `inventoryAction` (the input that opens and closes it) and
+  `inventoryZOffset`, `inventoryYOffset`, `inventoryOpenSpeed` (its placement in front of the camera and its opening
+  time), the counterparts of the tools' `action`, `zOffset`, `yOffset` and `openSpeed`. The two
   old placeholders stay and keep working. Unlike `InventorySlotPlaceholder` it has no `IsNetworked`: the inventory is
   per user, and the app's network bridge for it only called the same initialization. Warrants a minor bump.
 

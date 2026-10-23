@@ -78,6 +78,18 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [Tooltip("Whether or not I want the inventory to show how many items the user has of a certain type")]
         public bool showItemCount = true;
 
+        [Tooltip("VR only: the input pressed in order to open and close the inventory panel")]
+        public InputAction inventoryAction;
+
+        [Tooltip("VR only: the distance of the inventory panel from the camera")]
+        public float inventoryZOffset = 0.5f;
+
+        [Tooltip("VR only: the offset of the inventory panel on the camera's y axis")]
+        public float inventoryYOffset = -0.15f;
+
+        [Tooltip("VR only: the time, in seconds, the inventory panel takes to open and close")]
+        public float inventoryOpenSpeed = 0.25f;
+
         #endregion
 
         /// <summary>
