@@ -44,7 +44,7 @@ longer returned).
   (25) is no longer returned (the number stays reserved) and the `target` of the REPORT lists the connection instead of two
   hosts. The messages that sent the user to the Addressables management window for a login now say `-vdCommand login` or
   Virtuademy > Available Tenants.
-- **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and refuse (exit 25, now meaning *target mismatch*) when
+- **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and refuse (exit 30, *target mismatch*) when
   it is not the project's active connection, with nothing built or sent. The run takes the active connection once, when it
   starts, and every request of it (the world list, the script verification, the uploads and imports) goes to that connection;
   the `target` of the REPORT lists the connection and the Configuration-API host. `-vdExpectTenant` still compares the label.
@@ -52,8 +52,8 @@ longer returned).
 - **The Addressables management window keeps its connection per operation.** Build, verify and deploy take the project's
   active connection when they start and use it to the end; the worlds it lists belong to one connection and a deploy refuses
   when the active one changed since. The ticked worlds are kept per project and connection
-  (`Virtuademy_AddressablesManagement_SelectedWorlds_<hash>`): the old machine-wide value, which could tick a PREP world in a
-  production tenant, is no longer read. `EnvironmentsDeploy`, `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync`
+  (`Virtuademy_AddressablesManagement_SelectedWorlds_<hash>`): the old machine-wide value, which could tick a world of another
+  tenant, is no longer read. `EnvironmentsDeploy`, `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync`
   and the hot-update verifier take an optional `connectionKey`.
 - **A run ends from the editor's update loop**, not from the continuation of the async work: the exit code is set when the run
   finishes and the update calls `EditorApplication.Exit`. No `-quit`, as before.

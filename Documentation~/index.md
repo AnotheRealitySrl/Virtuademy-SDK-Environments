@@ -53,7 +53,7 @@ Unity -batchmode -nographics -projectPath <project> -logFile -
 | `connections` | every connection of the store: tenant, environment, user, whether its token is valid, which one the project uses. No network |
 | `whoami [-vdConnection <connection>]` | one connection (the project's active one when none is named); exit 11 when it has no session. Never the token |
 | `tenant-config -vdConfigFile <path> [-vdEnv <key>] [-vdConfigFolder <folder>] [-vdAllowTracked]` | imports the file downloaded from the Back Office into `Assets/Editor/TenantConfiguration`, adds it to the App Assets and selects it; exits 23 when git does not ignore where it would land (it holds the app's secret), unless `-vdAllowTracked` |
-| `worlds [-vdConnection <connection>]` | the worlds the login can deploy to, and where each included scene is already published. `-vdConnection` (also on `preview` and `deploy`) must be the project's active connection, or the command exits 25 and sends nothing |
+| `worlds [-vdConnection <connection>]` | the worlds the login can deploy to, and where each included scene is already published. `-vdConnection` (also on `preview` and `deploy`) must be the project's active connection, or the command exits 30 and sends nothing |
 | `build [-vdScenes a,b]` | verifies the interpreted scripts, builds every platform each included scene needs, zips into `ServerData` |
 | `preview (-vdWorlds <ids> \| -vdTenant) [-vdExpectTenant <label>] [-vdScenes a,b]` | what a deploy there would add and update; checks the tenant label when given |
 | `deploy (-vdWorlds <ids> \| -vdTenant) -vdExpectTenant <label> [-vdBuild] [-vdDryRun] [-vdScenes a,b]` | uploads and imports the built zips (and the interpreted assembly, to worlds); `-vdExpectTenant` is the tenant label the session shows and is mandatory (exit 24 when missing or different); `-vdBuild` builds first, `-vdDryRun` sends nothing |
@@ -76,9 +76,10 @@ Every run ends with a `[EnvironmentsCli] REPORT {json}` line and exits the edito
 1 unexpected, 10 bad arguments, 11 login required, 12 Addressables not configured, 13 nothing to build, 14
 build failed, 15 interpreted scripts refused, 16 world not deployable, 17 deploy finished with problems, 18
 not a tenant manager, 19 configuration file not imported, 20 platform unreachable, 21 timeout, 22 zips
-missing, 23 configuration file would not be ignored by git, 24 tenant not confirmed, 25 target mismatch (`-vdConnection` is
-not the project's active connection), 26 connection unknown, 27 login timed out, 28 login failed, 29 `login` in batch on an OS with
-no encrypted store (the login would end with the process). Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
+missing, 23 configuration file would not be ignored by git, 24 tenant not confirmed, 26 connection unknown, 27 login timed
+out, 28 login failed, 29 `login` in batch on an OS with no encrypted store (the login would end with the process), 30 target
+mismatch (`-vdConnection` is not the project's active connection). 25 (API host not matching the logged-in tenant) is no longer
+returned and stays reserved. Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
 a deploy lets the step in flight finish and reports what was and was not done. Batch mode never starts an interactive login on its own: log in once with `login` (or from **Virtuademy > Available Tenants**), and the
 commands renew the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list
 (`Assets/Virtuademy/Editor/Settings/AddressablesSceneList.asset`). Details: the class's XML documentation.

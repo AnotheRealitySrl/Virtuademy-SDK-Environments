@@ -432,7 +432,7 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         // The old key held one machine-wide value: the same ids were ticked again in any tenant and any project,
-        // and a tick left from PREP once sent a production deploy to prod world 44. The ticks belong to a
+        // and a tick left from another tenant once sent a deploy to the wrong world. The ticks belong to a
         // connection of a project now, and the old value is no longer read.
         private const string SELECTED_WORLDS_KEY_BASE = "Virtuademy_AddressablesManagement_SelectedWorlds";
 

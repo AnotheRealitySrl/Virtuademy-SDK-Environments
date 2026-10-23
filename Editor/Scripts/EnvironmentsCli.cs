@@ -89,7 +89,7 @@ namespace Virtuademy.SDK.Environments.Editor
     /// becomes meanwhile. They take its Application API address from the tenant that connection reported at login, never from
     /// the project's generated <c>PlatformEndpoints</c> asset: a token is sent to the host of the connection it belongs to.
     /// <c>-vdConnection &lt;connection&gt;</c> (on those three) names the connection the caller means and exits with
-    /// <see cref="ExitApiHostMismatch"/> (target mismatch) when it is not the active one. The REPORT
+    /// <see cref="ExitTargetMismatch"/> when it is not the active one. The REPORT
     /// of those three commands carries a <c>target</c> object: the connection, the tenant label, its environment and
     /// the API host.
     /// </para>
@@ -194,9 +194,9 @@ namespace Virtuademy.SDK.Environments.Editor
         public const int ExitTenantNotConfirmed = 24;
 
         /// <summary>
-        /// Target mismatch: <c>-vdConnection</c> names a connection that is not the project's active one. (Until ADR 0037 it meant that the
-        /// Application API address of the project's generated asset was on another host than the login's; the address now comes from the
-        /// connection, so that case cannot happen and the number says "wrong target" instead.)
+        /// No longer returned, and reserved: the Application API address of the project's generated asset was on another host than the
+        /// login's. The address comes from the connection since ADR 0037, so that case cannot happen. Scripts written for earlier versions
+        /// read 25 with that meaning, so the number is not reused.
         /// </summary>
         public const int ExitApiHostMismatch = 25;
 
@@ -211,6 +211,9 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary><c>login</c> in batch mode where the store cannot be written (no encryption on this OS yet): the session would die with the process.</summary>
         public const int ExitStoreNotPersistent = 29;
+
+        /// <summary>Target mismatch: <c>-vdConnection</c> names a connection that is not the project's active one. Nothing was built or sent.</summary>
+        public const int ExitTargetMismatch = 30;
 
         private const string log_prefix = "[EnvironmentsCli] ";
         private const int default_timeout_minutes = 60;
@@ -1269,7 +1272,7 @@ namespace Virtuademy.SDK.Environments.Editor
                                      "configuration file in Virtuademy > Available Tenants, or name the active one.";
                     Debug.LogError(log_prefix + message);
                     report["error"] = message;
-                    return ExitApiHostMismatch;
+                    return ExitTargetMismatch;
                 }
             }
 
@@ -1394,7 +1397,8 @@ namespace Virtuademy.SDK.Environments.Editor
             ExitZipsMissing => "zips missing",
             ExitSecretNotIgnored => "configuration file would not be ignored by git",
             ExitTenantNotConfirmed => "tenant not confirmed",
-            ExitApiHostMismatch => "target mismatch: the connection named is not the project's active one",
+            ExitApiHostMismatch => "API host does not match the logged-in tenant",
+            ExitTargetMismatch => "target mismatch: the connection named is not the project's active one",
             ExitConnectionUnknown => "connection unknown",
             ExitLoginTimeout => "login timed out",
             ExitLoginFailed => "login failed",
