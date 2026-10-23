@@ -44,6 +44,10 @@ namespace Virtuademy.SDK.Environments.UIKit
         [SerializeField, Tooltip("Height of the panel centre relative to the eyes in VR, in metres.")]
         private float vrHeightOffset = -0.15f;
 
+        [SerializeField, Tooltip("Sideways offset of the panel centre in VR, in metres (positive: to the right). " +
+            "Keeps a HUD beside the popups instead of behind them.")]
+        private float vrSideOffset;
+
         [SerializeField, Tooltip("In VR, follow the head. Off: placed once in front of the user when enabled.")]
         private bool vrFollowHead = true;
 
@@ -76,6 +80,7 @@ namespace Virtuademy.SDK.Environments.UIKit
                 document.worldSpaceSize = vrSize;
                 document.pivot = Pivot.Center;
                 transform.localScale = Vector3.one;
+                ApplyRootSize();
                 Recentre(true);
             }
             else if (screenPanelSettings != null && document.panelSettings != screenPanelSettings)
@@ -86,7 +91,13 @@ namespace Virtuademy.SDK.Environments.UIKit
 
         private void LateUpdate()
         {
-            if (vr && vrFollowHead)
+            if (!vr)
+            {
+                return;
+            }
+            // The tree may be rebuilt (panel swap, WorldSpaceUIDocumentRebuilder): keep its root sized.
+            ApplyRootSize();
+            if (vrFollowHead)
             {
                 Recentre(false);
             }
@@ -98,6 +109,27 @@ namespace Virtuademy.SDK.Environments.UIKit
             if (vr)
             {
                 Recentre(true);
+            }
+        }
+
+        /// <summary>
+        /// Gives the document's root the VR size in panel pixels. The SDK templates lay their content
+        /// out in absolutely positioned layers that fill the root, so a root sized by its content (what
+        /// a document gets in world space when the fixed size does not reach it) is 0×0, and every
+        /// text wraps to one letter per line. Setting the size on the root itself does not depend on
+        /// that.
+        /// </summary>
+        private void ApplyRootSize()
+        {
+            VisualElement root = document != null ? document.rootVisualElement : null;
+            if (root == null)
+            {
+                return;
+            }
+            if (root.style.width.value.value != vrSize.x || root.style.height.value.value != vrSize.y)
+            {
+                root.style.width = vrSize.x;
+                root.style.height = vrSize.y;
             }
         }
 
@@ -116,7 +148,9 @@ namespace Virtuademy.SDK.Environments.UIKit
             }
             forward.Normalize();
 
-            Vector3 targetPosition = head.position + forward * vrDistance + Vector3.up * vrHeightOffset;
+            Vector3 right = Vector3.Cross(Vector3.up, forward);
+            Vector3 targetPosition = head.position + forward * vrDistance + Vector3.up * vrHeightOffset
+                                     + right * vrSideOffset;
             Quaternion targetRotation = Quaternion.LookRotation(forward, Vector3.up);
 
             if (snap)
