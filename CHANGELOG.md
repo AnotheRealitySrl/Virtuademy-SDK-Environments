@@ -29,6 +29,14 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   time), the counterparts of the tools' `action`, `zOffset`, `yOffset` and `openSpeed`. The two
   old placeholders stay and keep working. Unlike `InventorySlotPlaceholder` it has no `IsNetworked`: the inventory is
   per user, and the app's network bridge for it only called the same initialization. Warrants a minor bump.
+  It also carries `pickedToolsShared` (as on `ToolInventoryPlaceholder`) and `startingItems` (as on
+  `InventorySlotPlaceholder`). Without an `inventoryAction`, B/Y (the secondary button of either hand) opens the VR
+  panel.
+
+- **The inventory changes during the experience**, from scripts and Visual Scripting. `InventoryPlaceholder.SetSlotCounts(wearSlots,
+  inventorySlots)` gives it more slots (counts only grow; it raises `SlotCountsChanged`), beside the `InventoryMode`
+  setter. Two nodes: **Virtuademy Inventory: Set Mode** (`SetInventoryModeNode`) and **Virtuademy Inventory: Set Slot
+  Counts** (`SetInventorySlotCountsNode`). Additive; warrants a minor bump.
 
 - **The Virtuademy theme** (`Common/Theme/`, `Runtime/UIKit/Theme/`). `VirtuademyTheme.asset` holds the colour
   roles (`EThemeRole`: surface, raised surface, border, text, secondary text, action, text on action, success,

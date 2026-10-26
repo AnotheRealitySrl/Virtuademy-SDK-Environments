@@ -107,6 +107,32 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// </summary>
         public event Action<EInventoryMode, EInventoryMode> InventoryModeChanged;
 
+        /// <summary>
+        /// Raised by <see cref="SetSlotCounts"/> when a slot count grows.
+        /// </summary>
+        public event Action SlotCountsChanged;
+
+        /// <summary>
+        /// Gives the inventory more slots during the experience (for example a slot unlocked by a task). Counts only
+        /// grow: a value below the current one is ignored, since the slots may hold items. Takes effect at once when
+        /// the inventory is shown, otherwise when it is first shown.
+        /// </summary>
+        /// <remarks>Node: <c>Virtuademy Inventory: Set Slot Counts</c>.</remarks>
+        public void SetSlotCounts(int wearSlots, int inventorySlots)
+        {
+            bool grows = wearSlots > wearSlotsCount || inventorySlots > inventorySlotsCount;
+            wearSlotsCount = Mathf.Max(wearSlotsCount, wearSlots);
+            inventorySlotsCount = Mathf.Max(inventorySlotsCount, inventorySlots);
+            if (grows)
+            {
+                SlotCountsChanged?.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// The active system; set it during the experience to switch (see <see cref="InventoryModeChanged"/>).
+        /// </summary>
+        /// <remarks>Node: <c>Virtuademy Inventory: Set Mode</c>.</remarks>
         public EInventoryMode InventoryMode
         {
             get => inventoryMode;
