@@ -1,5 +1,3 @@
-using System;
-
 using UnityEngine;
 
 namespace Virtuademy.Environments.ScriptingApi
@@ -18,7 +16,7 @@ namespace Virtuademy.Environments.ScriptingApi
         /// </summary>
         /// <remarks>Node: <c>Virtuademy general: Spawn Feedback</c>. WebGL only, as the node says.</remarks>
         void ShowAnswerFeedback(Transform where, bool correct);
-
+    
         /// <summary>
         /// Closes the contextual menu if one is open. A world calls it before showing something of
         /// its own in the same place.
@@ -37,45 +35,5 @@ namespace Virtuademy.Environments.ScriptingApi
         /// <c>Virtuademy inventory: AddPickableToInventoryNode</c>.
         /// </remarks>
         bool AddPickableToInventory(GameObject pickable);
-
-        /// <summary>
-        /// The item name of the tool the local player holds, or an empty string when the hand is
-        /// empty or the scene has no tool inventory.
-        /// </summary>
-        /// <remarks>Node: <c>Virtuademy Tools: Get Held Tool</c>.</remarks>
-        string HeldToolName { get; }
-
-        /// <summary>
-        /// Puts the tool with this item name in the local player's hand, as if the player had
-        /// picked it from the wheel. True when the tool is held afterwards (also when it already
-        /// was); false when the scene has no tool inventory or none of its tools has that name.
-        /// </summary>
-        /// <remarks>
-        /// The application never switches tools on its own: call this only in answer to something
-        /// the player did. Node: <c>Virtuademy Tools: Equip Tool</c>.
-        /// </remarks>
-        bool EquipTool(string toolName);
-
-        /// <summary>Empties the local player's hand. Does nothing when it is already empty.</summary>
-        /// <remarks>Node: <c>Virtuademy Tools: Unequip Tool</c>.</remarks>
-        void UnequipTool();
-
-        /// <summary>The local player took a tool in hand; carries its item name.</summary>
-        /// <remarks>Node: <c>Virtuademy Tools: On Tool Equipped</c>.</remarks>
-        event Action<string> ToolEquipped;
-
-        /// <summary>The local player put a tool away, or switched from it; carries its item name.</summary>
-        /// <remarks>Node: <c>Virtuademy Tools: On Tool Unequipped</c>.</remarks>
-        event Action<string> ToolUnequipped;
-
-        /// <summary>
-        /// The local player used the held tool: a use started (a tool with a use mode), or the tool
-        /// was applied to an item trigger detector. Carries its item name.
-        /// </summary>
-        /// <remarks>
-        /// Per-use detail (held time, the object aimed at, uses left) is on the tool's
-        /// <c>ToolItemPlaceholder</c> events. Node: <c>Virtuademy Tools: On Tool Used</c>.
-        /// </remarks>
-        event Action<string> ToolUsed;
-    }
+}
 }

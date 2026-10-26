@@ -1,8 +1,5 @@
-﻿using System;
-
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Events;
-using UnityEngine.InputSystem;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -10,46 +7,34 @@ using UnityEditor;
 
 namespace Virtuademy.Environments.ScriptingApi.Placeholders
 {
-    /// <summary>How the player uses a held tool.</summary>
+    /// <summary>How the player uses a tool held in the hand.</summary>
     public enum EToolUseMode
     {
-        /// <summary>The tool has no use action: holding it is all it does (the behaviour before 2026.7).</summary>
+        /// <summary>The tool has no use: holding it is all it does (the behaviour before 2026.7).</summary>
         None = 0,
-        /// <summary>Each press is one use: started and ended fire together.</summary>
+        /// <summary>Each press of the use key is one use.</summary>
         Click = 1,
-        /// <summary>A use lasts while the action is held: started, held every frame, ended on release.</summary>
+        /// <summary>A use starts on press and ends on release (On Use Ended).</summary>
         Hold = 2,
     }
 
-    /// <summary>How the held tool is shown on desktop and mobile. VR always shows the tool itself.</summary>
-    public enum EToolHeldDisplay
+    /// <summary>Multiplayer: whose wheel a tool goes to when a player picks it up.</summary>
+    public enum EToolPickupSharing
     {
-        /// <summary>What the tool inventory sets for every tool (its Held Tool Display).</summary>
+        /// <summary>What the tool inventory says (its Picked Tools Shared).</summary>
         AsInventory = 0,
-        /// <summary>The tool's icon follows the pointer.</summary>
-        CursorIcon = 1,
-        /// <summary>The tool's 3D model is shown in front of the camera, as if in hand.</summary>
-        Model = 2,
-        /// <summary>Both: the icon follows the pointer and the 3D model is in front of the camera.</summary>
-        Both = 3,
+        /// <summary>Only the wheel of the player who picked it up.</summary>
+        PickerOnly = 1,
+        /// <summary>Every player's wheel, also players who join later.</summary>
+        Everyone = 2,
     }
 
-    /// <summary>A <see cref="UnityEvent"/> carrying the seconds since the previous frame of a held use.</summary>
-    [Serializable]
-    public class ToolUseHeldEvent : UnityEvent<float> { }
-
-    /// <summary>A <see cref="UnityEvent"/> carrying the object a tool was used on.</summary>
-    [Serializable]
-    public class ToolTargetEvent : UnityEvent<GameObject> { }
-
-    /// <summary>
-    /// A tool of the tool inventory. The object it sits on is the tool the player sees; its
-    /// <see cref="PickablePlaceholder"/> gives the name, icon and number of uses.
-    /// </summary>
     /// <remarks>
-    /// The events fire only for the local player, on this scene object, whatever copy of the tool
-    /// the application shows in the player's hand. The application raises them: the
-    /// <c>Notify*</c> methods are not meant to be called by an environment.
+    /// With a use mode, the tool in the player's hand is used with the platform's single use key
+    /// (desktop left click or F, mobile tap or press, VR trigger of the holding hand). Each use spends
+    /// one of the Pickable's Number Of Uses and raises the Pickable's On Item Used, and On Item Expired
+    /// when the last one is spent; a Hold use also raises On Use Ended on release. The events fire for
+    /// the local player only.
     /// </remarks>
     [RequireComponent(typeof(PickablePlaceholder))]
     public class ToolItemPlaceholder : SceneComponentPlaceholderNetwork
@@ -65,117 +50,18 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             }
         }
 
-        [Header("Use")]
-        [Tooltip("How the player uses the tool while holding it. None keeps the tool passive.")]
+        [Tooltip("How the player uses the tool in the hand with the platform's use key. None: no use (as before 2026.7).")]
         public EToolUseMode useMode = EToolUseMode.None;
 
-        [Tooltip("The input that uses the tool. Leave it without bindings for the platform default: "
-                 + "the trigger of the holding hand in VR, the left mouse button or F on desktop, a tap on mobile.")]
-        public InputAction useAction;
-
-        [Tooltip("How far, in metres, the aim ray looks for the object the tool is used on.")]
-        [Min(0f)]
-        public float useRange = 3f;
-
-        [Tooltip("The layers the aim ray can hit.")]
-        public LayerMask useLayers = ~0;
-
-        [Header("Hold")]
-        [Tooltip("Optional. A child of this object marking where the right hand holds the tool: in VR the tool appears "
-                 + "with this point at the hand, ready to be grabbed; on desktop and mobile it is the grip point of the 3D view. "
-                 + "Empty keeps the hand pivots of the spawnable object.")]
-        public Transform holdAnchor;
-
-        [Tooltip("Optional. The same for the left hand (left-handed players in VR). Empty uses Hold Anchor, "
-                 + "then the left hand pivot of the spawnable object.")]
-        public Transform holdAnchorLeft;
-
-        [Tooltip("How the held tool is shown on desktop and mobile. As Inventory uses the tool inventory's setting.")]
-        public EToolHeldDisplay heldDisplay = EToolHeldDisplay.AsInventory;
-
-        [Header("Events")]
-        [Tooltip("The player took the tool in hand.")]
-        public UnityEvent onEquipped = new();
-
-        [Tooltip("The player put the tool away, or switched to another one.")]
-        public UnityEvent onUnequipped = new();
-
-        [Tooltip("A use started. With Click it is followed at once by On Use Ended.")]
-        public UnityEvent onUseStarted = new();
-
-        [Tooltip("Every frame of a Hold use, with the seconds since the previous frame.")]
-        public ToolUseHeldEvent onUseHeld = new();
-
-        [Tooltip("A use ended.")]
+        [Tooltip("Hold only: the use key was released. The use itself raises the Pickable's On Item Used.")]
         public UnityEvent onUseEnded = new();
 
-        [Tooltip("A use started while the aim ray hit an object within Use Range.")]
-        public ToolTargetEvent onUsedOnTarget = new();
+        [Tooltip("Desktop and mobile: also show the tool's 3D model in front of the camera, as if in hand, while it is held. "
+                 + "The Pickable's icon still follows the pointer when it has one. Off: icon only (as before 2026.7).")]
+        public bool showModelInHand = false;
 
-        [Tooltip("The last of the tool's uses was spent (Number Of Uses on the Pickable).")]
-        public UnityEvent onUsesFinished = new();
-
-        /// <summary>Whether the local player is holding this tool.</summary>
-        public bool IsEquipped { get; private set; }
-
-        /// <summary>Whether a use is in progress (always false between uses of a Click tool).</summary>
-        public bool IsInUse { get; private set; }
-
-        /// <summary>
-        /// What the aim ray hit when the current or last use started or was last held, or null.
-        /// </summary>
-        public GameObject AimTarget { get; private set; }
-
-        /// <summary>Uses left; -1 means unlimited.</summary>
-        public int RemainingUses { get; private set; } = -1;
-
-        /// <summary>Called by the application.</summary>
-        public void NotifyEquipped(int remainingUses)
-        {
-            IsEquipped = true;
-            RemainingUses = remainingUses;
-            onEquipped?.Invoke();
-        }
-
-        /// <summary>Called by the application.</summary>
-        public void NotifyUnequipped()
-        {
-            IsEquipped = false;
-            IsInUse = false;
-            onUnequipped?.Invoke();
-        }
-
-        /// <summary>Called by the application.</summary>
-        public void NotifyUseStarted(GameObject target, int remainingUses)
-        {
-            IsInUse = true;
-            AimTarget = target;
-            RemainingUses = remainingUses;
-            onUseStarted?.Invoke();
-            if (target != null)
-                onUsedOnTarget?.Invoke(target);
-        }
-
-        /// <summary>Called by the application.</summary>
-        public void NotifyUseHeld(float deltaTime, GameObject target)
-        {
-            AimTarget = target;
-            onUseHeld?.Invoke(deltaTime);
-        }
-
-        /// <summary>Called by the application.</summary>
-        public void NotifyUseEnded()
-        {
-            IsInUse = false;
-            onUseEnded?.Invoke();
-        }
-
-        /// <summary>Called by the application.</summary>
-        public void NotifyUsesFinished()
-        {
-            RemainingUses = 0;
-            onUsesFinished?.Invoke();
-        }
+        [Tooltip("Multiplayer: whose wheel the tool goes to when a player picks it up. As Inventory uses the tool inventory's setting.")]
+        public EToolPickupSharing pickupSharing = EToolPickupSharing.AsInventory;
     }
 
 #if UNITY_EDITOR
@@ -196,3 +82,5 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
     }
 #endif
 }
+
+
