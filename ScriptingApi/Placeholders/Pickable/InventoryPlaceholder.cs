@@ -59,6 +59,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [Tooltip("the input pressed in order to open and close the radialMenu")]
         public InputAction action;
 
+        [Tooltip("Multiplayer: a tool a player picks up during the experience goes to every player's wheel "
+                 + "(also players who join later). Off: only to the wheel of the player who picked it up. "
+                 + "A tool can override this with its Pickup Sharing.")]
+        public bool pickedToolsShared = false;
+
         [Tooltip("Whether or not you want to show the hand item in the inventory, used to remove items instead of clicking on the same item again")]
         [HideInInspector] public bool displayEmptyHand;
         [HideInInspector] public Sprite emptyHandSprite;
@@ -77,6 +82,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 
         [Tooltip("Whether or not I want the inventory to show how many items the user has of a certain type")]
         public bool showItemCount = true;
+
+        [Tooltip("Items each player has in the inventory from the start, routed as if picked up: a Wearable to the "
+                 + "wear slots, a tool to the tool wheel, anything else to the inventory. Use prefabs (or objects that are "
+                 + "not in the scene): an object listed here is not removed from the scene.")]
+        public List<PickablePlaceholder> startingItems = new();
 
         [Tooltip("VR only: the input pressed in order to open and close the inventory panel")]
         public InputAction inventoryAction;
