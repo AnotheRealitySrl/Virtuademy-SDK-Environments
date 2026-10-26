@@ -3,9 +3,27 @@
 ## Unreleased
 
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
-classes kept as `[Obsolete]` shells. No public member removed or renamed.
+classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four
+`EnvironmentsCli` commands, one option on every command and three exit codes (minor, additive; `ExitApiHostMismatch` stays defined and is no
+longer returned).
 
 #### Added
+- **`EnvironmentsCli` commands `login`, `logout`, `connections` and `whoami`** (meta-repo ADR 0037, first slice), over the
+  per-user connection store of `Virtuademy-SDK-Core`. `login [-vdConnection <connection> | -vdApp <app> [-vdEnv <key>]]
+  [-vdNoBrowser] [-vdLoginTimeoutSeconds <n>]` logs in to a connection of the store, or to the one of a configuration file
+  of the project (added to the store when it is new). It is the one command that wants a browser: it prints
+  `AUTH_URL <url>` the moment it has it, opens the system browser unless `-vdNoBrowser`, and gives up 180 s (or
+  `-vdLoginTimeoutSeconds`) after the URL is issued with the new exit code 27. `logout`, `connections` (needs no network) and
+  `whoami` (exit 11 when there is no session) answer from the store; `connections` and `whoami` are also in the store's
+  `status.json` (`%LOCALAPPDATA%\Virtuademy\SDK\`), readable without starting Unity. A connection is named by its key, its
+  tenant key, its tenant label or `app/env`; one that fits none or several is exit 26. New exit codes: 26 connection unknown,
+  27 login timed out, 28 login failed.
+- **`-vdResultFile <path>`, on every command**: the REPORT (and only it, never the editor log) is also written to that file
+  with `state: done`, replaced whole. A `login` writes the file first with `state: awaiting-browser` and the URL, so a script
+  can show it while the command waits.
+- **An open editor answers requests too**: while the editor has the project open Unity refuses a batch run on it, so a script
+  drops a request file in `UserSettings/Virtuademy/requests/` and the editor runs `login`, `logout` or `status` (see
+  `Virtuademy-SDK-Core`, `EditorRequestPump`).
 - **The build refuses an environment whose scripts compile into `Assembly-CSharp-firstpass`.** A component binds in
   the app only if the app has a class with the same assembly, namespace and name, and the app has no
   `Assembly-CSharp-firstpass` (nor `Assembly-UnityScript-firstpass` or `Assembly-CSharp-Editor-firstpass`): scripts
@@ -20,6 +38,26 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   `build.firstpassComponents`. Warrants a minor bump.
 
 #### Changed
+- **The CLI works on the project's active connection and takes its Application API address from it.** The session, `worlds`,
+  `preview` and `deploy` use the connection the project last logged in to (`session` reports its key); the address comes from the
+  tenant that connection reported at login, not from the project's generated `PlatformEndpoints` asset, so `ExitApiHostMismatch`
+  (25) is no longer returned (the number stays reserved) and the `target` of the REPORT lists the connection instead of two
+  hosts. The messages that sent the user to the Addressables management window for a login now say `-vdCommand login` or
+  Virtuademy > Available Tenants.
+- **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and refuse (exit 30, *target mismatch*) when
+  it is not the project's active connection, with nothing built or sent. The name is checked before the session, so a run
+  aimed at another connection gets 30 even when the active one has no session, not a request to log in. The run takes the active connection once, when it
+  starts, and every request of it (the world list, the script verification, the uploads and imports) goes to that connection;
+  the `target` of the REPORT lists the connection and the Configuration-API host. `-vdExpectTenant` still compares the label.
+  A `login` in batch mode on an OS with no encrypted store is exit 29.
+- **The Addressables management window keeps its connection per operation.** Build, verify and deploy take the project's
+  active connection when they start and use it to the end; the worlds it lists belong to one connection and a deploy refuses
+  when the active one changed since. The ticked worlds are kept per project and connection
+  (`Virtuademy_AddressablesManagement_SelectedWorlds_<hash>`): the old machine-wide value, which could tick a world of another
+  tenant, is no longer read. `EnvironmentsDeploy`, `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync`
+  and the hot-update verifier take an optional `connectionKey`.
+- **A run ends from the editor's update loop**, not from the continuation of the async work: the exit code is set when the run
+  finishes and the update calls `EditorApplication.Exit`. No `-quit`, as before.
 - **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
   Virtuademy app ships. A creator project now gets them with the SDK, at the app's versions, so the NavMesh, rig
   and spline components of an environment carry the fields the app reads. A project that lists one of them at

@@ -47,21 +47,42 @@ Unity -batchmode -nographics -projectPath <project> -logFile -
 | Command | What it does |
 |---|---|
 | `status` | the session, whether the Addressables are configured, the scene list and the interpreter. No network |
-| `session [-vdRenew]` | the session fields; with `-vdRenew` renews an expired session silently, or exits 11 |
+| `session [-vdRenew]` | the session fields of the project's active connection; with `-vdRenew` renews an expired session silently, or exits 11 |
+| `login [-vdConnection <connection> \| -vdApp <app> [-vdEnv <key>]] [-vdNoBrowser] [-vdLoginTimeoutSeconds <n>]` | logs in to a connection of the per-user store, or to the one of a configuration file of the project (added to the store when it is new). Prints `AUTH_URL <url>` as soon as it has it and opens the browser unless `-vdNoBrowser`; gives up 180 s after the URL (exit 27) |
+| `logout [-vdConnection <connection>]` | ends the connection's session (the Azure account stays while another connection uses it) |
+| `connections` | every connection of the store: tenant, environment, user, whether its token is valid, which one the project uses. No network |
+| `whoami [-vdConnection <connection>]` | one connection (the project's active one when none is named); exit 11 when it has no session. Never the token |
 | `tenant-config -vdConfigFile <path> [-vdEnv <key>] [-vdConfigFolder <folder>] [-vdAllowTracked]` | imports the file downloaded from the Back Office into `Assets/Editor/TenantConfiguration`, adds it to the App Assets and selects it; exits 23 when git does not ignore where it would land (it holds the app's secret), unless `-vdAllowTracked` |
-| `worlds` | the worlds the login can deploy to, and where each included scene is already published |
+| `worlds [-vdConnection <connection>]` | the worlds the login can deploy to, and where each included scene is already published. `-vdConnection` (also on `preview` and `deploy`) must be the project's active connection, or the command exits 30 and sends nothing |
 | `build [-vdScenes a,b]` | verifies the interpreted scripts, builds every platform each included scene needs, zips into `ServerData` |
 | `preview (-vdWorlds <ids> \| -vdTenant) [-vdExpectTenant <label>] [-vdScenes a,b]` | what a deploy there would add and update; checks the tenant label when given |
 | `deploy (-vdWorlds <ids> \| -vdTenant) -vdExpectTenant <label> [-vdBuild] [-vdDryRun] [-vdScenes a,b]` | uploads and imports the built zips (and the interpreted assembly, to worlds); `-vdExpectTenant` is the tenant label the session shows and is mandatory (exit 24 when missing or different); `-vdBuild` builds first, `-vdDryRun` sends nothing |
+
+A connection is one tenant of one Configuration-API instance (ADR 0037). It is named by its key (the instance's base URL, `#`,
+the tenant key), its tenant key, its tenant label or `app/env`; a name that fits none or several is exit 26. The connections live
+outside the project, in `%LOCALAPPDATA%\Virtuademy\SDK\`, encrypted for the OS user. The project's active connection is the
+one chosen in **Virtuademy > Available Tenants**; a `login` from the command line or a request file makes its connection
+active only when the project has none, and a command that names another one with `-vdConnection` is exit 30. The store's `status.json` in that folder lists them with no secret: `connections` and `whoami`
+can be read from it without starting Unity. `-vdResultFile <path>` (any command) writes the REPORT, and only it, to that file,
+replaced whole, with `state: done`; a `login` writes it first with `state: awaiting-browser` and the URL.
+
+Unity refuses to open a project another editor has open, so `login`, `logout`, `connections` and `whoami` run in batch only while the
+project is closed (`Temp/UnityLockfile` tells the two cases apart). With the editor open, drop a request file instead: write
+`UserSettings/Virtuademy/requests/<id>.json.tmp` with `{ "command": "login" | "logout" | "status", "connection": "...",
+"noBrowser": false, "loginTimeoutSeconds": 180, "resultFile": "path" }` and rename it to `<id>.json`. The editor picks it up within
+a fraction of a second and writes `<id>.result.json`; a login writes it first with `state: awaiting-browser` and the URL. Nothing
+else can be asked this way, never a build or a deploy.
 
 Every run ends with a `[EnvironmentsCli] REPORT {json}` line and exits the editor with a code: 0 done,
 1 unexpected, 10 bad arguments, 11 login required, 12 Addressables not configured, 13 nothing to build, 14
 build failed, 15 interpreted scripts refused, 16 world not deployable, 17 deploy finished with problems, 18
 not a tenant manager, 19 configuration file not imported, 20 platform unreachable, 21 timeout, 22 zips
-missing, 23 configuration file would not be ignored by git, 24 tenant not confirmed, 25 API host does not match
-the logged-in tenant. Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
-a deploy lets the step in flight finish and reports what was and was not done. Batch mode never starts an interactive login: log in once from the window, and the commands renew
-the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list
+missing, 23 configuration file would not be ignored by git, 24 tenant not confirmed, 26 connection unknown, 27 login timed
+out, 28 login failed, 29 `login` in batch on an OS with no encrypted store (the login would end with the process), 30 target
+mismatch (`-vdConnection` is not the project's active connection). 25 (API host not matching the logged-in tenant) is no longer
+returned and stays reserved. Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
+a deploy lets the step in flight finish and reports what was and was not done. Batch mode never starts an interactive login on its own: log in once with `login` (or from **Virtuademy > Available Tenants**), and the
+commands renew the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list
 (`Assets/Virtuademy/Editor/Settings/AddressablesSceneList.asset`). Details: the class's XML documentation.
 
 ## Folders

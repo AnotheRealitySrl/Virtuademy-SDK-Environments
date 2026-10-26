@@ -79,6 +79,12 @@ namespace Virtuademy.SDK.Environments.Editor
 
         // Worlds state
         private List<PublishableWorld> availableWorlds = new();
+
+        // The connection the worlds above were listed for, and the one the running operation works on. Both are
+        // fixed when they are taken: the project's active connection can change at any time (a selection in
+        // Available Tenants, a login), and a deploy must not follow it to another tenant's host.
+        private string worldsConnectionKey;
+        private string operationKey;
         private Dictionary<int, bool> selectedWorlds = new();
 
         // UI references
@@ -346,14 +352,18 @@ namespace Virtuademy.SDK.Environments.Editor
 
             try
             {
+                string connectionKey = ProjectConnections.ActiveKey;
+                worldsConnectionKey = connectionKey;
+
                 // Silent renewal only: this runs just from opening the window, and popping a
                 // browser login at someone who only clicked a menu item would be startling.
                 // Deploy actions, which the user explicitly asked for, do allow it.
                 WorldListResult listing = await EnvironmentsDeploy.LoadWorldsAsync(
+                    connectionKey: connectionKey,
                     progress: text => worldsLoadingLabel.text = text,
                     // Where every scene is already published, shown under each scene by SceneConfigurationDrawer:
                     // computed on ALL the worlds the account can see, before the deploy-role filter.
-                    onListed: visible => _ = PublishedEnvironmentsIndex.RefreshAsync(visible.Select(w => (w.Id, w.Label))));
+                    onListed: visible => _ = PublishedEnvironmentsIndex.RefreshAsync(visible.Select(w => (w.Id, w.Label)), connectionKey));
 
                 selectedWorlds.Clear();
 
@@ -421,7 +431,18 @@ namespace Virtuademy.SDK.Environments.Editor
             }
         }
 
-        private const string SELECTED_WORLDS_KEY = "Virtuademy_AddressablesManagement_SelectedWorlds";
+        // The old key held one machine-wide value: the same ids were ticked again in any tenant and any project,
+        // and a tick left from another tenant once sent a deploy to the wrong world. The ticks belong to a
+        // connection of a project now, and the old value is no longer read.
+        private const string SELECTED_WORLDS_KEY_BASE = "Virtuademy_AddressablesManagement_SelectedWorlds";
+
+        private string SelectedWorldsKey()
+        {
+            string scope = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).ToLowerInvariant() + "|" + (worldsConnectionKey ?? ProjectConnections.ActiveKey ?? "");
+            using System.Security.Cryptography.SHA1 sha = System.Security.Cryptography.SHA1.Create();
+            string hash = BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(scope))).Replace("-", "").Substring(0, 12);
+            return SELECTED_WORLDS_KEY_BASE + "_" + hash;
+        }
 
         private List<int> GetSelectedWorldIds()
         {
@@ -431,12 +452,12 @@ namespace Virtuademy.SDK.Environments.Editor
         private void SaveSelectedWorldIds()
         {
             var ids = GetSelectedWorldIds();
-            EditorPrefs.SetString(SELECTED_WORLDS_KEY, string.Join(",", ids));
+            EditorPrefs.SetString(SelectedWorldsKey(), string.Join(",", ids));
         }
 
         private HashSet<int> LoadSelectedWorldIds()
         {
-            string saved = EditorPrefs.GetString(SELECTED_WORLDS_KEY, "");
+            string saved = EditorPrefs.GetString(SelectedWorldsKey(), "");
             var result = new HashSet<int>();
             if (string.IsNullOrEmpty(saved)) return result;
 
@@ -497,6 +518,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             SetDeployButtonsEnabled(false);
+            operationKey = ProjectConnections.ActiveKey;
             try
             {
                 await DeployToWorlds(worldIds, scenes);
@@ -551,6 +573,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private async Task BuildAndDeployToWorldsAsync(List<int> worldIds)
         {
             SetDeployButtonsEnabled(false);
+            operationKey = ProjectConnections.ActiveKey;
 
             // The buttons come back on every way out, an exception included.
             try
@@ -590,8 +613,18 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private async Task DeployToWorlds(List<int> worldIds, List<string> scenes)
         {
+            // The ticked worlds are the ones of the connection that was active when they were listed.
+            if (!string.Equals(operationKey, worldsConnectionKey, StringComparison.OrdinalIgnoreCase))
+            {
+                LogDeployError("The project's connection changed since the worlds were listed. Nothing was sent: reload the worlds and tick them again.");
+                EditorUtility.DisplayDialog("Deploy blocked",
+                    "The project's connection changed since the worlds were listed, so the ticked worlds may belong to another tenant. " +
+                    "Nothing was sent. Reload the worlds and tick them again.", "OK");
+                return;
+            }
+
             int errorsBefore = deployErrorCount;
-            DeployReport report = await EnvironmentsDeploy.DeployToWorldsAsync(worldIds, availableWorlds, scenes, NewDeployObserver());
+            DeployReport report = await EnvironmentsDeploy.DeployToWorldsAsync(worldIds, availableWorlds, scenes, NewDeployObserver(), operationKey);
 
             // Nothing was sent (no API URL, no session): the problem is already in the panel.
             if (report.Fatal != null)
@@ -653,6 +686,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             SetDeployButtonsEnabled(false);
+            operationKey = ProjectConnections.ActiveKey;
             try
             {
                 await DeployToTenant(scenes);
@@ -676,6 +710,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private async Task BuildAndDeployToTenantAsync()
         {
             SetDeployButtonsEnabled(false);
+            operationKey = ProjectConnections.ActiveKey;
 
             // The buttons come back on every way out, an exception included.
             try
@@ -713,7 +748,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private async Task DeployToTenant(List<string> scenes)
         {
             int tenantErrorsBefore = deployErrorCount;
-            DeployReport report = await EnvironmentsDeploy.DeployToTenantAsync(scenes, NewDeployObserver());
+            DeployReport report = await EnvironmentsDeploy.DeployToTenantAsync(scenes, NewDeployObserver(), operationKey);
 
             // Not even started, or stopped before any scene: the problem is already in the panel.
             if (report.Fatal != null || report.Targets.Count == 0 || !report.Targets[0].UploadLinkObtained)
@@ -1267,6 +1302,7 @@ namespace Virtuademy.SDK.Environments.Editor
             if (!RequireAddressablesConfigured("Build Addressables"))
                 return;
 
+            operationKey = ProjectConnections.ActiveKey;
             if (!await BuildAndVerifyInterpretedDLLAsync())
             {
                 EditorUtility.DisplayDialog("Build blocked",
@@ -1307,7 +1343,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// server check). Returns true if the build may proceed; see
         /// <see cref="EnvironmentsBuild.VerifyInterpretedScriptsAsync"/>.
         /// </summary>
-        private Task<bool> BuildAndVerifyInterpretedDLLAsync() => EnvironmentsBuild.VerifyInterpretedScriptsAsync();
+        private Task<bool> BuildAndVerifyInterpretedDLLAsync() => EnvironmentsBuild.VerifyInterpretedScriptsAsync(operationKey ?? ProjectConnections.ActiveKey);
 
         /// <summary>
         /// Builds addressables for all platforms and creates zip files.
