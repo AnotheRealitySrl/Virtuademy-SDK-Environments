@@ -45,7 +45,8 @@ longer returned).
   hosts. The messages that sent the user to the Addressables management window for a login now say `-vdCommand login` or
   Virtuademy > Available Tenants.
 - **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and refuse (exit 30, *target mismatch*) when
-  it is not the project's active connection, with nothing built or sent. The run takes the active connection once, when it
+  it is not the project's active connection, with nothing built or sent. The name is checked before the session, so a run
+  aimed at another connection gets 30 even when the active one has no session, not a request to log in. The run takes the active connection once, when it
   starts, and every request of it (the world list, the script verification, the uploads and imports) goes to that connection;
   the `target` of the REPORT lists the connection and the Configuration-API host. `-vdExpectTenant` still compares the label.
   A `login` in batch mode on an OS with no encrypted store is exit 29.

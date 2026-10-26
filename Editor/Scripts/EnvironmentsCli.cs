@@ -835,7 +835,11 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private static async Task<int> WorldsAsync(Options options)
         {
-            int code = await RequireSessionAsync();
+            int code = ConfirmNamedConnection(options.Connection);
+            if (code != ExitDone)
+                return code;
+
+            code = await RequireSessionAsync();
             if (code != ExitDone)
                 return code;
 
@@ -893,6 +897,10 @@ namespace Virtuademy.SDK.Environments.Editor
             if (code != ExitDone)
                 return code;
 
+            code = ConfirmNamedConnection(options.Connection);
+            if (code != ExitDone)
+                return code;
+
             code = await RequireSessionAsync();
             if (code != ExitDone)
                 return code;
@@ -946,6 +954,10 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (options.Build && !AddressablesConfiguration.IsConfigured)
                 return AddressablesNotConfigured();
+
+            code = ConfirmNamedConnection(options.Connection);
+            if (code != ExitDone)
+                return code;
 
             code = await RequireSessionAsync();
             if (code != ExitDone)
@@ -1212,6 +1224,40 @@ namespace Virtuademy.SDK.Environments.Editor
             return usable;
         }
 
+        /// <summary>
+        /// A connection named on the command line has to be the one the run works on: the project's active one. The
+        /// key carries the Configuration-API host, so this is the label-and-host check for a tenant that two instances
+        /// may both call "Acme". <c>worlds</c>, <c>preview</c> and <c>deploy</c> run it before the session: a run aimed
+        /// at another connection gets <see cref="ExitTargetMismatch"/> even when the active connection has no session,
+        /// not a request to log in to a connection the caller did not name.
+        /// </summary>
+        private static int ConfirmNamedConnection(string connection)
+        {
+            if (string.IsNullOrEmpty(connection))
+                return ExitDone;
+
+            ConnectionRecord named = ConnectionStore.Find(connection, out string findError);
+            if (named == null)
+            {
+                Debug.LogError(log_prefix + findError);
+                report["error"] = findError;
+                return ExitConnectionUnknown;
+            }
+
+            if (string.Equals(named.Key, targetKey, StringComparison.OrdinalIgnoreCase))
+                return ExitDone;
+
+            string activeLabel = ConnectionStore.Get(targetKey)?.TenantLabel;
+            string message = $"-vdConnection names '{named.Key}' ({named.TenantLabel}), but the project's active connection is " +
+                             $"'{targetKey ?? "none"}' ({activeLabel}). Nothing was built or sent. Make the one you mean the project's by selecting its " +
+                             "configuration file in Virtuademy > Available Tenants, or name the active one.";
+            if (!report.ContainsKey("target"))
+                report["target"] = new Dictionary<string, object> { { "connection", targetKey }, { "expectedConnection", connection } };
+            Debug.LogError(log_prefix + message);
+            report["error"] = message;
+            return ExitTargetMismatch;
+        }
+
         /// <summary>The session, renewed silently if it expired; <see cref="ExitLoginRequired"/> with the instruction when it cannot be.</summary>
         private static async Task<int> RequireSessionAsync()
         {
@@ -1252,29 +1298,9 @@ namespace Virtuademy.SDK.Environments.Editor
                 { "expectedConnection", connection },
             };
 
-            // A connection named on the command line has to be the one the run works on: the project's active one.
-            // The key carries the Configuration-API host, so this is the label-and-host check for a tenant that two
-            // instances may both call "Acme".
-            if (!string.IsNullOrEmpty(connection))
-            {
-                ConnectionRecord named = ConnectionStore.Find(connection, out string findError);
-                if (named == null)
-                {
-                    Debug.LogError(log_prefix + findError);
-                    report["error"] = findError;
-                    return ExitConnectionUnknown;
-                }
-
-                if (!string.Equals(named.Key, targetKey, StringComparison.OrdinalIgnoreCase))
-                {
-                    string message = $"-vdConnection names '{named.Key}' ({named.TenantLabel}), but the project's active connection is " +
-                                     $"'{targetKey ?? "none"}' ({label}). Nothing was built or sent. Make the one you mean the project's by selecting its " +
-                                     "configuration file in Virtuademy > Available Tenants, or name the active one.";
-                    Debug.LogError(log_prefix + message);
-                    report["error"] = message;
-                    return ExitTargetMismatch;
-                }
-            }
+            int namedCode = ConfirmNamedConnection(connection);
+            if (namedCode != ExitDone)
+                return namedCode;
 
             string session = $"This session is logged in to tenant '{label}' ({tenant?.Env}), API {callHost ?? "unknown"}.";
 
