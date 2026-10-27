@@ -80,7 +80,9 @@ build failed, 15 interpreted scripts refused, 16 world not deployable, 17 deploy
 not a tenant manager, 19 configuration file not imported, 20 platform unreachable, 21 timeout, 22 zips
 missing, 23 configuration file would not be ignored by git, 24 tenant not confirmed (`-vdExpectTenant` missing), 26 connection unknown, 27 login timed
 out, 28 login failed, 29 `login` in batch on an OS with no encrypted store (the login would end with the process), 30 target
-mismatch (`-vdExpectTenant` is not the tenant of the connection the command acts on). 25 (API host not matching the logged-in tenant) is no longer
+mismatch (`-vdExpectTenant` is not the tenant of the connection the command acts on), 31 platform version mismatch (`preview` or
+`deploy` to a tenant whose platform version has another year or release than the one the project was set up from, or reports
+none; a project set up from `develop` is not checked). 25 (API host not matching the logged-in tenant) is no longer
 returned and stays reserved. Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
 a deploy lets the step in flight finish and reports what was and was not done. Batch mode never starts an interactive login on its own: log in once with `login` (or from **Virtuademy > Available Tenants**), and the
 commands renew the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list

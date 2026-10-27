@@ -90,7 +90,8 @@ namespace Virtuademy.SDK.Environments.Editor
     /// goes to it, whatever the default connection becomes meanwhile. They take its Application API address from the tenant
     /// that connection reported at login, never from the project's generated <c>PlatformEndpoints</c> asset: a token is sent
     /// to the host of the connection it belongs to. A <c>-vdExpectTenant</c> that is not that connection's tenant label exits
-    /// with <see cref="ExitTargetMismatch"/>. <c>build</c> verifies the interpreted scripts on the default connection. The
+    /// with <see cref="ExitTargetMismatch"/>; <c>preview</c> and <c>deploy</c> to a tenant on another platform version than the
+    /// project's exit with <see cref="ExitPlatformVersionMismatch"/>. <c>build</c> verifies the interpreted scripts on the default connection. The
     /// REPORT of those three commands carries a <c>target</c> object: the connection, whether it is the default one, the
     /// tenant label, its environment and the API host.
     /// </para>
@@ -215,6 +216,13 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>Target mismatch: <c>-vdExpectTenant</c> names another tenant than the one of the connection the command acts on. Nothing was built or sent.</summary>
         public const int ExitTargetMismatch = 30;
+
+        /// <summary>
+        /// <c>preview</c> or <c>deploy</c> to a tenant whose platform version has another year or release than the registry
+        /// entry the project was set up from, or that reports none (ADR 0037, version rule). Nothing was built or sent. The
+        /// remedy is the project's version, not another connection.
+        /// </summary>
+        public const int ExitPlatformVersionMismatch = 31;
 
         private const string log_prefix = "[EnvironmentsCli] ";
         private const int default_timeout_minutes = 60;
@@ -910,6 +918,10 @@ namespace Virtuademy.SDK.Environments.Editor
             if (code != ExitDone)
                 return code;
 
+            code = await ConfirmPlatformVersionAsync();
+            if (code != ExitDone)
+                return code;
+
             code = await RequireSessionAsync();
             if (code != ExitDone)
                 return code;
@@ -969,6 +981,10 @@ namespace Virtuademy.SDK.Environments.Editor
             // Before the session, the build and any request that carries the token: which tenant, which platform. A
             // label that names another tenant is a target mismatch even when that connection has no session.
             code = ConfirmTarget(options.Connection, options.ExpectTenant, required: true);
+            if (code != ExitDone)
+                return code;
+
+            code = await ConfirmPlatformVersionAsync();
             if (code != ExitDone)
                 return code;
 
@@ -1345,6 +1361,36 @@ namespace Virtuademy.SDK.Environments.Editor
             return ExitDone;
         }
 
+        /// <summary>
+        /// The version rule for targets (ADR 0037), before the session and the build: the tenant's platform version, read
+        /// again over HMAC (the store's copy when the platform cannot be read), must have the year and release of the
+        /// registry entry the project was set up from. A project set up from an entry that is not a version (<c>develop</c>)
+        /// has nothing to compare, and the rule is not applied. The REPORT's <c>platformVersion</c> says what was compared.
+        /// </summary>
+        private static async Task<int> ConfirmPlatformVersionAsync()
+        {
+            await ConnectionLoginService.RefreshConnectionAsync(targetKey);
+
+            string projectVersion = PlatformVersionRule.ProjectVersion;
+            string tenantVersion = ConnectionStore.Get(targetKey)?.PlatformVersion;
+            PlatformVersionRule.Verdict verdict = PlatformVersionRule.Check(projectVersion, tenantVersion);
+
+            report["platformVersion"] = new Dictionary<string, object>
+            {
+                { "project", projectVersion },
+                { "tenant", tenantVersion },
+                { "verdict", verdict.ToString() },
+            };
+
+            if (PlatformVersionRule.Allows(verdict))
+                return ExitDone;
+
+            string message = PlatformVersionRule.Refusal(verdict, projectVersion, tenantVersion) + " Nothing was built or sent.";
+            Debug.LogError(log_prefix + message);
+            report["error"] = message;
+            return ExitPlatformVersionMismatch;
+        }
+
         /// <summary>The host of a URL, with its port when it is not the scheme's own; null for none. Never the path or credentials.</summary>
         private static string HostOf(string url) =>
             Uri.TryCreate(url, UriKind.Absolute, out Uri uri) ? uri.Authority.ToLowerInvariant() : null;
@@ -1454,6 +1500,7 @@ namespace Virtuademy.SDK.Environments.Editor
             ExitLoginTimeout => "login timed out",
             ExitLoginFailed => "login failed",
             ExitStoreNotPersistent => "connection store not persistent on this OS",
+            ExitPlatformVersionMismatch => "platform version mismatch: the tenant runs another platform version than the project",
             _ => "unknown",
         };
 

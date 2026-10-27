@@ -4,7 +4,7 @@
 
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
 classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four
-`EnvironmentsCli` commands, one option on every command and four exit codes (minor; `ExitApiHostMismatch` stays defined and is no
+`EnvironmentsCli` commands, one option on every command and five exit codes (minor; `ExitApiHostMismatch` stays defined and is no
 longer returned, and a `-vdExpectTenant` that names another tenant is now 30 instead of 24).
 
 #### Added
@@ -64,7 +64,9 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
   up from), or that reports none, shows its worlds locked and cannot be ticked (`PlatformVersionRule`); a project set up from
   an entry that is not a version, such as `develop`, says so and does not apply the rule. The tenant's version is read
   again over HMAC (`ConnectionLoginService.RefreshConnectionAsync`) when a group lists its worlds and right before a deploy,
-  which stops with nothing built or sent when a target no longer matches. The command line does not apply the rule yet.
+  which stops with nothing built or sent when a target no longer matches. On the command line `preview` and `deploy` apply
+  the same rule before the session and the build, with the new exit code 31 (*platform version mismatch*, nothing built or
+  sent; the REPORT's `platformVersion` says what was compared).
   A Production group starts closed,
   and a deploy that includes it asks for a confirmation of its own; a deploy to more than one target lists them per tenant and
   environment and asks first. **Build & Deploy** verifies the interpreted scripts on the platform of every target
