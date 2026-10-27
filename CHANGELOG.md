@@ -40,7 +40,7 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 - **Equipment slots declared by the environment.** `InventoryPlaceholder.equipmentSlots`: a list of
   `EquipmentSlotDefinition` (type `Hand` or `Custom`, the custom slot's name as the wearables give it in `wearSlot`, an
-  optional icon), shown from the start. A wearable whose slot is not declared adds it; with an empty list the wear
+  optional icon shown on the slot in place of its name; the hand slot always shows the application's hand icon), shown from the start. A wearable whose slot is not declared adds it; with an empty list the wear
   slots are counted by `wearSlotsCount`. The counts of this placeholder are where the inventory starts: an item that
   does not fit adds a slot, so nothing is refused (the old placeholders keep their behaviour). At runtime `AddEquipmentSlot(type, name, icon)` (raises
   `EquipmentSlotsChanged`) and the node **Virtuademy Inventory: Add Equipment Slot** (`AddEquipmentSlotNode`).

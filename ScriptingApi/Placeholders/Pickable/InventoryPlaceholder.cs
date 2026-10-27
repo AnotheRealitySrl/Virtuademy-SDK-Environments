@@ -50,10 +50,12 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             [Tooltip("Hand: the tools. Custom: the wearables whose Wear Slot is this slot's name")]
             public EEquipmentSlotType type = EEquipmentSlotType.Custom;
 
-            [Tooltip("Custom slot: the name the wearables give in their Wear Slot (Head, Hands, Badge...)")]
+            [Tooltip("Custom slot: the name the wearables give in their Wear Slot (Head, Hands, Badge...), which matches "
+                     + "them to this slot; shown on the slot when it has no icon")]
             public string name;
 
-            [Tooltip("Optional: the mark shown on the slot (the slot's name without it)")]
+            [Tooltip("Optional: the icon shown on the slot to say its category, in place of its name. The hand slot "
+                     + "always shows the application's hand icon")]
             public Sprite icon;
         }
 
