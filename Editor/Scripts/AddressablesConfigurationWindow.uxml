@@ -3,8 +3,8 @@
     <engine:ScrollView>
         <engine:Label text="Addressables management window" name="Header" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 24px;" />
         <engine:VisualElement name="login-status-banner" style="flex-direction: row; align-items: center; justify-content: center; padding: 6px; margin-top: 4px; margin-bottom: 4px;">
-            <engine:Label text="Not logged in" name="login-status-label" style="font-size: 12px; white-space: normal; flex-shrink: 1; -unity-text-align: middle-center;" />
-            <engine:Button text="Login" name="open-tenant-selection-button" style="margin-left: 8px; flex-shrink: 0;" />
+            <engine:Label text="No default connection" name="login-status-label" style="font-size: 12px; white-space: normal; flex-shrink: 1; -unity-text-align: middle-center;" />
+            <engine:Button text="Available Tenants" name="open-tenant-selection-button" style="margin-left: 8px; flex-shrink: 0;" />
         </engine:VisualElement>
         <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
         <engine:VisualElement name="build-result-errors" style="flex-grow: 1;">
@@ -23,20 +23,12 @@
         </engine:GroupBox>
         <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
         <engine:VisualElement name="deploy-section" style="display: none;">
-            <engine:Label text="Deploy to worlds" style="-unity-font-style: bold; font-size: 14px; margin-top: 4px; margin-bottom: 4px; -unity-text-align: upper-center;" />
-            <engine:Label text="Loading worlds..." name="worlds-loading-label" style="-unity-text-align: upper-center; margin-bottom: 4px;" />
-            <engine:ScrollView name="worlds-list" style="max-height: 200px; margin-bottom: 4px;" />
+            <engine:Label text="Deploy targets" style="-unity-font-style: bold; font-size: 14px; margin-top: 4px; margin-bottom: 4px; -unity-text-align: upper-center;" />
+            <engine:Label text="One group per connection the project uses: tick its worlds, or its tenant level, to deploy there with that connection's login." style="white-space: normal; font-size: 11px; opacity: 0.75; margin-left: 4px; margin-right: 4px; margin-bottom: 4px;" />
+            <engine:VisualElement name="deploy-targets" style="margin-left: 4px; margin-right: 4px; margin-bottom: 4px;" />
             <engine:VisualElement name="deploy-buttons" style="flex-direction: row; align-items: center; justify-content: center;">
-                <engine:Button text="Deploy" name="deploy-button" tooltip="Upload existing zip files for selected scenes to the selected worlds." />
-                <engine:Button text="Build &amp; Deploy" name="build-and-deploy-button" tooltip="Build addressable scenes, then upload to selected worlds one by one." />
-            </engine:VisualElement>
-        </engine:VisualElement>
-        <engine:VisualElement name="tenant-deploy-section" style="display: none;">
-            <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
-            <engine:Label text="Deploy to tenant" style="-unity-font-style: bold; font-size: 14px; margin-top: 4px; margin-bottom: 4px; -unity-text-align: upper-center;" />
-            <engine:VisualElement name="tenant-deploy-buttons" style="flex-direction: row; align-items: center; justify-content: center;">
-                <engine:Button text="Deploy to Tenant" name="tenant-deploy-button" tooltip="Upload existing zip files for selected scenes to the tenant." />
-                <engine:Button text="Build &amp; Deploy to Tenant" name="tenant-build-and-deploy-button" tooltip="Build addressable scenes, then upload to tenant." />
+                <engine:Button text="Deploy" name="deploy-button" tooltip="Upload the built zips of the included scenes to every ticked target." />
+                <engine:Button text="Build &amp; Deploy" name="build-and-deploy-button" tooltip="Build the included scenes once, then verify and upload them to every ticked target with its own connection's login." />
             </engine:VisualElement>
         </engine:VisualElement>
         <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />

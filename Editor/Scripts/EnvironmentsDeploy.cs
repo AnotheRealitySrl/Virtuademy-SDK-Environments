@@ -341,9 +341,16 @@ namespace Virtuademy.SDK.Environments.Editor
         /// What deploying the <paramref name="included"/> scenes to a world (or to tenant level, when
         /// <paramref name="worldId"/> is null) does: the scenes that arrive as new environments and
         /// the ones that overwrite an environment already published with that name. Reads the list
-        /// <see cref="PublishedEnvironmentsIndex"/> holds; the caller refreshes it first.
+        /// <see cref="PublishedEnvironmentsIndex"/> holds for the project's default connection; the caller refreshes it first.
         /// </summary>
         public static DeployPreview Preview(IReadOnlyList<SceneConfiguration> included, int? worldId)
+            => Preview(included, worldId, ProjectConnections.DefaultKey);
+
+        /// <summary>
+        /// <see cref="Preview(IReadOnlyList{SceneConfiguration}, int?)"/> for a world (or the tenant level) of the given
+        /// connection: a world id means something only within its connection.
+        /// </summary>
+        public static DeployPreview Preview(IReadOnlyList<SceneConfiguration> included, int? worldId, string connectionKey)
         {
             DeployPreview preview = new() { Included = included?.Count ?? 0 };
 
@@ -353,16 +360,16 @@ namespace Virtuademy.SDK.Environments.Editor
                 return preview;
             }
 
-            if (!PublishedEnvironmentsIndex.HasData)
+            if (!PublishedEnvironmentsIndex.HasDataFor(connectionKey))
             {
-                preview.State = PublishedEnvironmentsIndex.IsLoading ? DeployPreviewState.Checking : DeployPreviewState.Unreadable;
+                preview.State = PublishedEnvironmentsIndex.IsLoadingFor(connectionKey) ? DeployPreviewState.Checking : DeployPreviewState.Unreadable;
                 return preview;
             }
 
             preview.State = DeployPreviewState.Ready;
             foreach (SceneConfiguration cfg in included)
             {
-                (PublishedEnvironmentsIndex.IsPublishedIn(cfg.SceneNameFiltered, worldId) ? preview.Updated : preview.Added).Add(cfg.Scene.name);
+                (PublishedEnvironmentsIndex.IsPublishedIn(connectionKey, cfg.SceneNameFiltered, worldId) ? preview.Updated : preview.Added).Add(cfg.Scene.name);
             }
 
             return preview;
@@ -565,7 +572,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 observer?.ProgressDone?.Invoke();
             }
 
-            _ = PublishedEnvironmentsIndex.RefreshAsync();
+            _ = PublishedEnvironmentsIndex.RefreshAsync(connectionKey);
             return report;
         }
 
@@ -703,7 +710,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 observer?.ProgressDone?.Invoke();
             }
 
-            _ = PublishedEnvironmentsIndex.RefreshAsync();
+            _ = PublishedEnvironmentsIndex.RefreshAsync(connectionKey);
             return report;
         }
 

@@ -8,8 +8,8 @@ namespace Virtuademy.SDK.Environments.Editor
     /// <summary>
     /// One scene of the registry: its name (the scene is not editable — the registry owns the list),
     /// "Include in build", the platforms, and where that scene is already published ("Published in
-    /// Showroom, Academy" / "Published at tenant level" / "Not published yet") read from
-    /// <see cref="PublishedEnvironmentsIndex"/>.
+    /// Showroom, Academy" / "Published at tenant level" / "Not published yet", one part per connection when the
+    /// project deploys to several) read from <see cref="PublishedEnvironmentsIndex"/>.
     /// </summary>
     [CustomPropertyDrawer(typeof(SceneListScriptableObject.SceneConfiguration))]
     internal class SceneConfigurationDrawer : PropertyDrawer
@@ -58,7 +58,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (asset == null) { published.text = string.Empty; published.tooltip = string.Empty; return; }
                 string key = PublishedEnvironmentsIndex.Key(asset.name);
                 published.text = PublishedEnvironmentsIndex.Summary(key);
-                published.tooltip = PublishedEnvironmentsIndex.HasData ? PublishedEnvironmentsIndex.Details(key) : string.Empty;
+                published.tooltip = PublishedEnvironmentsIndex.AnyData ? PublishedEnvironmentsIndex.Details(key) : string.Empty;
             }
 
             Refresh();

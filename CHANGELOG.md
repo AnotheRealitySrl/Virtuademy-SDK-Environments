@@ -51,15 +51,31 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
   the `target` of the REPORT lists the connection, whether it is the default one and the Configuration-API host.
   **A `-vdExpectTenant` that is not that connection's tenant label is exit 30** (*target mismatch*; it was 24 up to 2026.6),
   checked before the session, so a run aimed at the wrong tenant gets 30 even when its connection has no session, not a
-  request to log in. 24 now means only a `deploy` without `-vdExpectTenant`. The `connections` command marks the default
+  request to log in. 24 now means only a `deploy` without `-vdExpectTenant`. A command that names no connection in a
+  project with no default connection (several used, none chosen) is exit 26, not 11. The `connections` command marks the default
   connection with `default` (and `session` and the `target` say `default` too). A `login` in batch mode on an OS with no
   encrypted store is exit 29.
-- **The Addressables management window keeps its connection per operation.** Build, verify and deploy take the project's
-  default connection when they start and use it to the end; the worlds it lists belong to one connection and a deploy refuses
-  when the default one changed since. The ticked worlds are kept per project and connection
-  (`Virtuademy_AddressablesManagement_SelectedWorlds_<hash>`): the old machine-wide value, which could tick a world of another
-  tenant, is no longer read. `EnvironmentsDeploy`, `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync`
-  and the hot-update verifier take an optional `connectionKey`.
+- **The Addressables management window deploys to targets grouped per connection** (meta-repo ADR 0037). It shows one
+  collapsible group per connection the project uses (its tenant label, environment, platform version and login state, with
+  Log in and Log out), and in it the worlds the account can deploy to and, for a TenantManager, the tenant level, each with a
+  tick. The ticks are kept per project and connection in `UserSettings/Virtuademy/connections.json`: the machine-wide
+  `Virtuademy_AddressablesManagement_SelectedWorlds` value, which could tick a world of another tenant, is no longer read.
+  A group whose platform version does not have the year and release of the project's (the registry entry the project was set
+  up from), or that reports none, shows its worlds locked and cannot be ticked (`PlatformVersionRule`); a project set up from
+  an entry that is not a version, such as `develop`, says so and does not apply the rule. The tenant's version is read
+  again over HMAC (`ConnectionLoginService.RefreshConnectionAsync`) when a group lists its worlds and right before a deploy,
+  which stops with nothing built or sent when a target no longer matches. The command line does not apply the rule yet.
+  A Production group starts closed,
+  and a deploy that includes it asks for a confirmation of its own; a deploy to more than one target lists them per tenant and
+  environment and asks first. **Build & Deploy** verifies the interpreted scripts on the platform of every target
+  connection before anything is built, builds once, then deploys each target with its own connection's token; the errors in
+  the panel carry the tenant. The **Deploy to Tenant** buttons are gone (the tenant level is a tick), a single deployable world
+  is no longer ticked on its own, and the banner shows the default connection, with a button to Available Tenants instead of
+  a login of its own. **Build Addressables** verifies the scripts on the default connection. `EnvironmentsDeploy`,
+  `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync` and the hot-update verifier take an optional
+  `connectionKey`, and `EnvironmentsDeploy.Preview` an overload with the connection whose world it previews.
+  `PublishedEnvironmentsIndex` keeps one index per connection; the scenes' "Published in" line and the publication filter go
+  across them, with the tenant when there are several.
 - **A run ends from the editor's update loop**, not from the continuation of the async work: the exit code is set when the run
   finishes and the update calls `EditorApplication.Exit`. No `-quit`, as before.
 - **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
@@ -69,6 +85,13 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
   Rigging brings Burst with it. Warrants a minor bump.
 
 #### Fixed
+- **The Deploy errors panel kept the errors of the connection the window had shown before.** A login, a logout or another
+  default connection now clears it, except while a deploy runs; a logout also drops what the scene rows and the
+  publication filter knew about that connection.
+- **The interpreted scripts' server check could be skipped on another tenant.** The marker that skips the compile and the
+  verification when nothing changed since the last publish was per project: a deploy to a second tenant, whose script
+  policy lives in its own Platform DB, reused the first tenant's verdict when the whitelists matched. The marker now
+  includes the connection the check runs on.
 - **Build: a failed build no longer zips and deploys a previous run's output.** `EnvironmentsBuild.BuildAndZip`
   checks the build-target switch and the Addressables build result, empties each scene's platform folders and
   old zip before building, and restores the Addressables settings and the original active build target in

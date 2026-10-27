@@ -837,6 +837,8 @@ namespace Virtuademy.SDK.Environments.Editor
         private static async Task<int> WorldsAsync(Options options)
         {
             int code = UseNamedConnection(options.Connection);
+            if (code == ExitDone)
+                code = RequireConnection();
             if (code != ExitDone)
                 return code;
 
@@ -862,13 +864,13 @@ namespace Virtuademy.SDK.Environments.Editor
 
             // Where each scene is already published: the index the window's rows read.
             await PublishedEnvironmentsIndex.RefreshAsync(listing.Visible.Select(w => (w.Id, w.Label)), targetKey);
-            report["publishedKnown"] = PublishedEnvironmentsIndex.HasData;
-            report["tenantLevelVisible"] = PublishedEnvironmentsIndex.HasData && !PublishedEnvironmentsIndex.TenantUnknown;
+            report["publishedKnown"] = PublishedEnvironmentsIndex.HasDataFor(targetKey);
+            report["tenantLevelVisible"] = PublishedEnvironmentsIndex.HasDataFor(targetKey) && !PublishedEnvironmentsIndex.TenantUnknownFor(targetKey);
 
             SceneListScriptableObject list = SceneListScriptableObject.Find();
             report["scenes"] = EnvironmentsBuild.IncludedScenes(list).Select(c =>
             {
-                IReadOnlyList<PublishedEnvironmentsIndex.Entry> entries = PublishedEnvironmentsIndex.Get(c.SceneNameFiltered);
+                IReadOnlyList<PublishedEnvironmentsIndex.Entry> entries = PublishedEnvironmentsIndex.Get(targetKey, c.SceneNameFiltered);
                 return new Dictionary<string, object>
                 {
                     { "name", c.Scene.name },
@@ -899,6 +901,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 return code;
 
             code = UseNamedConnection(options.Connection);
+            if (code == ExitDone)
+                code = RequireConnection();
             if (code != ExitDone)
                 return code;
 
@@ -917,7 +921,7 @@ namespace Virtuademy.SDK.Environments.Editor
             WorldListResult listing = targets.Listing;
 
             await PublishedEnvironmentsIndex.RefreshAsync(listing.Visible.Select(w => (w.Id, w.Label)), targetKey);
-            if (!PublishedEnvironmentsIndex.HasData)
+            if (!PublishedEnvironmentsIndex.HasDataFor(targetKey))
             {
                 string message = "What is already published could not be read from the platform.";
                 Debug.LogError(log_prefix + message);
@@ -928,7 +932,7 @@ namespace Virtuademy.SDK.Environments.Editor
             List<Dictionary<string, object>> previews = new();
             foreach (int? target in options.Tenant ? new List<int?> { null } : options.Worlds.Select(id => (int?)id))
             {
-                DeployPreview preview = EnvironmentsDeploy.Preview(scenes, target);
+                DeployPreview preview = EnvironmentsDeploy.Preview(scenes, target, targetKey);
                 previews.Add(new Dictionary<string, object>
                 {
                     { "target", target == null ? "tenant" : "world" },
@@ -936,7 +940,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     { "label", target == null ? "Tenant level" : listing.Deployable.First(w => w.Id == target).Label },
                     { "new", preview.Added },
                     { "updated", preview.Updated },
-                    { "note", target == null && PublishedEnvironmentsIndex.TenantUnknown
+                    { "note", target == null && PublishedEnvironmentsIndex.TenantUnknownFor(targetKey)
                         ? "Tenant-level environments are not visible to your account: every scene is listed as new." : null },
                 });
             }
@@ -957,6 +961,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 return AddressablesNotConfigured();
 
             code = UseNamedConnection(options.Connection);
+            if (code == ExitDone)
+                code = RequireConnection();
             if (code != ExitDone)
                 return code;
 
@@ -1253,6 +1259,23 @@ namespace Virtuademy.SDK.Environments.Editor
 
             targetKey = named.Key;
             return ExitDone;
+        }
+
+        /// <summary>
+        /// A command that names no connection needs the project's default one. When there is none (the project uses
+        /// several connections and none was chosen, or the chosen one was removed from the store) it is
+        /// <see cref="ExitConnectionUnknown"/>, not a request to log in.
+        /// </summary>
+        private static int RequireConnection()
+        {
+            if (targetKey != null)
+                return ExitDone;
+
+            string message = "The project has no default connection: name one with -vdConnection (the connections command lists them), " +
+                             "or choose one in Virtuademy > Available Tenants.";
+            Debug.LogError(log_prefix + message);
+            report["error"] = message;
+            return ExitConnectionUnknown;
         }
 
         /// <summary>The session, renewed silently if it expired; <see cref="ExitLoginRequired"/> with the instruction when it cannot be.</summary>

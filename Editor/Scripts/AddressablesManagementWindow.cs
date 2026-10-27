@@ -77,32 +77,34 @@ namespace Virtuademy.SDK.Environments.Editor
         }
         private static string _legacyToken = "";
 
-        // Worlds state
-        private List<PublishableWorld> availableWorlds = new();
+        // The deploy targets: one group per connection the project uses (meta-repo ADR 0037), each with its worlds and its
+        // tenant level. A group's key is fixed when it is built, and a deploy to its targets goes with that connection's
+        // token and to that connection's hosts only, whatever the default connection becomes meanwhile.
+        private readonly Dictionary<string, TargetGroup> groups = new(StringComparer.OrdinalIgnoreCase);
 
-        // The connection the worlds above were listed for, and the one the running operation works on. Both are
-        // fixed when they are taken: the project's default connection can change at any time (a selection in
-        // Available Tenants, a login), and a deploy must not follow it to another tenant's host.
-        private string worldsConnectionKey;
-        private string operationKey;
-        private Dictionary<int, bool> selectedWorlds = new();
+        // Which groups were opened or closed in this window; a group not in it starts open, a Production one closed.
+        private readonly Dictionary<string, bool> groupExpanded = new(StringComparer.OrdinalIgnoreCase);
+
+        // What the groups were built from: the connections the project uses, whether each has a session, and the default one.
+        private string groupsSignature;
+
+        // The registry entry the project was set up from, read when the groups are built.
+        private string projectVersion;
+
+        private bool deployRunning;
+        private bool rebuildPending;
+        private bool missingModules;
 
         // UI references
         private Label loginStatusLabel;
         private IVisualElementScheduledItem sessionExpiryRefresh;
         private VisualElement deploySection;
-        private ScrollView worldsList;
-        private Label worldsLoadingLabel;
+        private VisualElement targetsContainer;
+        private VisualElement versionNotice;
         private Button deployButton;
         private Button buildAndDeployButton;
         private Button openTenantSelectionButton;
-        private Button logoutButton;
         private Button buildAddressablesButton;
-
-        // Tenant deploy UI references
-        private VisualElement tenantDeploySection;
-        private Button tenantDeployButton;
-        private Button tenantBuildAndDeployButton;
 
         // Platform module warnings
         private VisualElement platformWarningsContainer;
@@ -112,12 +114,47 @@ namespace Virtuademy.SDK.Environments.Editor
         private Toggle onlyInBuildToggle;
         private DropdownField publicationFilter;
         private Label sceneCountLabel;
-        private readonly Dictionary<int, VisualElement> worldDeployPreviews = new();
-        private VisualElement tenantDeployPreview;
 
         // Deploy error log
         private VisualElement deployErrorsContainer;
         private ScrollView deployErrorsScrollView;
+
+        /// <summary>One connection the project uses, as the window shows it: a foldout with its worlds and its tenant level.</summary>
+        private sealed class TargetGroup
+        {
+            public string Key;
+            public Foldout Foldout;
+            public Label Status;
+            public Button LoginButton;
+            public Button LogoutButton;
+            public Label WorldsStatus;
+            public VisualElement WorldsList;
+            public List<PublishableWorld> Deployable = new();
+            public readonly Dictionary<int, Toggle> WorldToggles = new();
+            public readonly Dictionary<int, VisualElement> WorldPreviews = new();
+            public Toggle TenantToggle;
+            public VisualElement TenantPreview;
+            public bool Production;
+            public PlatformVersionRule.Verdict Version;
+
+            /// <summary>The worlds were listed for this group, so its ticks can be shown and deployed to.</summary>
+            public bool Listed;
+            public bool Listing;
+
+            /// <summary>Bumped when the group is dropped: a listing that started before drops its result.</summary>
+            public int Generation;
+
+            public bool Allowed => PlatformVersionRule.Allows(Version);
+        }
+
+        /// <summary>A group's ticked targets, as one deploy takes them.</summary>
+        private sealed class GroupTargets
+        {
+            public TargetGroup Group;
+            public List<int> Worlds;
+            public bool Tenant;
+            public int Count => Worlds.Count + (Tenant ? 1 : 0);
+        }
 
         [MenuItem("Virtuademy/Addressables management")]
         public static void ShowExample()
@@ -148,11 +185,16 @@ namespace Virtuademy.SDK.Environments.Editor
             // Scenes created, deleted or moved while the window was in the background.
             SyncSceneRegistry();
 
-            // The session label ages on its own (the token expires while the window sits idle),
-            // so re-render it here. Without reloading the worlds: that is a network round trip
-            // per focus change, and nothing about the world list changed.
-            if (loginStatusLabel != null)
-                RefreshLoginState(reloadWorlds: false);
+            // A connection logged in or out by another process (the command line, another editor) has its group built
+            // again. Otherwise only the labels, which age on their own (a token expires while the window sits idle):
+            // reloading the worlds is a network round trip per focus change, and nothing about them changed.
+            if (loginStatusLabel == null)
+                return;
+
+            if (GroupsSignature() != groupsSignature)
+                RebuildTargets();
+            else
+                RefreshLabels();
         }
 
 
@@ -170,57 +212,42 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             LoadSettings();
             AddDataBindings();
-            SetupLoginAwareUI();
+            SetupDeployTargetsUI();
 
             EditorLoginState.OnLoginStateChanged += OnLoginStateChanged;
             EditorLoginState.OnTokenChanged += OnTokenChanged;
         }
 
-        #region Login-aware UI
+        #region Deploy targets
 
-        private void SetupLoginAwareUI()
+        private void SetupDeployTargetsUI()
         {
             loginStatusLabel = root.Q<Label>("login-status-label");
             deploySection = root.Q<VisualElement>("deploy-section");
-            worldsList = root.Q<ScrollView>("worlds-list");
-            worldsLoadingLabel = root.Q<Label>("worlds-loading-label");
+            targetsContainer = root.Q<VisualElement>("deploy-targets");
             deployButton = root.Q<Button>("deploy-button");
             buildAndDeployButton = root.Q<Button>("build-and-deploy-button");
 
+            // The window's own login is gone: connections are logged in per group below, and imported, chosen for play
+            // mode and logged out in Available Tenants.
             openTenantSelectionButton = root.Q<Button>("open-tenant-selection-button");
+            openTenantSelectionButton.text = "Available Tenants";
+            openTenantSelectionButton.tooltip = "Import a configuration file, log in, and choose the project's default connection.";
             openTenantSelectionButton.clicked += () =>
             {
                 EditorApplication.ExecuteMenuItem("Virtuademy/Available Tenants");
             };
 
-            // Through the session manager, so the Azure refresh token goes away too: clearing
-            // only EditorLoginState would leave a cache that logs the user straight back in.
-            logoutButton = new Button(async () => await EditorSessionManager.LogoutAsync())
-            {
-                text = "Logout"
-            };
-            logoutButton.style.display = DisplayStyle.None;
-            logoutButton.style.marginLeft = 8;     // as the Login button, which it replaces
-            logoutButton.style.flexShrink = 0;     // the status label wraps; the button keeps its width
-            loginStatusLabel.parent.Add(logoutButton);
+            versionNotice = new VisualElement();
+            deploySection.Insert(deploySection.IndexOf(targetsContainer), versionNotice);
 
             deployButton.clicked += OnDeployClicked;
             buildAndDeployButton.clicked += OnBuildAndDeployClicked;
 
-            // Tenant deploy
-            tenantDeploySection = root.Q<VisualElement>("tenant-deploy-section");
-            tenantDeployButton = root.Q<Button>("tenant-deploy-button");
-            tenantBuildAndDeployButton = root.Q<Button>("tenant-build-and-deploy-button");
-
-            tenantDeployButton.clicked += OnTenantDeployClicked;
-            tenantBuildAndDeployButton.clicked += OnTenantBuildAndDeployClicked;
-
-            tenantDeployPreview = new VisualElement { style = { marginBottom = 4, marginLeft = 8, marginRight = 8 } };
-            tenantDeploySection.Insert(tenantDeploySection.IndexOf(root.Q<VisualElement>("tenant-deploy-buttons")), tenantDeployPreview);
-
             InitDeployErrorsContainer();
 
-            RefreshLoginState();
+            deploySection.style.display = DisplayStyle.Flex;
+            RebuildTargets();
         }
 
         private void InitDeployErrorsContainer()
@@ -256,217 +283,430 @@ namespace Virtuademy.SDK.Environments.Editor
             root.Add(deployErrorsContainer);
         }
 
+        /// <summary>
+        /// A login or a logout on any connection, or another default connection. The errors in the panel belong to the
+        /// connections as they were, so they go; the groups are built again from the project's connections.
+        /// </summary>
         private void OnLoginStateChanged()
         {
-            RefreshLoginState();
+            if (!deployRunning)
+                ClearDeployErrors();
+
+            // Where the scenes are published belongs to the session that read it: a connection logged out forgets it,
+            // and with it the filter choices it fed.
+            foreach (string key in ProjectConnections.Used.Where(k => ConnectionStore.Get(k)?.HasSession != true))
+                PublishedEnvironmentsIndex.Clear(key);
+
+            RebuildTargets();
         }
 
-        private void RefreshLoginState(bool reloadWorlds = true)
+        // A renewal or a server rejection changes only a token: re-render the labels, never the worlds — this runs
+        // inside the API call that renewed it.
+        private void OnTokenChanged() => RefreshLabels();
+
+        /// <summary>The connections the project uses that are in the store, in the order the project first used them.</summary>
+        private static List<ConnectionRecord> UsedConnections() =>
+            ProjectConnections.Used.Select(ConnectionStore.Get).Where(r => r != null).ToList();
+
+        private static string GroupsSignature() =>
+            string.Join("|", UsedConnections().Select(r => $"{r.Key}#{r.HasSession}")) + "|play:" + ProjectConnections.DefaultKey;
+
+        /// <summary>
+        /// Builds one group per connection the project uses. A group remembers nothing of its own: the ticks are read back
+        /// from the project's settings (<see cref="ProjectConnections.TargetsOf"/>) once its worlds are listed. Deferred
+        /// while a deploy runs, which holds on to the groups it was started with.
+        /// </summary>
+        private void RebuildTargets()
         {
-            bool loggedIn = EditorLoginState.IsLoggedIn;
+            if (targetsContainer == null)
+                return;
 
-            if (openTenantSelectionButton != null)
-                openTenantSelectionButton.style.display = loggedIn ? DisplayStyle.None : DisplayStyle.Flex;
-            if (logoutButton != null)
-                logoutButton.style.display = loggedIn ? DisplayStyle.Flex : DisplayStyle.None;
-
-            if (loggedIn)
+            if (deployRunning)
             {
-                string tenantLabel = EditorLoginState.CurrentTenant?.Label ?? "Unknown";
-                string envLabel = EditorLoginState.LoggedInEnv;
-                string username = EditorLoginState.Username;
-                string userPart = !string.IsNullOrEmpty(username) ? $" - {username}" : string.Empty;
-                string rolePart = EditorLoginState.IsTenantManager ? " [TenantManager]" : "";
+                rebuildPending = true;
+                return;
+            }
 
-                // An expired token is not a broken state — the next operation renews it — but the
-                // user should know a login prompt may appear before their deploy starts.
-                string sessionPart = EditorSessionManager.DescribeSession(out bool tokenValid);
+            foreach (TargetGroup old in groups.Values)
+                old.Generation++;
+            groups.Clear();
+            targetsContainer.Clear();
+            groupsSignature = GroupsSignature();
 
-                loginStatusLabel.text = $"Logged in: {tenantLabel} {envLabel}{userPart}{rolePart}{sessionPart}";
-                loginStatusLabel.style.color = tokenValid
-                    ? new Color(0.2f, 0.8f, 0.2f)
-                    : new Color(0.9f, 0.7f, 0.2f);
+            projectVersion = PlatformVersionRule.ProjectVersion;
+            RefreshVersionNotice(projectVersion);
 
-                deploySection.style.display = DisplayStyle.Flex;
-                tenantDeploySection.style.display = EditorLoginState.IsTenantManager ? DisplayStyle.Flex : DisplayStyle.None;
+            List<ConnectionRecord> connections = UsedConnections();
+            if (connections.Count == 0)
+            {
+                targetsContainer.Add(new Label("This project uses no connection yet. Import the configuration file of a tenant and log in from " +
+                                               "Virtuademy > Available Tenants: each connection then gets its group here.")
+                {
+                    style = { whiteSpace = WhiteSpace.Normal, marginLeft = 4, marginRight = 4, marginBottom = 4 }
+                });
+            }
 
-                if (reloadWorlds)
-                    LoadWorlds();
+            foreach (ConnectionRecord record in connections)
+            {
+                TargetGroup group = BuildGroup(record, projectVersion);
+                groups[record.Key] = group;
+                targetsContainer.Add(group.Foldout);
+
+                if (group.Foldout.value)
+                    LoadGroupWorlds(group);
+            }
+
+            RefreshLabels();
+            RefreshDeployPreviews();
+            RefreshButtons();
+        }
+
+        /// <summary>Says once, above the groups, when the project has no platform version the tenants can be compared with.</summary>
+        private void RefreshVersionNotice(string projectVersion)
+        {
+            versionNotice.Clear();
+            if (PlatformVersionRule.Check(projectVersion, null) != PlatformVersionRule.Verdict.ProjectUnknown)
+                return;
+
+            string text = projectVersion == null
+                ? "This project has no setup configuration, so the platform version of the tenants is not checked before a deploy."
+                : $"This project was set up from '{projectVersion}', which is not a platform version, so the platform version of the " +
+                  "tenants is not checked before a deploy.";
+            versionNotice.Add(new HelpBox(text, HelpBoxMessageType.Info) { style = { marginBottom = 4 } });
+        }
+
+        private static bool IsProduction(ConnectionRecord record) =>
+            string.Equals(record.Environment, nameof(Env.Production), StringComparison.OrdinalIgnoreCase)
+            || record.Tenant?.Env == Env.Production;
+
+        private TargetGroup BuildGroup(ConnectionRecord record, string projectVersion)
+        {
+            TargetGroup group = new()
+            {
+                Key = record.Key,
+                Production = IsProduction(record),
+                Version = PlatformVersionRule.Check(projectVersion, record.PlatformVersion),
+            };
+
+            bool expanded = groupExpanded.TryGetValue(record.Key, out bool open) ? open : !group.Production;
+            group.Foldout = new Foldout { value = expanded, style = { marginBottom = 4 } };
+
+            // The ticks inside raise change events too, and they bubble up here: only the foldout's own counts.
+            group.Foldout.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.target != group.Foldout)
+                    return;
+
+                groupExpanded[group.Key] = evt.newValue;
+                if (evt.newValue && !group.Listed && !group.Listing)
+                    LoadGroupWorlds(group);
+            });
+
+            VisualElement statusRow = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginBottom = 2 } };
+            group.Status = new Label { style = { whiteSpace = WhiteSpace.Normal, flexShrink = 1, flexGrow = 1 } };
+            statusRow.Add(group.Status);
+
+            group.LoginButton = new Button(() => LoginGroup(group)) { text = "Log in", style = { flexShrink = 0 } };
+            group.LogoutButton = new Button(async () => await EditorSessionManager.LogoutAsync(group.Key)) { text = "Log out", style = { flexShrink = 0 } };
+            statusRow.Add(group.LoginButton);
+            statusRow.Add(group.LogoutButton);
+            group.Foldout.Add(statusRow);
+
+            string refusal = PlatformVersionRule.Refusal(group.Version, projectVersion, record.PlatformVersion);
+            if (refusal != null)
+                group.Foldout.Add(new HelpBox(refusal, HelpBoxMessageType.Error) { style = { marginBottom = 4 } });
+
+            if (group.Production)
+                group.Foldout.Add(new HelpBox("Production. A deploy that includes this tenant asks for a confirmation of its own.",
+                                              HelpBoxMessageType.Warning) { style = { marginBottom = 4 } });
+
+            group.WorldsStatus = new Label { style = { whiteSpace = WhiteSpace.Normal, marginBottom = 2, opacity = 0.85f } };
+            group.Foldout.Add(group.WorldsStatus);
+            group.WorldsList = new VisualElement();
+            group.Foldout.Add(group.WorldsList);
+
+            if (!expanded)
+                group.WorldsStatus.text = "Open the group to list its worlds.";
+
+            return group;
+        }
+
+        /// <summary>The browser login of one group's connection. It does not change the default connection.</summary>
+        private async void LoginGroup(TargetGroup group)
+        {
+            group.LoginButton.SetEnabled(false);
+            try
+            {
+                LoginOutcome outcome = await ConnectionLoginService.LoginAsync(group.Key, new LoginOptions
+                {
+                    OnStatus = status => { if (group.Status != null) group.Status.text = status; },
+                });
+
+                if (!outcome.Success)
+                    LogDeployError($"{PublishedEnvironmentsIndex.LabelOf(group.Key)}: the login failed. {outcome.Message}");
+            }
+            finally
+            {
+                group.LoginButton?.SetEnabled(true);
+            }
+        }
+
+        /// <summary>
+        /// Lists the worlds of one group with silent renewal only: this runs from opening the window or a group, and
+        /// popping a browser login at someone who only looked would be startling. Deploy actions do allow it.
+        /// </summary>
+        private async void LoadGroupWorlds(TargetGroup group)
+        {
+            group.WorldsList.Clear();
+            group.WorldToggles.Clear();
+            group.WorldPreviews.Clear();
+            group.TenantToggle = null;
+            group.TenantPreview = null;
+            group.Listed = false;
+            group.WorldsStatus.style.display = DisplayStyle.Flex;
+
+            ConnectionRecord record = ConnectionStore.Get(group.Key);
+            if (record?.HasSession != true)
+            {
+                group.WorldsStatus.text = "Log in to list the worlds of this tenant.";
+                RefreshButtons();
+                return;
+            }
+
+            int generation = group.Generation;
+            group.Listing = true;
+            group.WorldsStatus.text = "Loading worlds...";
+
+            try
+            {
+                // The platform version can change at any time (an upgrade of the tenant): read it again before the ticks
+                // are offered, and rebuild the group when the version rule's verdict moved.
+                if (await RefreshVersionAsync(group.Key) != group.Version)
+                {
+                    if (generation == group.Generation)
+                    {
+                        group.Listing = false;
+                        RebuildTargets();
+                    }
+
+                    return;
+                }
+
+                if (generation != group.Generation)
+                    return;
+
+                WorldListResult listing = await EnvironmentsDeploy.LoadWorldsAsync(
+                    connectionKey: group.Key,
+                    progress: text => { if (generation == group.Generation) group.WorldsStatus.text = text; },
+                    // Where every scene is already published, shown under each scene by SceneConfigurationDrawer:
+                    // computed on ALL the worlds the account can see, before the deploy-role filter.
+                    onListed: visible => _ = PublishedEnvironmentsIndex.RefreshAsync(visible.Select(w => (w.Id, w.Label)), group.Key));
+
+                if (generation != group.Generation)
+                    return;
+
+                if (listing.Status != WorldListStatus.Ok)
+                {
+                    group.WorldsStatus.text = listing.Message;
+                    return;
+                }
+
+                group.Deployable = listing.Deployable;
+                group.Listed = true;
+                FillGroupTargets(group, ConnectionStore.Get(group.Key) ?? record);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[AddressablesManagement] Error loading the worlds of {PublishedEnvironmentsIndex.LabelOf(group.Key)}: {ex.Message}");
+                if (generation == group.Generation)
+                    group.WorldsStatus.text = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                if (generation == group.Generation)
+                {
+                    group.Listing = false;
+                    RefreshButtons();
+                }
+            }
+        }
+
+        /// <summary>One tick per world the account can deploy to, and the tenant level for a TenantManager, as the project last left them.</summary>
+        private void FillGroupTargets(TargetGroup group, ConnectionRecord record)
+        {
+            IReadOnlyList<ProjectConnections.DeployTarget> saved = ProjectConnections.TargetsOf(group.Key);
+            HashSet<int> savedWorlds = new(saved.Where(t => !t.TenantLevel).Select(t => t.WorldId.Value));
+            bool savedTenant = saved.Any(t => t.TenantLevel);
+
+            group.WorldsStatus.style.display = group.Deployable.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            if (group.Deployable.Count == 0)
+                group.WorldsStatus.text = "Your account cannot deploy to any world of this tenant.";
+
+            foreach (PublishableWorld world in group.Deployable)
+            {
+                // A group the version rule refuses shows its worlds unticked and locked; the ticks the project kept for it
+                // are left alone and come back if the versions agree again.
+                Toggle toggle = new() { text = $"{world.Label} (ID: {world.Id})", value = group.Allowed && savedWorlds.Contains(world.Id) };
+                toggle.SetEnabled(group.Allowed);
+                toggle.RegisterValueChangedCallback(evt => OnTargetTicked(group, evt));
+
+                VisualElement preview = NewDeployPreview();
+                group.WorldToggles[world.Id] = toggle;
+                group.WorldPreviews[world.Id] = preview;
+                group.WorldsList.Add(toggle);
+                group.WorldsList.Add(preview);
+            }
+
+            if (record.IsTenantManager)
+            {
+                group.TenantToggle = new Toggle
+                {
+                    text = "Tenant level",
+                    tooltip = "Every world of the tenant. The interpreted scripts are not uploaded: an environment deployed at tenant level runs without them.",
+                    value = group.Allowed && savedTenant,
+                    style = { marginTop = 2 },
+                };
+                group.TenantToggle.SetEnabled(group.Allowed);
+                group.TenantToggle.RegisterValueChangedCallback(evt => OnTargetTicked(group, evt));
+                group.TenantPreview = NewDeployPreview();
+                group.WorldsList.Add(group.TenantToggle);
+                group.WorldsList.Add(group.TenantPreview);
+            }
+
+            RefreshDeployPreviews();
+        }
+
+        /// <summary>
+        /// The connection's tenant read again over HMAC (<see cref="ConnectionLoginService.RefreshConnectionAsync"/>), and the
+        /// version rule's verdict on it. When the platform cannot be read, the verdict on what the store last had.
+        /// </summary>
+        private async Task<PlatformVersionRule.Verdict> RefreshVersionAsync(string connectionKey)
+        {
+            await ConnectionLoginService.RefreshConnectionAsync(connectionKey);
+            return PlatformVersionRule.Check(projectVersion, ConnectionStore.Get(connectionKey)?.PlatformVersion);
+        }
+
+        /// <summary>
+        /// Right before a deploy: every target connection's platform version read again. A target the rule no longer
+        /// allows stops the deploy (nothing is built or sent), with a dialog that names it, and the groups are built again.
+        /// </summary>
+        private async Task<bool> RecheckVersionsAsync(List<GroupTargets> targets)
+        {
+            List<string> refused = new();
+            foreach (GroupTargets target in targets)
+            {
+                if (!PlatformVersionRule.Allows(await RefreshVersionAsync(target.Group.Key)))
+                    refused.Add(PublishedEnvironmentsIndex.LabelOf(target.Group.Key));
+            }
+
+            if (refused.Count == 0)
+                return true;
+
+            string message = $"The platform version of {string.Join(", ", refused)} changed and no longer matches the project's. Nothing was built or sent.";
+            LogDeployError(message);
+            EditorUtility.DisplayDialog("Deploy blocked", message + " The groups were read again: check the ticks.", "OK");
+            RebuildTargets();
+            return false;
+        }
+
+        private void OnTargetTicked(TargetGroup group, ChangeEvent<bool> evt)
+        {
+            evt.StopPropagation();
+            ProjectConnections.SetTargets(group.Key,
+                group.WorldToggles.Where(t => t.Value.value).Select(t => t.Key),
+                group.TenantToggle?.value ?? false);
+            RefreshDeployPreviews();
+            RefreshButtons();
+        }
+
+        /// <summary>The ticked targets of every group that can be deployed to: listed, and allowed by the version rule.</summary>
+        private List<GroupTargets> TickedTargets() => groups.Values
+            .Where(g => g.Allowed && g.Listed)
+            .Select(g => new GroupTargets
+            {
+                Group = g,
+                Worlds = g.WorldToggles.Where(t => t.Value.value).Select(t => t.Key).ToList(),
+                Tenant = g.TenantToggle?.value ?? false,
+            })
+            .Where(t => t.Count > 0)
+            .ToList();
+
+        /// <summary>The banner (the default connection), each group's title and status, and the session-expiry refresh.</summary>
+        private void RefreshLabels()
+        {
+            if (loginStatusLabel == null)
+                return;
+
+            ConnectionRecord defaultConnection = ConnectionStore.Get(ProjectConnections.DefaultKey);
+            if (defaultConnection == null)
+            {
+                loginStatusLabel.text = "No default connection: choose one in Available Tenants.";
+                loginStatusLabel.style.color = new Color(0.8f, 0.4f, 0.2f);
             }
             else
             {
-                loginStatusLabel.text = "Not logged in";
-                loginStatusLabel.style.color = new Color(0.8f, 0.4f, 0.2f);
+                string session = defaultConnection.HasSession
+                    ? $"logged in{(string.IsNullOrEmpty(defaultConnection.Username) ? "" : $" as {defaultConnection.Username}")}{EditorSessionManager.DescribeSession(defaultConnection, out _)}"
+                    : "not logged in";
+                loginStatusLabel.text = $"Default connection: {PublishedEnvironmentsIndex.LabelOf(defaultConnection.Key)}, {session}";
+                loginStatusLabel.style.color = !defaultConnection.HasSession
+                    ? new Color(0.8f, 0.4f, 0.2f)
+                    : defaultConnection.IsTokenValid ? new Color(0.2f, 0.8f, 0.2f) : new Color(0.9f, 0.7f, 0.2f);
+            }
 
-                deploySection.style.display = DisplayStyle.None;
-                tenantDeploySection.style.display = DisplayStyle.None;
-                availableWorlds.Clear();
-                selectedWorlds.Clear();
-                worldDeployPreviews.Clear();
+            foreach (TargetGroup group in groups.Values)
+            {
+                ConnectionRecord record = ConnectionStore.Get(group.Key);
+                if (record == null)
+                    continue;
 
-                // Where the scenes are published belongs to the session that just ended: drop it, and
-                // with it the per-world filter choices it fed.
-                PublishedEnvironmentsIndex.Clear();
-                if (publicationFilter != null && publicationFilter.value != publication_all)
+                string state = !record.HasSession ? "not logged in" : record.IsTokenValid ? "logged in" : "session expired";
+                bool isDefault = string.Equals(record.Key, defaultConnection?.Key, StringComparison.OrdinalIgnoreCase);
+                group.Foldout.text = $"{record.TenantLabel} · {record.Environment ?? "?"} · platform {record.PlatformVersion ?? "unknown"} · {state}" +
+                                     (isDefault ? " · default" : "");
+
+                if (record.HasSession)
                 {
-                    publicationFilter.SetValueWithoutNotify(publication_all);
-                    RebuildSceneList();
+                    string user = string.IsNullOrEmpty(record.Username) ? "" : $" as {record.Username}";
+                    string role = record.IsTenantManager ? " [TenantManager]" : "";
+                    group.Status.text = $"Logged in{user}{role}{EditorSessionManager.DescribeSession(record, out bool tokenValid)}";
+                    group.Status.style.color = tokenValid ? new Color(0.2f, 0.8f, 0.2f) : new Color(0.9f, 0.7f, 0.2f);
                 }
+                else
+                {
+                    group.Status.text = "Not logged in.";
+                    group.Status.style.color = new Color(0.8f, 0.4f, 0.2f);
+                }
+
+                group.LoginButton.style.display = record.HasSession ? DisplayStyle.None : DisplayStyle.Flex;
+                group.LogoutButton.style.display = record.HasSession ? DisplayStyle.Flex : DisplayStyle.None;
             }
 
             ScheduleSessionExpiryRefresh();
         }
 
-        // A renewal or a server rejection changes only the token: re-render the label, never the
-        // worlds — this runs inside the API call that renewed it.
-        private void OnTokenChanged() => RefreshLoginState(reloadWorlds: false);
-
         /// <summary>
-        /// The label goes stale on its own when the token expires while the window sits idle:
-        /// re-render it once, right after that moment. One run per token, re-armed on every
-        /// render, so a renewal moves it and a logout drops it.
+        /// The labels go stale on their own when a token expires while the window sits idle: re-render them once, right
+        /// after the first such moment among the project's connections. Re-armed on every render.
         /// </summary>
         private void ScheduleSessionExpiryRefresh()
         {
             sessionExpiryRefresh?.Pause();
             sessionExpiryRefresh = null;
 
-            DateTime? usableUntil = EditorLoginState.TokenUsableUntilUtc;
-            if (!EditorLoginState.IsTokenValid || usableUntil == null)
+            DateTime? next = UsedConnections()
+                .Where(r => r.IsTokenValid && r.UsableUntilUtc != null)
+                .Select(r => r.UsableUntilUtc)
+                .OrderBy(t => t)
+                .FirstOrDefault();
+            if (next == null)
                 return;
 
             // One second past the moment, so IsTokenValid has already flipped when it runs.
-            long delayMs = (long)Math.Max(0, (usableUntil.Value - DateTime.UtcNow).TotalMilliseconds) + 1000;
+            long delayMs = (long)Math.Max(0, (next.Value - DateTime.UtcNow).TotalMilliseconds) + 1000;
             sessionExpiryRefresh = loginStatusLabel.schedule
-                .Execute(() => RefreshLoginState(reloadWorlds: false))
+                .Execute(RefreshLabels)
                 .StartingIn(delayMs);
-        }
-
-        private async void LoadWorlds()
-        {
-            worldsList.Clear();
-            worldsLoadingLabel.style.display = DisplayStyle.Flex;
-            worldsLoadingLabel.text = "Loading worlds...";
-            deployButton.SetEnabled(false);
-            buildAndDeployButton.SetEnabled(false);
-
-            try
-            {
-                string connectionKey = ProjectConnections.DefaultKey;
-                worldsConnectionKey = connectionKey;
-
-                // Silent renewal only: this runs just from opening the window, and popping a
-                // browser login at someone who only clicked a menu item would be startling.
-                // Deploy actions, which the user explicitly asked for, do allow it.
-                WorldListResult listing = await EnvironmentsDeploy.LoadWorldsAsync(
-                    connectionKey: connectionKey,
-                    progress: text => worldsLoadingLabel.text = text,
-                    // Where every scene is already published, shown under each scene by SceneConfigurationDrawer:
-                    // computed on ALL the worlds the account can see, before the deploy-role filter.
-                    onListed: visible => _ = PublishedEnvironmentsIndex.RefreshAsync(visible.Select(w => (w.Id, w.Label)), connectionKey));
-
-                selectedWorlds.Clear();
-
-                if (listing.Status != WorldListStatus.Ok)
-                {
-                    worldsLoadingLabel.text = listing.Message;
-                    return;
-                }
-
-                availableWorlds = listing.Deployable;
-                worldsLoadingLabel.style.display = DisplayStyle.None;
-
-                HashSet<int> savedSelection = LoadSelectedWorldIds();
-                worldDeployPreviews.Clear();
-
-                if (availableWorlds.Count == 1)
-                {
-                    // Single world: show as label, auto-select
-                    var world = availableWorlds[0];
-                    selectedWorlds[world.Id] = true;
-                    SaveSelectedWorldIds();
-
-                    Label worldLabel = new Label($"{world.Label} (ID: {world.Id})");
-                    worldLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-                    worldLabel.style.marginTop = 4;
-                    worldLabel.style.marginBottom = 4;
-                    worldsList.Add(worldLabel);
-                    worldsList.Add(worldDeployPreviews[world.Id] = NewDeployPreview());
-                }
-                else
-                {
-                    foreach (var world in availableWorlds)
-                    {
-                        bool wasSelected = savedSelection.Contains(world.Id);
-                        selectedWorlds[world.Id] = wasSelected;
-
-                        Toggle toggle = new Toggle
-                        {
-                            text = $"{world.Label} (ID: {world.Id})",
-                            value = wasSelected
-                        };
-                        int worldId = world.Id;
-                        VisualElement preview = NewDeployPreview();
-                        preview.style.display = wasSelected ? DisplayStyle.Flex : DisplayStyle.None;
-                        toggle.RegisterValueChangedCallback(evt =>
-                        {
-                            selectedWorlds[worldId] = evt.newValue;
-                            SaveSelectedWorldIds();
-                            preview.style.display = evt.newValue ? DisplayStyle.Flex : DisplayStyle.None;
-                            RefreshDeployPreviews();
-                        });
-                        worldsList.Add(toggle);
-                        worldsList.Add(worldDeployPreviews[worldId] = preview);
-                    }
-                }
-                RefreshDeployPreviews();
-
-                deployButton.SetEnabled(true);
-                buildAndDeployButton.SetEnabled(true);
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[AddressablesManagement] Error loading worlds: {ex.Message}");
-                worldsLoadingLabel.text = $"Error: {ex.Message}";
-            }
-        }
-
-        // The old key held one machine-wide value: the same ids were ticked again in any tenant and any project,
-        // and a tick left from another tenant once sent a deploy to the wrong world. The ticks belong to a
-        // connection of a project now, and the old value is no longer read.
-        private const string SELECTED_WORLDS_KEY_BASE = "Virtuademy_AddressablesManagement_SelectedWorlds";
-
-        private string SelectedWorldsKey()
-        {
-            string scope = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).ToLowerInvariant() + "|" + (worldsConnectionKey ?? ProjectConnections.DefaultKey ?? "");
-            using System.Security.Cryptography.SHA1 sha = System.Security.Cryptography.SHA1.Create();
-            string hash = BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(scope))).Replace("-", "").Substring(0, 12);
-            return SELECTED_WORLDS_KEY_BASE + "_" + hash;
-        }
-
-        private List<int> GetSelectedWorldIds()
-        {
-            return selectedWorlds.Where(kvp => kvp.Value).Select(kvp => kvp.Key).ToList();
-        }
-
-        private void SaveSelectedWorldIds()
-        {
-            var ids = GetSelectedWorldIds();
-            EditorPrefs.SetString(SelectedWorldsKey(), string.Join(",", ids));
-        }
-
-        private HashSet<int> LoadSelectedWorldIds()
-        {
-            string saved = EditorPrefs.GetString(SelectedWorldsKey(), "");
-            var result = new HashSet<int>();
-            if (string.IsNullOrEmpty(saved)) return result;
-
-            foreach (string part in saved.Split(','))
-            {
-                if (int.TryParse(part.Trim(), out int id))
-                    result.Add(id);
-            }
-            return result;
         }
 
         private List<string> GetBuiltSceneNames()
@@ -485,11 +725,10 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             ClearDeployErrors();
 
-            List<int> worldIds = GetSelectedWorldIds();
-            if (worldIds.Count == 0)
+            List<GroupTargets> targets = TickedTargets();
+            if (targets.Count == 0)
             {
-                Debug.LogWarning("[AddressablesManagement] No worlds selected for deploy.");
-                EditorUtility.DisplayDialog("Deploy", "Please select at least one world.", "OK");
+                EditorUtility.DisplayDialog("Deploy", "Tick at least one world, or the tenant level, in the group of a connection.", "OK");
                 return;
             }
 
@@ -501,14 +740,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             // Check that zip files exist
-            List<string> missingZips = new();
-            foreach (string scene in scenes)
-            {
-                string zipPath = Path.Combine(addressables_output_folder, scene + ".zip");
-                if (!File.Exists(zipPath))
-                    missingZips.Add(scene);
-            }
-
+            List<string> missingZips = scenes.Where(scene => !File.Exists(Path.Combine(addressables_output_folder, scene + ".zip"))).ToList();
             if (missingZips.Count > 0)
             {
                 string missing = string.Join(", ", missingZips);
@@ -517,15 +749,17 @@ namespace Virtuademy.SDK.Environments.Editor
                 return;
             }
 
-            SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.DefaultKey;
+            if (!ConfirmTargets("Deploy", targets) || !await RecheckVersionsAsync(targets))
+                return;
+
+            SetDeployRunning(true);
             try
             {
-                await DeployToWorlds(worldIds, scenes);
+                await DeployToTargetsAsync("Deploy", targets, scenes);
             }
             finally
             {
-                SetDeployButtonsEnabled(true);
+                SetDeployRunning(false);
             }
         }
 
@@ -533,30 +767,29 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             ClearDeployErrors();
 
-            List<int> worldIds = GetSelectedWorldIds();
-            if (worldIds.Count == 0)
+            List<GroupTargets> targets = TickedTargets();
+            if (targets.Count == 0)
             {
-                Debug.LogWarning("[AddressablesManagement] No worlds selected for build & deploy.");
-                EditorUtility.DisplayDialog("Build & Deploy", "Please select at least one world.", "OK");
+                EditorUtility.DisplayDialog("Build & Deploy", "Tick at least one world, or the tenant level, in the group of a connection.", "OK");
                 return;
             }
 
-            await RunBuildAndDeployAsync(worldIds);
-        }
+            // Asked before the build, which takes minutes: nobody should come back to a question.
+            if (!ConfirmTargets("Build & Deploy", targets) || !await RecheckVersionsAsync(targets))
+                return;
 
-        /// <summary>The build and deploy itself, with the world ids passed in rather than read off the window.</summary>
-        /// <remarks>
-        /// Assembly reloads are locked for the whole flow (<see cref="LockedReloadAsync"/>): the build switches the
-        /// build target, which queues a recompilation and a domain reload, and a reload while the code below awaits
-        /// the network would end it silently.
-        /// </remarks>
-        private Task RunBuildAndDeployAsync(List<int> worldIds) => LockedReloadAsync(() => BuildAndDeployToWorldsAsync(worldIds));
+            await LockedReloadAsync(() => BuildAndDeployAsync(targets));
+        }
 
         /// <summary>
         /// Runs <paramref name="flow"/> with assembly reloads locked, and always unlocks afterwards: on every
         /// early return and on an exception too, because a lock left behind stops the editor from ever
         /// compiling a script again until it is restarted.
         /// </summary>
+        /// <remarks>
+        /// The build switches the build target, which queues a recompilation and a domain reload, and a reload while the
+        /// code awaits the network would end it silently.
+        /// </remarks>
         private static async Task LockedReloadAsync(Func<Task> flow)
         {
             EditorApplication.LockReloadAssemblies();
@@ -570,10 +803,14 @@ namespace Virtuademy.SDK.Environments.Editor
             }
         }
 
-        private async Task BuildAndDeployToWorldsAsync(List<int> worldIds)
+        /// <summary>
+        /// The interpreted scripts are verified on every target connection's platform before anything is built (the
+        /// script policy lives per Platform DB), the scenes are built once, and each target is then deployed with its own
+        /// connection's token.
+        /// </summary>
+        private async Task BuildAndDeployAsync(List<GroupTargets> targets)
         {
-            SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.DefaultKey;
+            SetDeployRunning(true);
 
             // The buttons come back on every way out, an exception included.
             try
@@ -581,18 +818,19 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (!RequireAddressablesConfigured("Build & Deploy"))
                     return;
 
-                // 0. Build + verify the interpreted DLL (local whitelist + authoritative server
-                //    check). Block the whole build & deploy if it fails.
-                if (!await BuildAndVerifyInterpretedDLLAsync())
+                foreach (string key in targets.Select(t => t.Group.Key).Distinct(StringComparer.OrdinalIgnoreCase))
                 {
-                    LogDeployError("Interpreted script DLL failed the security checks. Build & deploy aborted (see Console).");
-                    EditorUtility.DisplayDialog("Build & Deploy blocked",
-                        "The interpreted script DLL did not pass the security checks. See the Console. " +
-                        "Nothing was built or deployed.", "OK");
-                    return;
+                    if (!await EnvironmentsBuild.VerifyInterpretedScriptsAsync(key))
+                    {
+                        string label = PublishedEnvironmentsIndex.LabelOf(key);
+                        LogDeployError($"{label}: the interpreted script DLL failed the security checks. Build & deploy aborted (see Console).");
+                        EditorUtility.DisplayDialog("Build & Deploy blocked",
+                            $"The interpreted script DLL did not pass the security checks of {label}. See the Console. " +
+                            "Nothing was built or deployed.", "OK");
+                        return;
+                    }
                 }
 
-                // 1. Build
                 BuildAndZipScenes();
 
                 if (buildResult != EBuildError.None)
@@ -601,160 +839,127 @@ namespace Virtuademy.SDK.Environments.Editor
                     return;
                 }
 
-                // 2. Deploy
-                List<string> scenes = GetBuiltSceneNames();
-                await DeployToWorlds(worldIds, scenes);
+                await DeployToTargetsAsync("Build & Deploy", targets, GetBuiltSceneNames());
             }
             finally
             {
-                SetDeployButtonsEnabled(true);
+                SetDeployRunning(false);
             }
         }
 
-        private async Task DeployToWorlds(List<int> worldIds, List<string> scenes)
+        /// <summary>
+        /// Before a deploy to more than one target: the targets per tenant and environment, and a confirmation. Then, when
+        /// any of them is in a Production environment, a confirmation for those alone. False when either is declined.
+        /// </summary>
+        private static bool ConfirmTargets(string what, List<GroupTargets> targets)
         {
-            // The ticked worlds are the ones of the connection that was the default one when they were listed.
-            if (!string.Equals(operationKey, worldsConnectionKey, StringComparison.OrdinalIgnoreCase))
+            string Describe(GroupTargets t)
             {
-                LogDeployError("The project's connection changed since the worlds were listed. Nothing was sent: reload the worlds and tick them again.");
-                EditorUtility.DisplayDialog("Deploy blocked",
-                    "The project's connection changed since the worlds were listed, so the ticked worlds may belong to another tenant. " +
-                    "Nothing was sent. Reload the worlds and tick them again.", "OK");
-                return;
+                List<string> places = t.Worlds
+                    .Select(id => $"{t.Group.Deployable.FirstOrDefault(w => w.Id == id)?.Label ?? "world"} ({id})")
+                    .ToList();
+                if (t.Tenant)
+                    places.Add("tenant level");
+                return $"{PublishedEnvironmentsIndex.LabelOf(t.Group.Key)}: {string.Join(", ", places)}";
             }
 
-            int errorsBefore = deployErrorCount;
-            DeployReport report = await EnvironmentsDeploy.DeployToWorldsAsync(worldIds, availableWorlds, scenes, NewDeployObserver(), operationKey);
+            int count = targets.Sum(t => t.Count);
+            if (count > 1 && !EditorUtility.DisplayDialog($"{what} to {count} targets",
+                    "The scenes included in the build go to:\n\n" + string.Join("\n", targets.Select(Describe)) +
+                    "\n\nEach tenant is deployed with its own connection's login.", what, "Cancel"))
+                return false;
 
-            // Nothing was sent (no API URL, no session): the problem is already in the panel.
-            if (report.Fatal != null)
-                return;
+            List<GroupTargets> production = targets.Where(t => t.Group.Production).ToList();
+            if (production.Count > 0 && !EditorUtility.DisplayDialog("Deploy to production",
+                    "These targets are in a Production environment:\n\n" + string.Join("\n", production.Select(Describe)) +
+                    "\n\nDeploy there?", "Deploy to production", "Cancel"))
+                return false;
 
-            ReportDeployOutcome("World deploy", errorsBefore, report.ImportsStarted, report.Expected);
+            return true;
         }
 
-        /// <summary>Errors go to the deploy panel and the Console, progress to the editor's progress bar.</summary>
-        private DeployObserver NewDeployObserver() => new()
+        /// <summary>Each group's worlds, then its tenant level, with that group's connection. Problems go to the panel prefixed with the tenant.</summary>
+        private async Task DeployToTargetsAsync(string what, List<GroupTargets> targets, List<string> scenes)
         {
-            Error = LogDeployError,
-            Progress = (title, info, fraction) => EditorUtility.DisplayProgressBar(title, info, fraction),
+            int errorsBefore = deployErrorCount;
+            int importsStarted = 0;
+            int expected = 0;
+
+            foreach (GroupTargets target in targets)
+            {
+                DeployObserver observer = NewDeployObserver(PublishedEnvironmentsIndex.LabelOf(target.Group.Key));
+
+                if (target.Worlds.Count > 0)
+                {
+                    DeployReport report = await EnvironmentsDeploy.DeployToWorldsAsync(target.Worlds, target.Group.Deployable, scenes, observer, target.Group.Key);
+                    importsStarted += report.ImportsStarted;
+                    expected += Math.Max(report.Expected, target.Worlds.Count * scenes.Count);
+                }
+
+                if (target.Tenant)
+                {
+                    DeployReport report = await EnvironmentsDeploy.DeployToTenantAsync(scenes, observer, target.Group.Key);
+                    importsStarted += report.ImportsStarted;
+                    expected += Math.Max(report.Expected, scenes.Count);
+                }
+            }
+
+            ReportDeployOutcome(what, errorsBefore, importsStarted, expected);
+        }
+
+        /// <summary>Errors go to the deploy panel and the Console, prefixed with the tenant; progress to the editor's progress bar.</summary>
+        private DeployObserver NewDeployObserver(string tenant) => new()
+        {
+            Error = message => LogDeployError($"{tenant}: {message}"),
+            Progress = (title, info, fraction) => EditorUtility.DisplayProgressBar($"{title} ({tenant})", info, fraction),
             ProgressDone = EditorUtility.ClearProgressBar,
         };
 
-        private void SetDeployButtonsEnabled(bool enabled)
+        /// <summary>While a deploy runs the groups are frozen: no ticking, and a rebuild waits for the end.</summary>
+        private void SetDeployRunning(bool running)
         {
-            deployButton?.SetEnabled(enabled);
-            buildAndDeployButton?.SetEnabled(enabled);
-            tenantDeployButton?.SetEnabled(enabled);
-            tenantBuildAndDeployButton?.SetEnabled(enabled);
+            deployRunning = running;
+            targetsContainer?.SetEnabled(!running);
+            RefreshButtons();
 
-            // Re-assert missing-module gating on build buttons — RefreshPlatformWarnings
-            // will disable them again if any selected scene targets an uninstalled module.
-            if (enabled)
-                RefreshPlatformWarnings();
-        }
-
-        #endregion
-
-        #region Tenant Deploy
-
-        private async void OnTenantDeployClicked()
-        {
-            ClearDeployErrors();
-
-            List<string> scenes = GetBuiltSceneNames();
-            if (scenes.Count == 0)
+            if (!running && rebuildPending)
             {
-                Debug.LogWarning("[AddressablesManagement] No scenes marked for build.");
-                return;
-            }
-
-            List<string> missingZips = new();
-            foreach (string scene in scenes)
-            {
-                string zipPath = Path.Combine(addressables_output_folder, scene + ".zip");
-                if (!File.Exists(zipPath))
-                    missingZips.Add(scene);
-            }
-
-            if (missingZips.Count > 0)
-            {
-                string missing = string.Join(", ", missingZips);
-                LogDeployError($"Missing zip files for: {missing}. Build first.");
-                EditorUtility.DisplayDialog("Deploy to Tenant", $"Missing zip files for:\n{missing}\n\nPlease build first.", "OK");
-                return;
-            }
-
-            SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.DefaultKey;
-            try
-            {
-                await DeployToTenant(scenes);
-            }
-            finally
-            {
-                SetDeployButtonsEnabled(true);
+                rebuildPending = false;
+                RebuildTargets();
             }
         }
 
-        private async void OnTenantBuildAndDeployClicked()
+        /// <summary>
+        /// The build buttons wait for the build modules the included scenes need; the deploy buttons also for a ticked
+        /// target; none works while a deploy runs.
+        /// </summary>
+        private void RefreshButtons()
         {
-            ClearDeployErrors();
+            bool hasTargets = TickedTargets().Count > 0;
+            const string missingModulesTooltip =
+                "Disabled: one or more selected scenes require build modules that are not installed. " +
+                "See the warnings above.";
+            const string noTargetTooltip = "Tick a world, or the tenant level, in the group of a connection first.";
 
-            await RunTenantBuildAndDeployAsync();
-        }
-
-        /// <summary>Same as above for the tenant deploy, with the reloads locked the same way.</summary>
-        private Task RunTenantBuildAndDeployAsync() => LockedReloadAsync(BuildAndDeployToTenantAsync);
-
-        private async Task BuildAndDeployToTenantAsync()
-        {
-            SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.DefaultKey;
-
-            // The buttons come back on every way out, an exception included.
-            try
+            if (buildAddressablesButton != null)
             {
-                if (!RequireAddressablesConfigured("Build & Deploy to Tenant"))
-                    return;
-
-                // 0. Build + verify the interpreted DLL. Block the whole build & deploy if it fails.
-                if (!await BuildAndVerifyInterpretedDLLAsync())
-                {
-                    LogDeployError("Interpreted script DLL failed the security checks. Tenant build & deploy aborted (see Console).");
-                    EditorUtility.DisplayDialog("Build & Deploy blocked",
-                        "The interpreted script DLL did not pass the security checks. See the Console. " +
-                        "Nothing was built or deployed.", "OK");
-                    return;
-                }
-
-                BuildAndZipScenes();
-
-                if (buildResult != EBuildError.None)
-                {
-                    LogDeployError($"Build failed ({buildResult}). Aborting tenant deploy.");
-                    return;
-                }
-
-                List<string> scenes = GetBuiltSceneNames();
-                await DeployToTenant(scenes);
+                buildAddressablesButton.SetEnabled(!missingModules && !deployRunning);
+                buildAddressablesButton.tooltip = missingModules ? missingModulesTooltip : string.Empty;
             }
-            finally
+
+            if (deployButton != null)
             {
-                SetDeployButtonsEnabled(true);
+                deployButton.SetEnabled(hasTargets && !deployRunning);
+                deployButton.tooltip = hasTargets ? "Upload the built zips of the included scenes to every ticked target." : noTargetTooltip;
             }
-        }
 
-        private async Task DeployToTenant(List<string> scenes)
-        {
-            int tenantErrorsBefore = deployErrorCount;
-            DeployReport report = await EnvironmentsDeploy.DeployToTenantAsync(scenes, NewDeployObserver(), operationKey);
-
-            // Not even started, or stopped before any scene: the problem is already in the panel.
-            if (report.Fatal != null || report.Targets.Count == 0 || !report.Targets[0].UploadLinkObtained)
-                return;
-
-            ReportDeployOutcome("Tenant deploy", tenantErrorsBefore, report.ImportsStarted, report.Expected);
+            if (buildAndDeployButton != null)
+            {
+                buildAndDeployButton.SetEnabled(hasTargets && !missingModules && !deployRunning);
+                buildAndDeployButton.tooltip = missingModules ? missingModulesTooltip
+                    : hasTargets ? "Build the included scenes once, then verify and upload them to every ticked target with its own connection's login."
+                    : noTargetTooltip;
+            }
         }
 
         #endregion
@@ -827,18 +1032,18 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>
-        /// All / Published / Not published, then one entry per world the index knows about (every
-        /// world the account can see, not only the deployable ones) and Tenant level when readable.
-        /// Each place carries, in brackets, how many of the project's scenes are published there — the
-        /// number of rows the filter would show. Keeps the current choice when it still exists (by
-        /// place, since its text changes with the count), falls back to All otherwise.
+        /// All / Published / Not published, then, per connection whose index has data, Tenant level when readable and one
+        /// entry per world the index knows about (every world the account can see, not only the deployable ones). With
+        /// more than one connection each place carries its tenant. Each place carries, in brackets, how many of the
+        /// project's scenes are published there — the number of rows the filter would show. Keeps the current choice when
+        /// it still exists (by place, since its text changes with the count), falls back to All otherwise.
         /// </summary>
         private void RefreshPublicationFilterChoices()
         {
             if (publicationFilter == null) return;
 
             string current = publicationFilter.value;
-            bool currentIsPlace = publicationPlaceChoices.TryGetValue(current ?? string.Empty, out int? currentPlace);
+            bool currentIsPlace = publicationPlaceChoices.TryGetValue(current ?? string.Empty, out (string Connection, int? WorldId) currentPlace);
 
             publicationPlaceChoices.Clear();
             List<string> choices = new() { publication_all, publication_published, publication_not_published };
@@ -847,32 +1052,37 @@ namespace Virtuademy.SDK.Environments.Editor
                 .Where(c => c.Scene != null)
                 .Select(c => PublishedEnvironmentsIndex.Key(c.Scene.name))
                 .ToList();
-            int CountIn(int? place) => sceneKeys.Count(k => PublishedEnvironmentsIndex.IsPublishedIn(k, place));
 
-            if (PublishedEnvironmentsIndex.HasData && !PublishedEnvironmentsIndex.TenantUnknown)
+            // Without data (logged out, first load in progress) there is nothing to filter a place on.
+            IReadOnlyList<string> connections = PublishedEnvironmentsIndex.ConnectionsWithData;
+            foreach (string connection in connections)
             {
-                string tenantChoice = $"{publication_tenant} ({CountIn(null)})";
-                choices.Add(tenantChoice);
-                publicationPlaceChoices[tenantChoice] = null;
-            }
+                int CountIn(int? place) => sceneKeys.Count(k => PublishedEnvironmentsIndex.IsPublishedIn(connection, k, place));
+                string prefix = connections.Count > 1 ? $"{PublishedEnvironmentsIndex.LabelOf(connection)} · " : string.Empty;
 
-            // Without data (logged out, first load in progress) there is nothing to filter a world on.
-            IReadOnlyList<(int Id, string Label)> worlds = PublishedEnvironmentsIndex.HasData
-                ? PublishedEnvironmentsIndex.Worlds
-                : Array.Empty<(int, string)>();
-            HashSet<string> duplicateLabels = new(worlds.GroupBy(w => w.Label).Where(g => g.Count() > 1).Select(g => g.Key));
-            foreach ((int id, string label) in worlds.OrderBy(w => w.Label, StringComparer.OrdinalIgnoreCase))
-            {
-                // The dropdown shows its value as text, so two worlds with the same name need the id to tell them apart.
-                string worldName = duplicateLabels.Contains(label) ? $"{label} [ID: {id}]" : label;
-                string choice = $"{publication_world_prefix}{worldName} ({CountIn(id)})";
-                if (publicationPlaceChoices.ContainsKey(choice)) continue;
-                choices.Add(choice);
-                publicationPlaceChoices[choice] = id;
+                if (!PublishedEnvironmentsIndex.TenantUnknownFor(connection))
+                {
+                    string tenantChoice = $"{prefix}{publication_tenant} ({CountIn(null)})";
+                    choices.Add(tenantChoice);
+                    publicationPlaceChoices[tenantChoice] = (connection, null);
+                }
+
+                IReadOnlyList<(int Id, string Label)> worlds = PublishedEnvironmentsIndex.WorldsOf(connection);
+                HashSet<string> duplicateLabels = new(worlds.GroupBy(w => w.Label).Where(g => g.Count() > 1).Select(g => g.Key));
+                foreach ((int id, string label) in worlds.OrderBy(w => w.Label, StringComparer.OrdinalIgnoreCase))
+                {
+                    // The dropdown shows its value as text, so two worlds with the same name need the id to tell them apart.
+                    string worldName = duplicateLabels.Contains(label) ? $"{label} [ID: {id}]" : label;
+                    string choice = $"{prefix}{publication_world_prefix}{worldName} ({CountIn(id)})";
+                    if (publicationPlaceChoices.ContainsKey(choice)) continue;
+                    choices.Add(choice);
+                    publicationPlaceChoices[choice] = (connection, id);
+                }
             }
 
             string next = currentIsPlace
-                ? publicationPlaceChoices.FirstOrDefault(p => p.Value == currentPlace).Key ?? publication_all
+                ? publicationPlaceChoices.FirstOrDefault(p => string.Equals(p.Value.Connection, currentPlace.Connection, StringComparison.OrdinalIgnoreCase)
+                                                              && p.Value.WorldId == currentPlace.WorldId).Key ?? publication_all
                 : choices.Contains(current) ? current : publication_all;
             publicationFilter.choices = choices;
             publicationFilter.SetValueWithoutNotify(next);
@@ -897,16 +1107,16 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (cfg.Scene == null) continue;
                 if (search.Length > 0 && cfg.Scene.name.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0) continue;
                 if (onlyInBuild && !cfg.IncludeInBuild) continue;
-                if (publication != publication_all && PublishedEnvironmentsIndex.HasData)
+                if (publication != publication_all && PublishedEnvironmentsIndex.AnyData)
                 {
                     string key = PublishedEnvironmentsIndex.Key(cfg.Scene.name);
-                    if (publicationPlaceChoices.TryGetValue(publication, out int? placeId))
+                    if (publicationPlaceChoices.TryGetValue(publication, out (string Connection, int? WorldId) place))
                     {
-                        if (!PublishedEnvironmentsIndex.IsPublishedIn(key, placeId)) continue;
+                        if (!PublishedEnvironmentsIndex.IsPublishedIn(place.Connection, key, place.WorldId)) continue;
                     }
                     else
                     {
-                        bool published = PublishedEnvironmentsIndex.Get(key).Count > 0;
+                        bool published = PublishedEnvironmentsIndex.IsPublishedAnywhere(key);
                         if (published != (publication == publication_published)) continue;
                     }
                 }
@@ -944,8 +1154,8 @@ namespace Virtuademy.SDK.Environments.Editor
         private const string publication_tenant = "Tenant level";
         private const string publication_world_prefix = "World: ";
 
-        /// <summary>Filter choices that point at one place: a world id, or null for tenant level.</summary>
-        private readonly Dictionary<string, int?> publicationPlaceChoices = new();
+        /// <summary>Filter choices that point at one place: a connection and a world id, or null for its tenant level.</summary>
+        private readonly Dictionary<string, (string Connection, int? WorldId)> publicationPlaceChoices = new();
 
         private static readonly Color preview_new_color = new(0.42f, 0.78f, 0.45f);
         private static readonly Color preview_update_color = new(0.95f, 0.66f, 0.28f);
@@ -957,29 +1167,38 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>
-        /// Under every selected world (and the tenant section): what the current "Include in build"
-        /// selection does there — the scenes that arrive as new environments (green) and the ones that
-        /// overwrite an environment already published with that name (orange).
+        /// Under every ticked world and tenant level, in its connection's group: what the current "Include in build"
+        /// selection does there — the scenes that arrive as new environments (green) and the ones that overwrite an
+        /// environment already published with that name (orange).
         /// </summary>
         private void RefreshDeployPreviews()
         {
-            foreach (KeyValuePair<int, VisualElement> pair in worldDeployPreviews)
+            foreach (TargetGroup group in groups.Values)
             {
-                if (selectedWorlds.TryGetValue(pair.Key, out bool selected) && selected)
-                    FillDeployPreview(pair.Value, pair.Key);
+                foreach (KeyValuePair<int, VisualElement> pair in group.WorldPreviews)
+                {
+                    if (group.WorldToggles.TryGetValue(pair.Key, out Toggle toggle) && toggle.value)
+                        FillDeployPreview(pair.Value, pair.Key, group.Key);
+                    else
+                        pair.Value.Clear();
+                }
+
+                if (group.TenantPreview == null)
+                    continue;
+
+                if (group.TenantToggle?.value == true)
+                    FillDeployPreview(group.TenantPreview, null, group.Key);
                 else
-                    pair.Value.Clear();
+                    group.TenantPreview.Clear();
             }
-            if (tenantDeployPreview != null)
-                FillDeployPreview(tenantDeployPreview, null);
         }
 
-        private void FillDeployPreview(VisualElement target, int? worldId)
+        private void FillDeployPreview(VisualElement target, int? worldId, string connectionKey)
         {
             target.Clear();
             if (sceneConfigurations?.SceneConfigurations == null) return;
 
-            DeployPreview preview = EnvironmentsDeploy.Preview(EnvironmentsBuild.IncludedScenes(sceneConfigurations), worldId);
+            DeployPreview preview = EnvironmentsDeploy.Preview(EnvironmentsBuild.IncludedScenes(sceneConfigurations), worldId, connectionKey);
 
             switch (preview.State)
             {
@@ -1214,27 +1433,10 @@ namespace Virtuademy.SDK.Environments.Editor
 
             platformWarningsContainer.style.display = anyWarning ? DisplayStyle.Flex : DisplayStyle.None;
 
-            // Disable build buttons while any selected scene targets a non-installed module.
-            // Plain deploy buttons (which only re-upload already-built zips) stay enabled.
-            const string missingModulesTooltip =
-                "Disabled: one or more selected scenes require build modules that are not installed. " +
-                "See the warnings above.";
-
-            if (buildAddressablesButton != null)
-            {
-                buildAddressablesButton.SetEnabled(!anyWarning);
-                buildAddressablesButton.tooltip = anyWarning ? missingModulesTooltip : string.Empty;
-            }
-            if (buildAndDeployButton != null)
-            {
-                buildAndDeployButton.SetEnabled(!anyWarning);
-                buildAndDeployButton.tooltip = anyWarning ? missingModulesTooltip : string.Empty;
-            }
-            if (tenantBuildAndDeployButton != null)
-            {
-                tenantBuildAndDeployButton.SetEnabled(!anyWarning);
-                tenantBuildAndDeployButton.tooltip = anyWarning ? missingModulesTooltip : string.Empty;
-            }
+            // Build buttons wait while any selected scene targets a non-installed module.
+            // The plain deploy button (which only re-uploads already-built zips) does not.
+            missingModules = anyWarning;
+            RefreshButtons();
         }
 
         /// <summary>
@@ -1302,8 +1504,8 @@ namespace Virtuademy.SDK.Environments.Editor
             if (!RequireAddressablesConfigured("Build Addressables"))
                 return;
 
-            operationKey = ProjectConnections.DefaultKey;
-            if (!await BuildAndVerifyInterpretedDLLAsync())
+            // The build alone has no target: the scripts are verified on the default connection's platform.
+            if (!await BuildAndVerifyInterpretedDLLAsync(ProjectConnections.DefaultKey))
             {
                 EditorUtility.DisplayDialog("Build blocked",
                     "The interpreted script DLL did not pass the security checks. " +
@@ -1343,7 +1545,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// server check). Returns true if the build may proceed; see
         /// <see cref="EnvironmentsBuild.VerifyInterpretedScriptsAsync"/>.
         /// </summary>
-        private Task<bool> BuildAndVerifyInterpretedDLLAsync() => EnvironmentsBuild.VerifyInterpretedScriptsAsync(operationKey ?? ProjectConnections.DefaultKey);
+        private static Task<bool> BuildAndVerifyInterpretedDLLAsync(string connectionKey) => EnvironmentsBuild.VerifyInterpretedScriptsAsync(connectionKey);
 
         /// <summary>
         /// Builds addressables for all platforms and creates zip files.

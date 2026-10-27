@@ -877,7 +877,7 @@ $@"{{
         }
 
         /// <summary>
-        /// What a publish would produce, plus the rules it must satisfy. Two inputs only:
+        /// What a publish would produce, plus the rules it must satisfy, on which platform. Three inputs only:
         ///
         ///   * the assembly name, which already digests the source — the scripts, the assembly
         ///     definition minus its own name field, the Unity version, the per-target defines and
@@ -885,17 +885,20 @@ $@"{{
         ///     project here would be a second implementation of the same thing, free to drift from
         ///     the one the name is built from;
         ///   * the whitelist, so a policy that tightens forces a re-verify instead of leaving
-        ///     already-published code accepted under the old rules until someone edits a script.
+        ///     already-published code accepted under the old rules until someone edits a script;
+        ///   * the connection the server check runs on: the verdict of one platform is not another's
+        ///     (its policy overrides live in its own Platform DB), so a deploy to a second tenant is
+        ///     verified there even when the scripts and the whitelist are the ones of the last publish.
         ///
         /// The policy stays OUT of the assembly name for the same reason it belongs here: it
         /// decides whether the code is acceptable, not what the code compiles to. Folding it into
         /// the name would mint a new identity for bytes that did not change, and the backend would
         /// store a second copy of an assembly it already has.
         /// </summary>
-        static string ComputePublishFingerprint(string assemblyName, string policyJson)
+        static string ComputePublishFingerprint(string assemblyName, string policyJson, string connectionKey)
         {
             return HotUpdateDllLocator.Sha256Hex(System.Text.Encoding.UTF8.GetBytes(
-                (assemblyName ?? string.Empty) + "\n" + (policyJson ?? string.Empty)));
+                (assemblyName ?? string.Empty) + "\n" + (policyJson ?? string.Empty) + "\n" + (connectionKey ?? string.Empty).ToLowerInvariant()));
         }
         // ============================================================
         //  BUILD + VERIFY — used by the Addressables build gate
@@ -971,7 +974,7 @@ $@"{{
             //    Read once and carried through the steps below: the property rescans the source on
             //    every access, and this run must not straddle two identities.
             string expected = HotUpdateAssemblyName;
-            string fingerprint = ComputePublishFingerprint(expected, fetch.Json);
+            string fingerprint = ComputePublishFingerprint(expected, fetch.Json, connectionKey);
 
             if (fingerprint == EditorPrefs.GetString(FingerprintKey, string.Empty))
             {
