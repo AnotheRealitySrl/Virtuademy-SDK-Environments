@@ -14,7 +14,7 @@
             </engine:VisualElement>
             <engine:VisualElement name="binary-catalog" class="build-error-item">
                 <engine:VisualElement name="binary-catalog-icon" class="build-error-item-icon" />
-                <engine:Label text="Unable to build Addressables correctly. Plese go to &lt;i&gt;&quot;Asset Management/Addressables/Settings&quot;&lt;/i&gt;, remove the check from the &quot;Enable Json catalog&quot;, add it again, save the project, and then restart the Editor. Finally, launch the build again." name="binary-catalog-text" class="build-error-item-text" style="white-space: normal;" />
+                <engine:Label text="Unable to build Addressables correctly. Please go to &lt;i&gt;&quot;Asset Management/Addressables/Settings&quot;&lt;/i&gt;, remove the check from the &quot;Enable Json catalog&quot;, add it again, save the project, and then restart the Editor. Finally, launch the build again." name="binary-catalog-text" class="build-error-item-text" style="white-space: normal;" />
             </engine:VisualElement>
         </engine:VisualElement>
         <engine:GroupBox name="scene-configuration">
@@ -33,7 +33,7 @@
         </engine:VisualElement>
         <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
         <engine:GroupBox name="addressables-settings">
-            <engine:Foldout text="Show advanced addressables configurations" name="addressables-settings-foldout" value="false" tooltip="If one or more misconfigurations of the project occurs, you can fix them by clicking the button &quot;Configure Addressables settings&quot;" style="-unity-font-style: bold;">
+            <engine:Foldout text="Show advanced addressables configurations" name="addressables-settings-foldout" value="false" tooltip="If one or more misconfigurations of the project occurs, you can fix them by clicking the button &quot;Fix Addressables configurations&quot; (the Build Addressables button turns into it)" style="-unity-font-style: bold;">
                 <engine:GroupBox name="top-level-settings" class="settings-group" style="flex-direction: row; align-items: flex-start;">
                     <engine:Foldout text="Top-level settings" name="top-level-settings-foldout" style="-unity-font-style: bold;">
                         <engine:VisualElement name="project-settings-git-instance" class="settings-item">

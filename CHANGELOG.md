@@ -95,6 +95,8 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
   Rigging brings Burst with it. Warrants a minor bump.
 
 #### Fixed
+- The advanced section's tooltip of the Addressables management window named a button that no longer exists
+  ("Configure Addressables settings"; it is "Fix Addressables configurations"), and the binary-catalog message read "Plese".
 - **A build from the editor no longer stops on Addressables' "Addressables Build Report" dialog.** Addressables asks once
   per project, in a modal dialog, whether to turn on "Debug Build Layout"; left behind the editor it held the build
   until someone found it. `AddressablesBuildScript` records that the question was answered before it builds (an
