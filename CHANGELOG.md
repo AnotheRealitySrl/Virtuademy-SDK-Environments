@@ -15,7 +15,7 @@ longer returned).
   `AUTH_URL <url>` the moment it has it, opens the system browser unless `-vdNoBrowser`, and gives up 180 s (or
   `-vdLoginTimeoutSeconds`) after the URL is issued with the new exit code 27. `logout`, `connections` (needs no network) and
   `whoami` (exit 11 when there is no session) answer from the store; `connections` and `whoami` are also in the store's
-  `status.json` (`%LOCALAPPDATA%\Virtuademy\SDK\`), readable without starting Unity. A connection is named by its key, its
+  `status.json` (`%USERPROFILE%\.virtuademy\sdk\`), readable without starting Unity. A connection is named by its key, its
   tenant key, its tenant label or `app/env`; one that fits none or several is exit 26. New exit codes: 26 connection unknown,
   27 login timed out, 28 login failed.
 - **`-vdResultFile <path>`, on every command**: the REPORT (and only it, never the editor log) is also written to that file

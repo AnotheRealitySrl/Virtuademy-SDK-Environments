@@ -60,7 +60,7 @@ Unity -batchmode -nographics -projectPath <project> -logFile -
 
 A connection is one tenant of one Configuration-API instance (ADR 0037). It is named by its key (the instance's base URL, `#`,
 the tenant key), its tenant key, its tenant label or `app/env`; a name that fits none or several is exit 26. The connections live
-outside the project, in `%LOCALAPPDATA%\Virtuademy\SDK\`, encrypted for the OS user. The project's active connection is the
+outside the project, in `%USERPROFILE%\.virtuademy\sdk\`, encrypted for the OS user. The project's active connection is the
 one chosen in **Virtuademy > Available Tenants**; a `login` from the command line or a request file makes its connection
 active only when the project has none, and a command that names another one with `-vdConnection` is exit 30. The store's `status.json` in that folder lists them with no secret: `connections` and `whoami`
 can be read from it without starting Unity. `-vdResultFile <path>` (any command) writes the REPORT, and only it, to that file,

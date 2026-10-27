@@ -57,7 +57,7 @@ namespace Virtuademy.SDK.Environments.Editor
     /// stays in the token cache when another connection uses it.</description></item>
     /// <item><description><c>connections</c>: every connection of the store, with whether its session is valid and
     /// which one the project uses. Needs no network. The same list, without any secret, is in the store's status file
-    /// (<c>%LOCALAPPDATA%\Virtuademy\SDK\status.json</c>), which can be read without starting Unity.</description></item>
+    /// (<c>%USERPROFILE%\.virtuademy\sdk\status.json</c>), which can be read without starting Unity.</description></item>
     /// <item><description><c>whoami [-vdConnection &lt;connection&gt;]</c>: one connection (the project's active one when none is
     /// named): tenant, environment, user, role and when the token expires, never the token. Exits with
     /// <see cref="ExitLoginRequired"/> when there is no session. Also readable from the status file.</description></item>
