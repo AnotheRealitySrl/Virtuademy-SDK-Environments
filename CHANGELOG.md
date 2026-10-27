@@ -36,6 +36,14 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
   out of those folders to a normal one (the vendor's own folder, for example), which compiles into `Assembly-CSharp`.
   In the command line it is `ExitBuildFailed` with `build.failure` `FirstpassScripts`, and the components in
   `build.firstpassComponents`. Warrants a minor bump.
+- **A Back Office button (`Back Office ↗`), per connection, in the Addressables management window** (meta-repo
+  ADR 0038, decision 7). Each logged-in group asks its own Application API, with that connection's token,
+  `GET /tenants/backoffice-access/my` while it lists its worlds, and shows the button when the answer says the account
+  may enter and the tenant's
+  `config-public` gives a Back Office address (`ConnectionRecord.BackofficeUrl` of `Virtuademy-SDK-Core`). The button
+  opens the Back Office in the browser on the first ticked world the access covers (`?world=<id>`), or on its home page,
+  with no world parameter, when no such world is ticked (the tenant level alone included). An API that predates the
+  route answers 404 or 405 and the group shows no button, with no message. The group's **Log out** button is red.
 
 #### Changed
 - **The CLI works on a connection and takes its Application API address from it.** `worlds`, `preview` and `deploy` act on the

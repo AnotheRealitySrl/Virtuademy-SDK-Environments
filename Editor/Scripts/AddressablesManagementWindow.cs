@@ -3,8 +3,11 @@ using Virtuademy.SDK.TenantConfiguration.Editor;
 using Virtuademy.SDK.TenantConfiguration;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using Unity.Properties;
 using UnityEditor;
@@ -127,6 +130,7 @@ namespace Virtuademy.SDK.Environments.Editor
             public Label Status;
             public Button LoginButton;
             public Button LogoutButton;
+            public Button BackofficeButton;
             public Label WorldsStatus;
             public VisualElement WorldsList;
             public List<PublishableWorld> Deployable = new();
@@ -136,6 +140,9 @@ namespace Virtuademy.SDK.Environments.Editor
             public VisualElement TenantPreview;
             public bool Production;
             public PlatformVersionRule.Verdict Version;
+
+            /// <summary>What the account may open in this tenant's Back Office; null shows no Back Office button.</summary>
+            public BackofficeAccess Backoffice;
 
             /// <summary>The worlds were listed for this group, so its ticks can be shown and deployed to.</summary>
             public bool Listed;
@@ -154,6 +161,16 @@ namespace Virtuademy.SDK.Environments.Editor
             public List<int> Worlds;
             public bool Tenant;
             public int Count => Worlds.Count + (Tenant ? 1 : 0);
+        }
+
+        /// <summary>The answer of <c>GET /tenants/backoffice-access/my</c> (meta-repo ADR 0038, decision 7).</summary>
+        private sealed class BackofficeAccess
+        {
+            [JsonProperty("canAccess")] public bool CanAccess;
+            [JsonProperty("tenantLevel")] public bool TenantLevel;
+            [JsonProperty("worldIds")] public List<int> WorldIds;
+
+            public bool Covers(int worldId) => TenantLevel || (WorldIds?.Contains(worldId) ?? false);
         }
 
         [MenuItem("Virtuademy/Addressables management")]
@@ -408,6 +425,16 @@ namespace Virtuademy.SDK.Environments.Editor
 
             group.LoginButton = new Button(() => LoginGroup(group)) { text = "Log in", style = { flexShrink = 0 } };
             group.LogoutButton = new Button(async () => await EditorSessionManager.LogoutAsync(group.Key)) { text = "Log out", style = { flexShrink = 0 } };
+            TintRed(group.LogoutButton);
+
+            // Shown once the group's listing has asked whether the account may enter (LoadGroupBackofficeAccessAsync).
+            group.BackofficeButton = new Button(() => OpenBackoffice(group))
+            {
+                text = "Back Office ↗",
+                style = { flexShrink = 0, display = DisplayStyle.None },
+            };
+
+            statusRow.Add(group.BackofficeButton);
             statusRow.Add(group.LoginButton);
             statusRow.Add(group.LogoutButton);
             group.Foldout.Add(statusRow);
@@ -429,6 +456,20 @@ namespace Virtuademy.SDK.Environments.Editor
                 group.WorldsStatus.text = "Open the group to list its worlds.";
 
             return group;
+        }
+
+        /// <summary>
+        /// A red button for an action that ends something (a logout). An inline background replaces the theme's hover
+        /// colour, so the hover is lightened here.
+        /// </summary>
+        private static void TintRed(Button button)
+        {
+            Color normal = new(0.62f, 0.2f, 0.2f);
+            Color hover = new(0.74f, 0.27f, 0.27f);
+            button.style.backgroundColor = normal;
+            button.style.color = Color.white;
+            button.RegisterCallback<PointerEnterEvent>(_ => button.style.backgroundColor = hover);
+            button.RegisterCallback<PointerLeaveEvent>(_ => button.style.backgroundColor = normal);
         }
 
         /// <summary>The browser login of one group's connection. It does not change the default connection.</summary>
@@ -494,6 +535,9 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (generation != group.Generation)
                     return;
+
+                // Beside the listing, not in its way: the access decides only the Back Office button.
+                _ = LoadGroupBackofficeAccessAsync(group, generation);
 
                 WorldListResult listing = await EnvironmentsDeploy.LoadWorldsAsync(
                     connectionKey: group.Key,
@@ -574,6 +618,9 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             RefreshDeployPreviews();
+
+            // The access can arrive before the worlds: what the button opens depends on the ticks just made.
+            RefreshBackofficeButton(group);
         }
 
         /// <summary>
@@ -617,7 +664,115 @@ namespace Virtuademy.SDK.Environments.Editor
                 group.TenantToggle?.value ?? false);
             RefreshDeployPreviews();
             RefreshButtons();
+            RefreshBackofficeButton(group);
         }
+
+        #region Back Office
+
+        /// <summary>
+        /// Asks the group's Application API whether the account may open the tenant's Back Office (meta-repo ADR 0038,
+        /// decision 7), with silent renewal only, and shows or hides the group's button from the answer.
+        /// </summary>
+        private async Task LoadGroupBackofficeAccessAsync(TargetGroup group, int generation)
+        {
+            BackofficeAccess access = await LoadBackofficeAccessAsync(group.Key);
+            if (generation != group.Generation)
+                return;
+
+            group.Backoffice = access;
+            RefreshBackofficeButton(group);
+        }
+
+        /// <summary>
+        /// The access when the account may enter, else null. The token goes to this connection's Application API only.
+        /// A tenant with no Back Office address is not asked. An API older than the route answers 404 or 405, and is
+        /// skipped without a word (the version rule of meta-repo ADR 0037); any other failure is logged and shows no
+        /// button either.
+        /// </summary>
+        private static async Task<BackofficeAccess> LoadBackofficeAccessAsync(string connectionKey)
+        {
+            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
+            if (string.IsNullOrEmpty(applicationApiUrl) || BackofficeUriOf(connectionKey) == null)
+                return null;
+
+            string url = $"{applicationApiUrl}/tenants/backoffice-access/my?api-version=2";
+            try
+            {
+                using HttpResponseMessage response = await EditorSessionManager.SendAuthorizedAsync(connectionKey,
+                    () => new HttpRequestMessage(HttpMethod.Get, url), allowInteractive: false);
+
+                if (response == null || response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
+                    return null;
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Debug.LogWarning($"[AddressablesManagement] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {response.StatusCode}");
+                    return null;
+                }
+
+                BackofficeAccess access = JsonConvert.DeserializeObject<BackofficeAccess>(await response.Content.ReadAsStringAsync());
+                return access?.CanAccess == true ? access : null;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[AddressablesManagement] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>The connection's Back Office address, when it is an absolute http(s) URL.</summary>
+        private static Uri BackofficeUriOf(string connectionKey)
+        {
+            string value = ConnectionStore.Get(connectionKey)?.BackofficeUrl;
+            return Uri.TryCreate(value, UriKind.Absolute, out Uri uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
+                ? uri
+                : null;
+        }
+
+        /// <summary>
+        /// The world the button opens the Back Office on: the first ticked world, in the group's order, that the access
+        /// covers. Null opens the home page: no world is ticked (the tenant level is not a world), or none is covered.
+        /// </summary>
+        private static PublishableWorld BackofficeWorld(TargetGroup group) => group.Deployable
+            .FirstOrDefault(w => group.WorldToggles.TryGetValue(w.Id, out Toggle toggle) && toggle.value && group.Backoffice.Covers(w.Id));
+
+        private static string BackofficeLink(Uri home, int? worldId)
+        {
+            if (worldId == null)
+                return home.AbsoluteUri;
+
+            UriBuilder builder = new(home);
+            string query = builder.Query.TrimStart('?');
+            builder.Query = (query.Length > 0 ? query + "&" : "") + "world=" + worldId.Value.ToString(CultureInfo.InvariantCulture);
+            return builder.Uri.AbsoluteUri;
+        }
+
+        /// <summary>Shown while the group's connection has a session, a Back Office address and an access that says yes.</summary>
+        private void RefreshBackofficeButton(TargetGroup group)
+        {
+            if (group.BackofficeButton == null)
+                return;
+
+            Uri home = BackofficeUriOf(group.Key);
+            bool show = home != null && group.Backoffice != null && ConnectionStore.Get(group.Key)?.HasSession == true;
+            group.BackofficeButton.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!show)
+                return;
+
+            PublishableWorld world = BackofficeWorld(group);
+            group.BackofficeButton.tooltip = world == null
+                ? "Opens the Back Office of this tenant in the browser, on its home page. Tick a world to open it on that world."
+                : $"Opens the Back Office of this tenant in the browser, on the first ticked world: {world.Label} (ID: {world.Id}).";
+        }
+
+        private void OpenBackoffice(TargetGroup group)
+        {
+            Uri home = BackofficeUriOf(group.Key);
+            if (home != null && group.Backoffice != null)
+                Application.OpenURL(BackofficeLink(home, BackofficeWorld(group)?.Id));
+        }
+
+        #endregion
 
         /// <summary>The ticked targets of every group that can be deployed to: listed, and allowed by the version rule.</summary>
         private List<GroupTargets> TickedTargets() => groups.Values
@@ -680,6 +835,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 group.LoginButton.style.display = record.HasSession ? DisplayStyle.None : DisplayStyle.Flex;
                 group.LogoutButton.style.display = record.HasSession ? DisplayStyle.Flex : DisplayStyle.None;
+                RefreshBackofficeButton(group);
             }
 
             ScheduleSessionExpiryRefresh();
