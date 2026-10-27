@@ -44,9 +44,8 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   wear slots are counted by `wearSlotsCount`, as before. At runtime `AddEquipmentSlot(type, name, icon)` (raises
   `EquipmentSlotsChanged`) and the node **Virtuademy Inventory: Add Equipment Slot** (`AddEquipmentSlotNode`).
   Additive; warrants a minor bump.
-- **`PickablePlaceholder.unique`** (default off). On: the inventory holds at most one, and a second one is refused. Off,
-  as before: picked copies stack in one slot. The slot now shows the QUANTITY of copies (from 2 up), never the
-  uses: `numberOfUses` stays a per-copy value for creators (a use spends the top copy's; a copy taken out keeps its
+- **An inventory slot shows the quantity of copies** (from 2 up; one copy shows no number), never the uses. Picked
+  copies stack in one slot, as before: `numberOfUses` stays a per-copy value for creators (a use spends the top copy's; a copy taken out keeps its
   own), and "∞" is no longer shown. Behaviour change for items with more than one use: two picked copies of a
   2-use item showed "4", they show "2". Warrants a minor bump.
 
