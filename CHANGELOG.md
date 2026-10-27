@@ -38,6 +38,18 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   setter. Two nodes: **Virtuademy Inventory: Set Mode** (`SetInventoryModeNode`) and **Virtuademy Inventory: Set Slot
   Counts** (`SetInventorySlotCountsNode`). Additive; warrants a minor bump.
 
+- **Equipment slots declared by the environment.** `InventoryPlaceholder.equipmentSlots`: a list of
+  `EquipmentSlotDefinition` (type `Hand` or `Custom`, the custom slot's name as the wearables give it in `wearSlot`, an
+  optional icon). A wearable whose slot is not declared is refused, with the refusal feedback; with an empty list the
+  wear slots are counted by `wearSlotsCount`, as before. At runtime `AddEquipmentSlot(type, name, icon)` (raises
+  `EquipmentSlotsChanged`) and the node **Virtuademy Inventory: Add Equipment Slot** (`AddEquipmentSlotNode`).
+  Additive; warrants a minor bump.
+- **`PickablePlaceholder.unique`** (default off). On: the inventory holds at most one, and a second one is refused. Off,
+  as before: picked copies stack in one slot. The slot now shows the QUANTITY of copies (from 2 up), never the
+  uses: `numberOfUses` stays a per-copy value for creators (a use spends the top copy's; a copy taken out keeps its
+  own), and "∞" is no longer shown. Behaviour change for items with more than one use: two picked copies of a
+  2-use item showed "4", they show "2". Warrants a minor bump.
+
 - **The Virtuademy theme** (`Common/Theme/`, `Runtime/UIKit/Theme/`). `VirtuademyTheme.asset` holds the colour
   roles (`EThemeRole`: surface, raised surface, border, text, secondary text, action, text on action, success,
   warning, error, info, scrim), the type scale, the three Poppins weights, radii and spacing. The action colour is

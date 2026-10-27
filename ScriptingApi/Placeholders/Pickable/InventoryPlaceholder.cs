@@ -33,6 +33,30 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             Grid = 1,
         }
 
+        /// <summary>What an equipment slot holds: the tools (the hand), or the wearables of one wear slot.</summary>
+        public enum EEquipmentSlotType
+        {
+            Hand = 0,
+            Custom = 1,
+        }
+
+        /// <summary>
+        /// An equipment slot declared by the environment: its type, and for a custom slot the name the wearables
+        /// give in <see cref="WearablePlaceholder.wearSlot"/> (Head, Hands, Badge...).
+        /// </summary>
+        [Serializable]
+        public class EquipmentSlotDefinition
+        {
+            [Tooltip("Hand: the tools. Custom: the wearables whose Wear Slot is this slot's name")]
+            public EEquipmentSlotType type = EEquipmentSlotType.Custom;
+
+            [Tooltip("Custom slot: the name the wearables give in their Wear Slot (Head, Hands, Badge...)")]
+            public string name;
+
+            [Tooltip("Optional: the mark shown on the slot (the slot's name without it)")]
+            public Sprite icon;
+        }
+
         [SerializeField, Tooltip("Which system is active: none, the tools radial menu or the inventory of pickable items. It can be changed at runtime")]
         private EInventoryMode inventoryMode = EInventoryMode.Inventory;
 
@@ -74,7 +98,13 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         #region Inventory
 
         [Header("Inventory")]
-        [Tooltip("Number of wear slots in the wear inventory. You cannot equip or hold more that this value items")]
+        [Tooltip("The equipment slots, each with its type: the hand (the tools) and the custom wear slots (Head, "
+                 + "Hands...). A wearable whose Wear Slot is not declared here is refused. Empty: the wear slots are "
+                 + "counted by Wear Slots Count instead, as before 2026.7")]
+        public List<EquipmentSlotDefinition> equipmentSlots = new();
+
+        [Tooltip("Number of wear slots in the wear inventory, used when no Equipment Slots are declared. You cannot "
+                 + "equip or hold more that this value items")]
         public int wearSlotsCount = 1;
 
         [Tooltip("Number of slots in the inventory. You cannot equip or hold more that this value items")]
@@ -111,6 +141,33 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// Raised by <see cref="SetSlotCounts"/> when a slot count grows.
         /// </summary>
         public event Action SlotCountsChanged;
+
+        /// <summary>
+        /// Raised by <see cref="AddEquipmentSlot"/> when a slot is added.
+        /// </summary>
+        public event Action EquipmentSlotsChanged;
+
+        /// <summary>
+        /// Declares one more equipment slot during the experience (for example a slot unlocked by a task). A slot
+        /// already declared (same type and name) is not added twice. Slots are only added: one may hold items.
+        /// </summary>
+        /// <remarks>Node: <c>Virtuademy Inventory: Add Equipment Slot</c>.</remarks>
+        public void AddEquipmentSlot(EEquipmentSlotType type, string slotName, Sprite slotIcon = null)
+        {
+            if (type == EEquipmentSlotType.Custom && string.IsNullOrEmpty(slotName))
+            {
+                return;
+            }
+            foreach (EquipmentSlotDefinition slot in equipmentSlots)
+            {
+                if (slot != null && slot.type == type && (type == EEquipmentSlotType.Hand || slot.name == slotName))
+                {
+                    return;
+                }
+            }
+            equipmentSlots.Add(new EquipmentSlotDefinition { type = type, name = slotName, icon = slotIcon });
+            EquipmentSlotsChanged?.Invoke();
+        }
 
         /// <summary>
         /// Gives the inventory more slots during the experience (for example a slot unlocked by a task). Counts only

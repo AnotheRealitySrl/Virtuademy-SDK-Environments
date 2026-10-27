@@ -17,6 +17,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [Tooltip("Number of times the item can be used before being lost, if -1 then it is infinite")]
         public int numberOfUses = -1;
 
+        [Tooltip("At most one in the inventory: a second one is refused. Off: picked copies stack in one slot, which "
+                 + "shows their quantity (each copy keeps its own uses)")]
+        public bool unique = false;
+
         [Tooltip("The icon used to display the item in the menu")]
         public Sprite icon; //The icon to display in the inventory
 
