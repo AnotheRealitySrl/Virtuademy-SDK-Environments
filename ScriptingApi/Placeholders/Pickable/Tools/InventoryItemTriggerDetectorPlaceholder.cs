@@ -9,6 +9,21 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 {
     public class InventoryItemTriggerDetectorPlaceholder : SceneComponentPlaceholderBase
     {
+        /// <summary>How the target is activated by a tool (2026.7).</summary>
+        public enum EActivation
+        {
+            /// <summary>Bringing the right tool to it is enough (as before 2026.7).</summary>
+            Contact = 0,
+            /// <summary>The tool must touch it while it is used (VR: the trigger; a Hold tool keeps acting while held).</summary>
+            Use = 1,
+        }
+
+        [Tooltip("How a tool activates this target. Contact: bringing the right tool to it is enough (on desktop and "
+                 + "mobile: clicking it with the tool). Use: the tool must touch it while it is used (in VR the trigger; "
+                 + "a Hold tool, like a spray, keeps acting while the trigger is held). On desktop and mobile the click "
+                 + "with the tool is the use, in both cases")]
+        public EActivation activation = EActivation.Contact;
+
         [Tooltip("The reference to the item that triggers the action when entering the collider")]
         public PickablePlaceholder inventoryItem;
 

@@ -38,6 +38,11 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   setter. Two nodes: **Virtuademy Inventory: Set Mode** (`SetInventoryModeNode`) and **Virtuademy Inventory: Set Slot
   Counts** (`SetInventorySlotCountsNode`). Additive; warrants a minor bump.
 
+- **`InventoryItemTriggerDetectorPlaceholder.activation`** (`EActivation`: `Contact`, the default and the behaviour
+  so far, or `Use`). In VR with the `InventoryPlaceholder`, the tools are used with the trigger: a `Contact` target
+  reacts as soon as the right tool touches it (its events and the right/wrong feedback, no use spent), a `Use` target
+  reacts when the tool touching it is used (the trigger; a Hold tool keeps acting while the trigger is held). Desktop
+  and mobile: the click with the tool, as before, for both. Additive; warrants a minor bump.
 - **Equipment slots declared by the environment.** `InventoryPlaceholder.equipmentSlots`: a list of
   `EquipmentSlotDefinition` (type `Hand` or `Custom`, the custom slot's name as the wearables give it in `wearSlot`, an
   optional icon shown on the slot in place of its name; the hand slot always shows the application's hand icon), shown from the start. A wearable whose slot is not declared adds it; with an empty list the wear
