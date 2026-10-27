@@ -244,12 +244,12 @@ namespace Virtuademy.SDK.Environments.Editor
         /// <param name="progress">Told what the call is doing ("Checking permissions...").</param>
         /// <param name="onListed">Called with every visible world as soon as the listing arrives, before the roles are
         /// read: the window starts its "where is it published" lookup there.</param>
-        /// <param name="connectionKey">The connection to list for; null is the project's active one, read once here.</param>
+        /// <param name="connectionKey">The connection to list for; null is the project's default one, read once here.</param>
         public static async Task<WorldListResult> LoadWorldsAsync(Action<string> progress = null,
                                                                   Action<IReadOnlyList<PublishableWorld>> onListed = null,
                                                                   string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             WorldListResult result = new();
 
             try
@@ -389,9 +389,9 @@ namespace Virtuademy.SDK.Environments.Editor
                                                                    IReadOnlyList<string> scenes, DeployObserver observer = null,
                                                                    string connectionKey = null)
         {
-            // One connection for the whole deploy: the project's active one can change while it runs (the window's
-            // selection, a login), and a token must not follow it to another tenant's host.
-            connectionKey ??= ProjectConnections.ActiveKey;
+            // One connection for the whole deploy, taken once here: a token must not follow another connection's choice
+            // (the default one can change while it runs) to another tenant's host.
+            connectionKey ??= ProjectConnections.DefaultKey;
             DeployReport report = new();
             observer?.Started?.Invoke(report);
             void Fail(string message) { report.Problems++; (observer?.Error ?? (m => Debug.LogError(m)))(message); }
@@ -578,7 +578,7 @@ namespace Virtuademy.SDK.Environments.Editor
         public static async Task<DeployReport> DeployToTenantAsync(IReadOnlyList<string> scenes, DeployObserver observer = null,
                                                                    string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             DeployReport report = new();
             observer?.Started?.Invoke(report);
             void Fail(string message) { report.Problems++; (observer?.Error ?? (m => Debug.LogError(m)))(message); }
@@ -871,7 +871,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         public static async Task<string> GetUploadLinkForWorld(string applicationApiUrl, int worldId, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/upload-link?api-version=2";
 
             HttpResponseMessage response;
@@ -907,7 +907,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         public static async Task<bool> ImportSceneToWorld(string applicationApiUrl, int worldId, string zipName, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environments/archives/import?api-version=2";
 
             HttpResponseMessage response;
@@ -1082,7 +1082,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         public static async Task<string> GetTenantUploadLink(string applicationApiUrl, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string apiUrl = $"{applicationApiUrl}/tenants/environments/upload-link?api-version=2";
 
             try
@@ -1120,7 +1120,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// </summary>
         public static async Task<(bool Ok, string Reason)> ImportEnvironmentDll(string applicationApiUrl, int worldId, string zipName, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environment-dll/import?api-version=2";
 
             try
@@ -1197,7 +1197,7 @@ namespace Virtuademy.SDK.Environments.Editor
         public static async Task<bool> LinkEnvironmentDll(string applicationApiUrl, int worldId,
                                                           string catalogName, string assemblyName, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string apiUrl = $"{applicationApiUrl}/worlds/{worldId}/environments/catalog/{catalogName}/environment-dll?api-version=2";
 
             try
@@ -1230,7 +1230,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         public static async Task<bool> ImportSceneToTenant(string applicationApiUrl, string zipName, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string apiUrl = $"{applicationApiUrl}/tenants/environments/archives/import?api-version=2";
 
             try

@@ -70,11 +70,11 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>Rebuilds the index for the given worlds (every world the account can see, not only the deployable ones).</summary>
-        /// <param name="connectionKey">The connection the worlds belong to; null is the project's active one, read once here.</param>
+        /// <param name="connectionKey">The connection the worlds belong to; null is the project's default one, read once here.</param>
         public static async Task RefreshAsync(IEnumerable<(int Id, string Label)> worlds, string connectionKey = null)
         {
             lastWorlds = worlds?.ToList() ?? new List<(int, string)>();
-            lastConnection = connectionKey ?? ProjectConnections.ActiveKey;
+            lastConnection = connectionKey ?? ProjectConnections.DefaultKey;
             await RefreshAsync();
         }
 
@@ -82,7 +82,7 @@ namespace Virtuademy.SDK.Environments.Editor
         public static async Task RefreshAsync()
         {
             if (IsLoading) return;
-            string connectionKey = lastConnection ?? ProjectConnections.ActiveKey;
+            string connectionKey = lastConnection ?? ProjectConnections.DefaultKey;
             string apiUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
             if (string.IsNullOrEmpty(apiUrl)) return;
 

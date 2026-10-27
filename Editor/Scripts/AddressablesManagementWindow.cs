@@ -81,7 +81,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private List<PublishableWorld> availableWorlds = new();
 
         // The connection the worlds above were listed for, and the one the running operation works on. Both are
-        // fixed when they are taken: the project's active connection can change at any time (a selection in
+        // fixed when they are taken: the project's default connection can change at any time (a selection in
         // Available Tenants, a login), and a deploy must not follow it to another tenant's host.
         private string worldsConnectionKey;
         private string operationKey;
@@ -352,7 +352,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             try
             {
-                string connectionKey = ProjectConnections.ActiveKey;
+                string connectionKey = ProjectConnections.DefaultKey;
                 worldsConnectionKey = connectionKey;
 
                 // Silent renewal only: this runs just from opening the window, and popping a
@@ -438,7 +438,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private string SelectedWorldsKey()
         {
-            string scope = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).ToLowerInvariant() + "|" + (worldsConnectionKey ?? ProjectConnections.ActiveKey ?? "");
+            string scope = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).ToLowerInvariant() + "|" + (worldsConnectionKey ?? ProjectConnections.DefaultKey ?? "");
             using System.Security.Cryptography.SHA1 sha = System.Security.Cryptography.SHA1.Create();
             string hash = BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(scope))).Replace("-", "").Substring(0, 12);
             return SELECTED_WORLDS_KEY_BASE + "_" + hash;
@@ -518,7 +518,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.ActiveKey;
+            operationKey = ProjectConnections.DefaultKey;
             try
             {
                 await DeployToWorlds(worldIds, scenes);
@@ -573,7 +573,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private async Task BuildAndDeployToWorldsAsync(List<int> worldIds)
         {
             SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.ActiveKey;
+            operationKey = ProjectConnections.DefaultKey;
 
             // The buttons come back on every way out, an exception included.
             try
@@ -613,7 +613,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private async Task DeployToWorlds(List<int> worldIds, List<string> scenes)
         {
-            // The ticked worlds are the ones of the connection that was active when they were listed.
+            // The ticked worlds are the ones of the connection that was the default one when they were listed.
             if (!string.Equals(operationKey, worldsConnectionKey, StringComparison.OrdinalIgnoreCase))
             {
                 LogDeployError("The project's connection changed since the worlds were listed. Nothing was sent: reload the worlds and tick them again.");
@@ -686,7 +686,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.ActiveKey;
+            operationKey = ProjectConnections.DefaultKey;
             try
             {
                 await DeployToTenant(scenes);
@@ -710,7 +710,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private async Task BuildAndDeployToTenantAsync()
         {
             SetDeployButtonsEnabled(false);
-            operationKey = ProjectConnections.ActiveKey;
+            operationKey = ProjectConnections.DefaultKey;
 
             // The buttons come back on every way out, an exception included.
             try
@@ -1302,7 +1302,7 @@ namespace Virtuademy.SDK.Environments.Editor
             if (!RequireAddressablesConfigured("Build Addressables"))
                 return;
 
-            operationKey = ProjectConnections.ActiveKey;
+            operationKey = ProjectConnections.DefaultKey;
             if (!await BuildAndVerifyInterpretedDLLAsync())
             {
                 EditorUtility.DisplayDialog("Build blocked",
@@ -1343,7 +1343,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// server check). Returns true if the build may proceed; see
         /// <see cref="EnvironmentsBuild.VerifyInterpretedScriptsAsync"/>.
         /// </summary>
-        private Task<bool> BuildAndVerifyInterpretedDLLAsync() => EnvironmentsBuild.VerifyInterpretedScriptsAsync(operationKey ?? ProjectConnections.ActiveKey);
+        private Task<bool> BuildAndVerifyInterpretedDLLAsync() => EnvironmentsBuild.VerifyInterpretedScriptsAsync(operationKey ?? ProjectConnections.DefaultKey);
 
         /// <summary>
         /// Builds addressables for all platforms and creates zip files.

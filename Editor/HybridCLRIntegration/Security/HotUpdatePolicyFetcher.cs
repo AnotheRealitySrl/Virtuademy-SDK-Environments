@@ -48,7 +48,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
         /// path, or null when not logged in / no URL in the tenant config.</summary>
         public static string ResolvePolicyUrl(string connectionKey = null)
         {
-            string baseUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey ?? ProjectConnections.ActiveKey);
+            string baseUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey ?? ProjectConnections.DefaultKey);
             return string.IsNullOrEmpty(baseUrl) ? null : baseUrl.TrimEnd('/') + PolicyPath;
         }
 

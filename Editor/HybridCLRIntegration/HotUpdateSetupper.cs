@@ -920,7 +920,7 @@ $@"{{
         /// </summary>
         public static async Task<bool> CompileVerifyAsync(string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             BundleIsCurrent = false;
 
             // Before the setup check: a project that interprets nothing does not need the

@@ -4,8 +4,8 @@
 
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
 classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four
-`EnvironmentsCli` commands, one option on every command and three exit codes (minor, additive; `ExitApiHostMismatch` stays defined and is no
-longer returned).
+`EnvironmentsCli` commands, one option on every command and four exit codes (minor; `ExitApiHostMismatch` stays defined and is no
+longer returned, and a `-vdExpectTenant` that names another tenant is now 30 instead of 24).
 
 #### Added
 - **`EnvironmentsCli` commands `login`, `logout`, `connections` and `whoami`** (meta-repo ADR 0037, first slice), over the
@@ -38,21 +38,25 @@ longer returned).
   `build.firstpassComponents`. Warrants a minor bump.
 
 #### Changed
-- **The CLI works on the project's active connection and takes its Application API address from it.** The session, `worlds`,
-  `preview` and `deploy` use the connection the project last logged in to (`session` reports its key); the address comes from the
+- **The CLI works on a connection and takes its Application API address from it.** `worlds`, `preview` and `deploy` act on the
+  connection `-vdConnection` names, or on the project's default connection (the one chosen in Available Tenants) when it names
+  none; `status`, `session` and `build` on the default one (`session` reports its key). The address comes from the
   tenant that connection reported at login, not from the project's generated `PlatformEndpoints` asset, so `ExitApiHostMismatch`
   (25) is no longer returned (the number stays reserved) and the `target` of the REPORT lists the connection instead of two
   hosts. The messages that sent the user to the Addressables management window for a login now say `-vdCommand login` or
   Virtuademy > Available Tenants.
-- **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and refuse (exit 30, *target mismatch*) when
-  it is not the project's active connection, with nothing built or sent. The name is checked before the session, so a run
-  aimed at another connection gets 30 even when the active one has no session, not a request to log in. The run takes the active connection once, when it
+- **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and act on that connection whether or not it is the
+  project's default one; a name that fits no connection, or several, is exit 26. The run takes its connection once, when it
   starts, and every request of it (the world list, the script verification, the uploads and imports) goes to that connection;
-  the `target` of the REPORT lists the connection and the Configuration-API host. `-vdExpectTenant` still compares the label.
-  A `login` in batch mode on an OS with no encrypted store is exit 29.
+  the `target` of the REPORT lists the connection, whether it is the default one and the Configuration-API host.
+  **A `-vdExpectTenant` that is not that connection's tenant label is exit 30** (*target mismatch*; it was 24 up to 2026.6),
+  checked before the session, so a run aimed at the wrong tenant gets 30 even when its connection has no session, not a
+  request to log in. 24 now means only a `deploy` without `-vdExpectTenant`. The `connections` command marks the default
+  connection with `default` (and `session` and the `target` say `default` too). A `login` in batch mode on an OS with no
+  encrypted store is exit 29.
 - **The Addressables management window keeps its connection per operation.** Build, verify and deploy take the project's
-  active connection when they start and use it to the end; the worlds it lists belong to one connection and a deploy refuses
-  when the active one changed since. The ticked worlds are kept per project and connection
+  default connection when they start and use it to the end; the worlds it lists belong to one connection and a deploy refuses
+  when the default one changed since. The ticked worlds are kept per project and connection
   (`Virtuademy_AddressablesManagement_SelectedWorlds_<hash>`): the old machine-wide value, which could tick a world of another
   tenant, is no longer read. `EnvironmentsDeploy`, `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync`
   and the hot-update verifier take an optional `connectionKey`.

@@ -42,10 +42,10 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             public string Error;
         }
 
-        /// <param name="connectionKey">The connection to verify on; null is the project's active one, read once here.</param>
+        /// <param name="connectionKey">The connection to verify on; null is the project's default one, read once here.</param>
         public static async Task<Result> VerifyAsync(byte[] dll, string fileName, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string baseUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
 
             if (string.IsNullOrEmpty(baseUrl) || ConnectionStore.Get(connectionKey)?.HasSession != true)

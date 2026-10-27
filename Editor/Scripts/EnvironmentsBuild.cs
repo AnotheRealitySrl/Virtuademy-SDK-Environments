@@ -175,10 +175,10 @@ namespace Virtuademy.SDK.Environments.Editor
         /// copy cached by the last successful fetch; a project without scripts passes straight
         /// through. With an expired session the check renews it silently when it can.
         /// </remarks>
-        /// <param name="connectionKey">The connection the server check runs on; null is the project's active one, read once here.</param>
+        /// <param name="connectionKey">The connection the server check runs on; null is the project's default one, read once here.</param>
         public static async Task<bool> VerifyInterpretedScriptsAsync(string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             Type setupperType = FindHotUpdateSetupperType();
 
             var method = setupperType?.GetMethod("CompileVerifyAsync", BindingFlags.Public | BindingFlags.Static);
