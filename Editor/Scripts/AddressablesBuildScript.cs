@@ -85,7 +85,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (!success)
             {
-                Debug.LogError("Addressables build error encountered: " + result.Error);
+                Debug.LogError("[PublishEnvironments] The build failed: " + result.Error);
             }
             return success;
         }
@@ -138,13 +138,13 @@ namespace Virtuademy.SDK.Environments.Editor
                 {
                     if (!EditorUserBuildSettings.SwitchActiveBuildTarget(group, target))
                     {
-                        Debug.LogError($"[AddressablesManagement] Could not switch the active build target to {target}: the remaining platforms were not built.");
+                        Debug.LogError($"[PublishEnvironments] Could not switch the active build target to {target}: the remaining platforms were not built.");
                         return;
                     }
 
                     if (!BuildAddressables())
                     {
-                        Debug.LogError($"[AddressablesManagement] The Addressables build failed for {target} (see the errors above): the remaining platforms were not built.");
+                        Debug.LogError($"[PublishEnvironments] The build failed for {target} (see the errors above): the remaining platforms were not built.");
                         return;
                     }
                 }
@@ -154,7 +154,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (EditorUserBuildSettings.activeBuildTarget != originalTarget
                     && !EditorUserBuildSettings.SwitchActiveBuildTarget(originalGroup, originalTarget))
                 {
-                    Debug.LogWarning($"[AddressablesManagement] Could not switch the active build target back to {originalTarget}.");
+                    Debug.LogWarning($"[PublishEnvironments] Could not switch the active build target back to {originalTarget}.");
                 }
             }
         }

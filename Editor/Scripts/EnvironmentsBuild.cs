@@ -92,7 +92,7 @@ namespace Virtuademy.SDK.Environments.Editor
     }
 
     /// <summary>
-    /// What <b>Build Addressables</b> in <see cref="AddressablesManagementWindow"/> does, without the
+    /// What <b>Build</b> in <see cref="AddressablesManagementWindow"/> (the Publish Environments window) does, without the
     /// window: verify the interpreted scripts, build the Addressables of every scene for every platform
     /// it needs, and zip each scene (and the scripts bundle) into <c>ServerData</c>. The window and
     /// <see cref="EnvironmentsCli"/> both call it, so they cannot drift.
@@ -185,7 +185,7 @@ namespace Virtuademy.SDK.Environments.Editor
             if (method == null)
             {
                 // HybridCLR not installed → no interpreted-scripts pipeline to gate.
-                Debug.LogWarning("[AddressablesManagement] HotUpdate verifier not found (HybridCLR not installed?). " +
+                Debug.LogWarning("[PublishEnvironments] HotUpdate verifier not found (HybridCLR not installed?). " +
                                  "Skipping interpreted DLL build/verify.");
                 return true;
             }
@@ -198,7 +198,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Interpreted DLL verify failed to run: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Interpreted DLL verify failed to run: {ex.Message}");
                 return false;
             }
         }
@@ -222,7 +222,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// Builds addressables for all platforms and creates zip files. Does NOT upload — used by
-        /// both "Build Addressables" and "Build &amp; Deploy" in the window, and by the command line.
+        /// both "Build" and "Build &amp; Deploy" in the window, and by the command line.
         /// Refuses before anything is built when a scene needs a build module that is not installed, or when
         /// its content has a component whose script the app cannot bind (<see cref="EnvironmentsScriptCheck"/>).
         /// </summary>
@@ -240,7 +240,7 @@ namespace Virtuademy.SDK.Environments.Editor
             {
                 result.Message = invalidNames;
                 result.Failure = EnvironmentsBuildFailure.InvalidSceneNames;
-                Debug.LogError("[AddressablesManagement] " + invalidNames);
+                Debug.LogError("[PublishEnvironments] " + invalidNames);
                 return result;
             }
 
@@ -286,7 +286,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 result.Failure = EnvironmentsBuildFailure.FirstpassScripts;
 
                 // The dialog and the report carry the first ones; the Console has every component.
-                Debug.LogError("[AddressablesManagement] " + EnvironmentsScriptCheck.Describe(firstpassComponents, int.MaxValue));
+                Debug.LogError("[PublishEnvironments] " + EnvironmentsScriptCheck.Describe(firstpassComponents, int.MaxValue));
                 return result;
             }
             // ─────────────────────────────────────────────────────────────────────────
@@ -345,7 +345,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (EditorUserBuildSettings.activeBuildTarget != originalTarget
                     && !EditorUserBuildSettings.SwitchActiveBuildTarget(originalGroup, originalTarget))
                 {
-                    Debug.LogWarning($"[AddressablesManagement] Could not switch the active build target back to {originalTarget}.");
+                    Debug.LogWarning($"[PublishEnvironments] Could not switch the active build target back to {originalTarget}.");
                 }
             }
 
@@ -360,7 +360,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (result.Failure == EnvironmentsBuildFailure.None)
             {
-                Debug.Log("[AddressablesManagement] Build successful for all platforms.");
+                Debug.Log("[PublishEnvironments] Build successful for all platforms.");
                 result.ScriptsAssembly = PrepareInterpretedAssemblyBundle();
                 ZipBuiltScenes(scenes, result.ScriptsAssembly);
 
@@ -383,7 +383,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             else
             {
-                Debug.LogError("[AddressablesManagement] " + (result.Failure == EnvironmentsBuildFailure.BuildFailed
+                Debug.LogError("[PublishEnvironments] " + (result.Failure == EnvironmentsBuildFailure.BuildFailed
                     ? result.Message
                     : "Build failed. Check errors above."));
             }
@@ -448,7 +448,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (!requiredFolderNames.Contains(folderName))
                 {
                     Directory.Delete(subfolder, true);
-                    Debug.Log($"[AddressablesManagement] Removed {(keepRequired ? "unneeded" : "stale")} platform folder: {subfolder}");
+                    Debug.Log($"[PublishEnvironments] Removed {(keepRequired ? "unneeded" : "stale")} platform folder: {subfolder}");
                 }
             }
         }
@@ -478,7 +478,7 @@ namespace Virtuademy.SDK.Environments.Editor
             AssetDatabase.TryGetGUIDAndLocalFileIdentifier(configuration.Scene, out string guid, out long _);
             AddressableAssetEntry addressableEntry = string.IsNullOrEmpty(guid) ? null : settings.CreateOrMoveEntry(guid, assetGroup);
             if (addressableEntry == null)
-                return $"Addressables could not register the scene \"{configuration.Scene.name}\". Nothing was zipped.";
+                return $"The build could not register the scene \"{configuration.Scene.name}\". Nothing was zipped.";
 
             string originalPlayerVersion = settings.OverridePlayerVersion;
             string originalBuiltInNaming = settings.BuiltInBundleCustomNaming;
@@ -495,7 +495,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 // False when Addressables reported an error (it is logged above) or the build script is missing.
                 if (!AddressablesBuildScript.BuildAddressables())
-                    return $"Addressables failed building \"{configuration.Scene.name}\" for {target} (see the errors above). Nothing was zipped.";
+                    return $"The build of \"{configuration.Scene.name}\" failed for {target} (see the errors above). Nothing was zipped.";
 
                 return null;
             }
@@ -590,7 +590,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             // The scenes still need the assembly, so they still declare it; the import will accept
             // them only where it is already registered.
-            Debug.LogWarning($"[AddressablesManagement] The interpreted-assembly bundle could not be built (see above). " +
+            Debug.LogWarning($"[PublishEnvironments] The interpreted-assembly bundle could not be built (see above). " +
                              $"The scene zips declare '{assemblyName}', and an import accepts them only where that " +
                              "assembly is already registered.");
 
@@ -617,7 +617,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[AddressablesManagement] Unreadable {path}: {ex.Message}. Build the scenes again.");
+                Debug.LogWarning($"[PublishEnvironments] Unreadable {path}: {ex.Message}. Build the scenes again.");
                 return null;
             }
         }
@@ -640,11 +640,11 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (File.Exists(fullZipPath))
                 {
                     File.Delete(fullZipPath);
-                    Debug.Log($"[AddressablesManagement] Removed existing zip: {fullZipPath}");
+                    Debug.Log($"[PublishEnvironments] Removed existing zip: {fullZipPath}");
                 }
 
                 ZipFile.CreateFromDirectory(fullBuildPath, fullZipPath, System.IO.Compression.CompressionLevel.Optimal, true);
-                Debug.Log($"[AddressablesManagement] Created zip: {fullZipPath}");
+                Debug.Log($"[PublishEnvironments] Created zip: {fullZipPath}");
             }
         }
 

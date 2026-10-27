@@ -54,7 +54,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                 {
                     Reachable = false,
                     Error = "Not logged in (no Application API URL / token). " +
-                            "Log in via 'Virtuademy / Available Tenants'."
+                            "Log in via 'Virtuademy / Publish Environments'."
                 };
             }
 
@@ -88,7 +88,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                     {
                         Reachable = false,
                         Error = "The editor session expired and could not be renewed. " +
-                                "Log in again via 'Virtuademy / Available Tenants'."
+                                "Log in again via 'Virtuademy / Publish Environments'."
                     };
                 }
 

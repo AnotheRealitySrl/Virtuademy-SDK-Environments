@@ -101,7 +101,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
 
             // 3) Nothing → fail-closed.
             string why = string.IsNullOrEmpty(url)
-                ? "Not logged in (no tenant Application API URL). Log in via 'Virtuademy / Available Tenants'."
+                ? "Not logged in (no tenant Application API URL). Log in via 'Virtuademy / Publish Environments'."
                 : $"Could not fetch the policy from {url} and no cached copy exists.";
             return new FetchResult { Source = SourceKind.None, Error = why };
         }

@@ -213,7 +213,7 @@ namespace Virtuademy.SDK.Environments.Editor
     }
 
     /// <summary>
-    /// What the Addressables management window's world list, deploy preview and deploy buttons do,
+    /// What the Publish Environments window's world list, deploy preview and deploy buttons do,
     /// without the window: list the worlds the login can deploy to, say what a deploy would add and
     /// update, and upload and import the built scene zips (and the interpreted assembly) to worlds
     /// or to the tenant. The window and <see cref="EnvironmentsCli"/> both call it.
@@ -277,7 +277,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (!response.IsSuccessStatusCode)
                 {
                     string body = await response.Content.ReadAsStringAsync();
-                    Debug.LogError($"[AddressablesManagement] Failed to get worlds: {response.StatusCode} - {body}");
+                    Debug.LogError($"[PublishEnvironments] Failed to get worlds: {response.StatusCode} - {body}");
                     result.Status = WorldListStatus.Failed;
                     result.Message = $"Error loading worlds: {response.StatusCode}";
                     return result;
@@ -317,7 +317,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogWarning($"[AddressablesManagement] Could not check roles for world {world.Id}: {ex.Message}");
+                        Debug.LogWarning($"[PublishEnvironments] Could not check roles for world {world.Id}: {ex.Message}");
                     }
                 }
 
@@ -326,7 +326,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error loading worlds: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error loading worlds: {ex.Message}");
                 result.Status = WorldListStatus.Failed;
                 result.Message = $"Error: {ex.Message}";
                 return result;
@@ -730,7 +730,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 return false;
 
             report.Stopped = $"{reason} Stopped before {step}.";
-            Debug.LogWarning($"[AddressablesManagement] Deploy stopped: {report.Stopped}");
+            Debug.LogWarning($"[PublishEnvironments] Deploy stopped: {report.Stopped}");
             return true;
         }
 
@@ -793,7 +793,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     // platform accepts them where this assembly is already registered.
                     outcome.NotSent = true;
                     outcome.Reason = $"no bundle in {EnvironmentsBuild.OutputFolder}: the scenes that need it import only if it is already registered";
-                    Debug.LogWarning($"[AddressablesManagement] World \"{worldLabel}\": no bundle for '{assemblyName}' in " +
+                    Debug.LogWarning($"[PublishEnvironments] World \"{worldLabel}\": no bundle for '{assemblyName}' in " +
                                      $"{EnvironmentsBuild.OutputFolder}. The scenes that need it import only if it is already registered.");
                     continue;
                 }
@@ -855,7 +855,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 string assemblyName = EnvironmentsBuild.ReadDeclaredAssembly(scene, out bool declares);
                 if (!declares)
                 {
-                    Debug.LogWarning($"[AddressablesManagement] World \"{worldLabel}\": \"{scene}\" was built before the " +
+                    Debug.LogWarning($"[PublishEnvironments] World \"{worldLabel}\": \"{scene}\" was built before the " +
                                      "scene zips declared their interpreted assembly, so its script link was left as it was. " +
                                      "Build the scenes again.");
                     continue;
@@ -889,26 +889,26 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error getting upload link for world {worldId}: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error getting upload link for world {worldId}: {ex.Message}");
                 return null;
             }
 
             if (response == null)
             {
-                Debug.LogError($"[AddressablesManagement] Could not get an upload link for world {worldId}: no valid session.");
+                Debug.LogError($"[PublishEnvironments] Could not get an upload link for world {worldId}: no valid session.");
                 return null;
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                Debug.LogError($"[AddressablesManagement] GetUploadLink failed for world {worldId}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
+                Debug.LogError($"[PublishEnvironments] GetUploadLink failed for world {worldId}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
                 return null;
             }
 
             string uploadLink = await response.Content.ReadAsStringAsync();
             // Remove surrounding quotes if the API returns a JSON string
             uploadLink = uploadLink.Trim('"');
-            Debug.Log($"[AddressablesManagement] Upload link received for world {worldId}");
+            Debug.Log($"[PublishEnvironments] Upload link received for world {worldId}");
             return uploadLink;
         }
 
@@ -927,23 +927,23 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error importing {zipName} to world {worldId}: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error importing {zipName} to world {worldId}: {ex.Message}");
                 return false;
             }
 
             if (response == null)
             {
-                Debug.LogError($"[AddressablesManagement] Could not import {zipName} to world {worldId}: no valid session.");
+                Debug.LogError($"[PublishEnvironments] Could not import {zipName} to world {worldId}: no valid session.");
                 return false;
             }
 
             if (!response.IsSuccessStatusCode)
             {
-                Debug.LogError($"[AddressablesManagement] Import failed for {zipName} to world {worldId}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
+                Debug.LogError($"[PublishEnvironments] Import failed for {zipName} to world {worldId}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
                 return false;
             }
 
-            Debug.Log($"[AddressablesManagement] Import {zipName} to world {worldId} started successfully.");
+            Debug.Log($"[PublishEnvironments] Import {zipName} to world {worldId} started successfully.");
             return true;
         }
 
@@ -980,19 +980,19 @@ namespace Virtuademy.SDK.Environments.Editor
                 HttpResponseMessage response = await uploadClient.PutAsync(uploadUri, content);
                 if (response.IsSuccessStatusCode)
                 {
-                    Debug.Log($"[AddressablesManagement] Upload completed: {fileName}");
+                    Debug.Log($"[PublishEnvironments] Upload completed: {fileName}");
                     return true;
                 }
                 else
                 {
                     string responseBody = await response.Content.ReadAsStringAsync();
-                    Debug.LogError($"[AddressablesManagement] Upload failed: {fileName} - {response.StatusCode}\n{responseBody}");
+                    Debug.LogError($"[PublishEnvironments] Upload failed: {fileName} - {response.StatusCode}\n{responseBody}");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Upload error {fileName}: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Upload error {fileName}: {ex.Message}");
                 return false;
             }
         }
@@ -1006,7 +1006,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (ftpConfig.port <= 0 || ftpConfig.port > 65535)
             {
-                Debug.LogWarning($"[AddressablesManagement] Invalid SFTP port ({ftpConfig.port}), defaulting to 22.");
+                Debug.LogWarning($"[PublishEnvironments] Invalid SFTP port ({ftpConfig.port}), defaulting to 22.");
                 ftpConfig.port = 22;
             }
 
@@ -1080,9 +1080,9 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] SFTP upload error {fileName}: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] SFTP upload error {fileName}: {ex.Message}");
                 if (ex.InnerException != null)
-                    Debug.LogError($"[AddressablesManagement] Inner exception: {ex.InnerException.Message}");
+                    Debug.LogError($"[PublishEnvironments] Inner exception: {ex.InnerException.Message}");
                 return false;
             }
         }
@@ -1099,24 +1099,24 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (response == null)
                 {
-                    Debug.LogError("[AddressablesManagement] Could not get the tenant upload link: no valid session.");
+                    Debug.LogError("[PublishEnvironments] Could not get the tenant upload link: no valid session.");
                     return null;
                 }
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Debug.LogError($"[AddressablesManagement] GetTenantUploadLink failed: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
+                    Debug.LogError($"[PublishEnvironments] GetTenantUploadLink failed: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
                     return null;
                 }
 
                 string uploadLink = await response.Content.ReadAsStringAsync();
                 uploadLink = uploadLink.Trim('"');
-                Debug.Log("[AddressablesManagement] Tenant upload link received.");
+                Debug.Log("[PublishEnvironments] Tenant upload link received.");
                 return uploadLink;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error getting tenant upload link: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error getting tenant upload link: {ex.Message}");
                 return null;
             }
         }
@@ -1139,7 +1139,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (response == null)
                 {
-                    Debug.LogError("[AddressablesManagement] Could not import the environment DLL: no valid session.");
+                    Debug.LogError("[PublishEnvironments] Could not import the environment DLL: no valid session.");
                     return (false, "no valid session.");
                 }
 
@@ -1151,7 +1151,7 @@ namespace Virtuademy.SDK.Environments.Editor
                     // platform's business and not something a creator's console should carry.
                     string body = await response.Content.ReadAsStringAsync();
 
-                    Debug.LogError($"[AddressablesManagement] Environment DLL import failed: {response.StatusCode} - {body}");
+                    Debug.LogError($"[PublishEnvironments] Environment DLL import failed: {response.StatusCode} - {body}");
                     return (false, DescribeDllImportFailure((int)response.StatusCode, body));
                 }
 
@@ -1159,7 +1159,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error importing the environment DLL: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error importing the environment DLL: {ex.Message}");
                 return (false, ex.Message);
             }
         }
@@ -1216,13 +1216,13 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (response == null)
                 {
-                    Debug.LogError($"[AddressablesManagement] Could not link {catalogName}: no valid session.");
+                    Debug.LogError($"[PublishEnvironments] Could not link {catalogName}: no valid session.");
                     return false;
                 }
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Debug.LogError($"[AddressablesManagement] Linking {catalogName} to {assemblyName} failed: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
+                    Debug.LogError($"[PublishEnvironments] Linking {catalogName} to {assemblyName} failed: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
                     return false;
                 }
 
@@ -1230,7 +1230,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error linking {catalogName}: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error linking {catalogName}: {ex.Message}");
                 return false;
             }
         }
@@ -1249,22 +1249,22 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (response == null)
                 {
-                    Debug.LogError($"[AddressablesManagement] Could not import {zipName} to the tenant: no valid session.");
+                    Debug.LogError($"[PublishEnvironments] Could not import {zipName} to the tenant: no valid session.");
                     return false;
                 }
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Debug.LogError($"[AddressablesManagement] Tenant import failed for {zipName}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
+                    Debug.LogError($"[PublishEnvironments] Tenant import failed for {zipName}: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}");
                     return false;
                 }
 
-                Debug.Log($"[AddressablesManagement] Tenant import {zipName} started successfully.");
+                Debug.Log($"[PublishEnvironments] Tenant import {zipName} started successfully.");
                 return true;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error importing {zipName} to tenant: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error importing {zipName} to tenant: {ex.Message}");
                 return false;
             }
         }

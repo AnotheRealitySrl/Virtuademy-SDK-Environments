@@ -19,7 +19,7 @@ namespace Virtuademy.BreakingChangeSolvers
     /// Runs the update routines of the SDK (the menu items under <b>Virtuademy &gt; Update routines</b>) from the
     /// command line, for a machine with nobody at the windows: a project moved to a new SDK version by
     /// <c>SetupCli</c> with its <c>update</c> step, CI, an assistant. The command line of the update routines is to the
-    /// windows what <c>EnvironmentsCli</c> is to the Addressables management window and <c>SetupCli</c> to the setup
+    /// windows what <c>EnvironmentsCli</c> is to the Publish Environments window and <c>SetupCli</c> to the setup
     /// window: the same scan and the same apply, driven by arguments.
     /// <code>
     /// Unity -batchmode -nographics -projectPath &lt;project&gt; -logFile -

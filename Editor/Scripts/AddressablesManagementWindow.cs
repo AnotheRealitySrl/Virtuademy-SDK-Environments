@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Unity.Properties;
 using UnityEditor;
@@ -24,8 +25,24 @@ using static Virtuademy.SDK.Environments.Editor.SceneListScriptableObject;
 
 namespace Virtuademy.SDK.Environments.Editor
 {
+    /// <summary>
+    /// The Publish Environments window (menu Virtuademy > Publish Environments; the class kept its old name): build the
+    /// project's scenes, and deploy them to the worlds and tenant levels of the connections the project uses (meta-repo
+    /// ADR 0037). Connections come in here: the file the Back Office downloads goes into the encrypted connection store,
+    /// and each connection gets a group where it is logged in and ticked.
+    /// </summary>
+    /// <remarks>
+    /// The window is an environment project's. The Virtuademy application, which has this package installed too, defines
+    /// <c>VIRTUADEMY_APPLICATION</c>, and its menu is not compiled there: an application switches tenant in Available
+    /// Tenants, with no login.
+    /// </remarks>
     public class AddressablesManagementWindow : EditorWindow
     {
+        private const string window_title = "Publish Environments";
+
+        // Set once the project's old configuration files were offered to the connection store in this editor session.
+        private const string credentials_imported_key = "Virtuademy_PublishEnvironments_CredentialsImported";
+
         private enum EBuildError
         {
             None,
@@ -98,15 +115,25 @@ namespace Virtuademy.SDK.Environments.Editor
         private bool rebuildPending;
         private bool missingModules;
 
+        // Logins started from a group, by connection key: they outlive a rebuild of the groups.
+        private readonly Dictionary<string, PendingLogin> pendingLogins = new(StringComparer.OrdinalIgnoreCase);
+
         // UI references
         private Label loginStatusLabel;
+        private Label connectionsSummaryLabel;
+        private Label deploySummaryLabel;
+        private Label buildStatusLabel;
+        private Label scenesInBuildLabel;
+        private VisualElement blockingBanner;
+        private VisualElement advancedFixRow;
+        private Foldout advancedFoldout;
         private IVisualElementScheduledItem sessionExpiryRefresh;
         private VisualElement deploySection;
         private VisualElement targetsContainer;
         private VisualElement versionNotice;
         private Button deployButton;
         private Button buildAndDeployButton;
-        private Button openTenantSelectionButton;
+        private Button importConfigurationButton;
         private Button buildAddressablesButton;
 
         // Platform module warnings
@@ -122,15 +149,26 @@ namespace Virtuademy.SDK.Environments.Editor
         private VisualElement deployErrorsContainer;
         private ScrollView deployErrorsScrollView;
 
-        /// <summary>One connection the project uses, as the window shows it: a foldout with its worlds and its tenant level.</summary>
+        /// <summary>
+        /// One connection the project uses, as the window shows it: a header row (state, tenant, environment, platform
+        /// version, default star, the main action and a menu) and a body with the account and the targets.
+        /// </summary>
         private sealed class TargetGroup
         {
             public string Key;
-            public Foldout Foldout;
-            public Label Status;
+            public VisualElement Root;
+            public Foldout Arrow;
+            public VisualElement Body;
+            public bool Expanded;
+            public VisualElement Dot;
+            public Label EnvironmentChip;
+            public Label VersionChip;
+            public Label Summary;
             public Button LoginButton;
-            public Button LogoutButton;
             public Button BackofficeButton;
+            public Button MenuButton;
+            public Label Status;
+            public VisualElement LoginActions;
             public Label WorldsStatus;
             public VisualElement WorldsList;
             public List<PublishableWorld> Deployable = new();
@@ -154,6 +192,14 @@ namespace Virtuademy.SDK.Environments.Editor
             public bool Allowed => PlatformVersionRule.Allows(Version);
         }
 
+        /// <summary>A browser login started from a group: it can be cancelled, and its authorization URL copied.</summary>
+        private sealed class PendingLogin
+        {
+            public readonly CancellationTokenSource Cancellation = new();
+            public string AuthUrl;
+            public string Status;
+        }
+
         /// <summary>A group's ticked targets, as one deploy takes them.</summary>
         private sealed class GroupTargets
         {
@@ -173,11 +219,13 @@ namespace Virtuademy.SDK.Environments.Editor
             public bool Covers(int worldId) => TenantLevel || (WorldIds?.Contains(worldId) ?? false);
         }
 
-        [MenuItem("Virtuademy/Addressables management")]
+#if !VIRTUADEMY_APPLICATION
+        [MenuItem("Virtuademy/Publish Environments")]
+#endif
         public static void ShowExample()
         {
             AddressablesManagementWindow wnd = GetWindow<AddressablesManagementWindow>();
-            wnd.titleContent = new GUIContent("Addressables management");
+            wnd.titleContent = new GUIContent(window_title);
         }
 
         private void OnApplicationQuit()
@@ -212,6 +260,9 @@ namespace Virtuademy.SDK.Environments.Editor
                 RebuildTargets();
             else
                 RefreshLabels();
+
+            RefreshSettingsChecks();
+            RefreshButtons();
         }
 
 
@@ -219,11 +270,30 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             root = rootVisualElement;
 
+            // A window restored from a layout saved before the rename keeps the title it was saved with.
+            titleContent = new GUIContent(window_title);
+
             VisualElement labelFromUXML = m_VisualTreeAsset.Instantiate();
             root.Add(labelFromUXML);
 
+            ShowLogo();
             InitializeWindow();
+            ImportProjectCredentials();
         }
+
+        /// <summary>The Virtuademy logo at the top, as the setup window shows it: light lettering on the dark skin, dark on the light one.</summary>
+        private void ShowLogo()
+        {
+            VisualElement logo = root.Q<VisualElement>("header-logo");
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                $"{package_root}/Editor/Icons/virtuademy-logo-{(EditorGUIUtility.isProSkin ? "light" : "dark")}.png");
+            if (texture != null)
+                logo.style.backgroundImage = texture;
+            else
+                root.Q<VisualElement>("window-header").style.display = DisplayStyle.None;
+        }
+
+        private const string package_root = "Packages/com.anotherealitysrl.virtuademy-sdk-environments";
 
         private void InitializeWindow()
         {
@@ -240,20 +310,17 @@ namespace Virtuademy.SDK.Environments.Editor
         private void SetupDeployTargetsUI()
         {
             loginStatusLabel = root.Q<Label>("login-status-label");
+            connectionsSummaryLabel = root.Q<Label>("connections-summary-label");
+            deploySummaryLabel = root.Q<Label>("deploy-summary-label");
             deploySection = root.Q<VisualElement>("deploy-section");
             targetsContainer = root.Q<VisualElement>("deploy-targets");
             deployButton = root.Q<Button>("deploy-button");
             buildAndDeployButton = root.Q<Button>("build-and-deploy-button");
 
-            // The window's own login is gone: connections are logged in per group below, and imported, chosen for play
-            // mode and logged out in Available Tenants.
-            openTenantSelectionButton = root.Q<Button>("open-tenant-selection-button");
-            openTenantSelectionButton.text = "Available Tenants";
-            openTenantSelectionButton.tooltip = "Import a configuration file, log in, and choose the project's default connection.";
-            openTenantSelectionButton.clicked += () =>
-            {
-                EditorApplication.ExecuteMenuItem("Virtuademy/Available Tenants");
-            };
+            // Connections come in through the section's import; each then has its group below, where it is logged in and
+            // logged out.
+            importConfigurationButton = root.Q<Button>("import-configuration-button");
+            importConfigurationButton.clicked += OnImportConfigurationClicked;
 
             versionNotice = new VisualElement();
             deploySection.Insert(deploySection.IndexOf(targetsContainer), versionNotice);
@@ -297,11 +364,11 @@ namespace Virtuademy.SDK.Environments.Editor
             deployErrorsScrollView.style.maxHeight = 220;
             deployErrorsContainer.Add(deployErrorsScrollView);
 
-            root.Add(deployErrorsContainer);
+            root.Q<VisualElement>("deploy-errors-slot").Add(deployErrorsContainer);
         }
 
         /// <summary>
-        /// A login or a logout on any connection, or another default connection. The errors in the panel belong to the
+        /// A login or a logout on any connection, or a connection added or removed. The errors in the panel belong to the
         /// connections as they were, so they go; the groups are built again from the project's connections.
         /// </summary>
         private void OnLoginStateChanged()
@@ -320,6 +387,71 @@ namespace Virtuademy.SDK.Environments.Editor
         // A renewal or a server rejection changes only a token: re-render the labels, never the worlds — this runs
         // inside the API call that renewed it.
         private void OnTokenChanged() => RefreshLabels();
+
+        /// <summary>
+        /// The file the Back Office downloads, into the encrypted connection store (<see cref="ConfigurationFileImport"/>): one
+        /// connection per environment of the file, each one the project uses from now on. No file is written to the project.
+        /// It needs the network, because a connection is named by the tenant key the platform gives; it makes no login.
+        /// </summary>
+        private async void OnImportConfigurationClicked()
+        {
+            string file = ConfigurationFileImport.PickFile();
+            if (file == null)
+                return;
+
+            importConfigurationButton.SetEnabled(false);
+            try
+            {
+                ConfigurationFileImport.StoreImportResult result = await ConfigurationFileImport.ImportIntoStoreAsync(file,
+                    onStatus: status => { if (connectionsSummaryLabel != null) connectionsSummaryLabel.text = status; });
+
+                if (result.Failures.Count > 0)
+                {
+                    EditorUtility.DisplayDialog("Import of the configuration file",
+                        (result.Connections.Count > 0 ? "Some environments of the file were imported, not these:\n\n" : "Nothing was imported:\n\n") +
+                        string.Join("\n", result.Failures), "OK");
+                }
+            }
+            catch (InvalidOperationException ex)
+            {
+                Debug.LogError($"[PublishEnvironments] The configuration file was not imported: {ex.Message}");
+                EditorUtility.DisplayDialog("Import failed", ex.Message, "OK");
+            }
+            finally
+            {
+                importConfigurationButton.SetEnabled(true);
+                RebuildTargets();
+            }
+        }
+
+        /// <summary>
+        /// The configuration files an environment project imported before the connection store (meta-repo ADR 0037,
+        /// "Migration") go into the store, once per editor session: it asks the platform about each credential the store
+        /// does not hold yet. The files are left where they are, and say so in the Console: an environment project does not
+        /// need them any more.
+        /// </summary>
+        private async void ImportProjectCredentials()
+        {
+            if (SessionState.GetBool(credentials_imported_key, false))
+                return;
+
+            SessionState.SetBool(credentials_imported_key, true);
+
+            AppConfigurationSettings settings = AppConfigurationSettings.FindSelected();
+            if (settings == null || settings.AppAssets.Count == 0)
+                return;
+
+            var (added, known, failures) = await ConnectionLoginService.ImportProjectCredentialsAsync(settings);
+            if (added > 0 || failures.Count > 0)
+            {
+                Debug.Log($"[PublishEnvironments] The project's configuration files: {added} connection(s) added to the store, {known} already there" +
+                          (failures.Count > 0 ? $", {failures.Count} not resolved: {string.Join("; ", failures)}." : ".") +
+                          " Each needs one login, in its group of the Publish Environments window. The files themselves, listed in " +
+                          $"{AssetDatabase.GetAssetPath(settings)}, are not needed by an environment project any more.");
+            }
+
+            RebuildTargets();
+        }
 
         /// <summary>The connections the project uses that are in the store, in the order the project first used them.</summary>
         private static List<ConnectionRecord> UsedConnections() =>
@@ -356,8 +488,9 @@ namespace Virtuademy.SDK.Environments.Editor
             List<ConnectionRecord> connections = UsedConnections();
             if (connections.Count == 0)
             {
-                targetsContainer.Add(new Label("This project uses no connection yet. Import the configuration file of a tenant and log in from " +
-                                               "Virtuademy > Available Tenants: each connection then gets its group here.")
+                targetsContainer.Add(new Label("No connection yet. Download the configuration file of a tenant from its Back Office " +
+                                               "(Download SDK Environments Config) and import it with the button above: each connection " +
+                                               "then gets its group here, where you log in.")
                 {
                     style = { whiteSpace = WhiteSpace.Normal, marginLeft = 4, marginRight = 4, marginBottom = 4 }
                 });
@@ -367,9 +500,9 @@ namespace Virtuademy.SDK.Environments.Editor
             {
                 TargetGroup group = BuildGroup(record, projectVersion);
                 groups[record.Key] = group;
-                targetsContainer.Add(group.Foldout);
+                targetsContainer.Add(group.Root);
 
-                if (group.Foldout.value)
+                if (group.Expanded)
                     LoadGroupWorlds(group);
             }
 
@@ -404,91 +537,258 @@ namespace Virtuademy.SDK.Environments.Editor
                 Production = IsProduction(record),
                 Version = PlatformVersionRule.Check(projectVersion, record.PlatformVersion),
             };
+            group.Expanded = groupExpanded.TryGetValue(record.Key, out bool open) ? open : !group.Production;
 
-            bool expanded = groupExpanded.TryGetValue(record.Key, out bool open) ? open : !group.Production;
-            group.Foldout = new Foldout { value = expanded, style = { marginBottom = 4 } };
-
-            // The ticks inside raise change events too, and they bubble up here: only the foldout's own counts.
-            group.Foldout.RegisterValueChangedCallback(evt =>
+            group.Root = new VisualElement
             {
-                if (evt.target != group.Foldout)
-                    return;
-
-                groupExpanded[group.Key] = evt.newValue;
-                if (evt.newValue && !group.Listed && !group.Listing)
-                    LoadGroupWorlds(group);
-            });
-
-            VisualElement statusRow = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginBottom = 2 } };
-            group.Status = new Label { style = { whiteSpace = WhiteSpace.Normal, flexShrink = 1, flexGrow = 1 } };
-            statusRow.Add(group.Status);
-
-            group.LoginButton = new Button(() => LoginGroup(group)) { text = "Log in", style = { flexShrink = 0 } };
-            group.LogoutButton = new Button(async () => await EditorSessionManager.LogoutAsync(group.Key)) { text = "Log out", style = { flexShrink = 0 } };
-            TintRed(group.LogoutButton);
-
-            // Shown once the group's listing has asked whether the account may enter (LoadGroupBackofficeAccessAsync).
-            group.BackofficeButton = new Button(() => OpenBackoffice(group))
-            {
-                text = "Back Office ↗",
-                style = { flexShrink = 0, display = DisplayStyle.None },
+                style = { paddingBottom = 3, marginBottom = 3, borderBottomWidth = 1, borderBottomColor = new Color(0f, 0f, 0f, 0.25f) },
             };
 
-            statusRow.Add(group.BackofficeButton);
-            statusRow.Add(group.LoginButton);
-            statusRow.Add(group.LogoutButton);
-            group.Foldout.Add(statusRow);
+            // The header: the state, who the tenant is, and what can be done with it.
+            VisualElement header = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, minHeight = 22 } };
 
-            string refusal = PlatformVersionRule.Refusal(group.Version, projectVersion, record.PlatformVersion);
-            if (refusal != null)
-                group.Foldout.Add(new HelpBox(refusal, HelpBoxMessageType.Error) { style = { marginBottom = 4 } });
+            group.Arrow = new Foldout { text = string.Empty, value = group.Expanded, style = { marginRight = 0, flexShrink = 0 } };
+            group.Arrow.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.target == group.Arrow)
+                    SetExpanded(group, evt.newValue);
+            });
+            header.Add(group.Arrow);
 
-            if (group.Production)
-                group.Foldout.Add(new HelpBox("Production. A deploy that includes this tenant asks for a confirmation of its own.",
-                                              HelpBoxMessageType.Warning) { style = { marginBottom = 4 } });
+            group.Dot = new VisualElement();
+            group.Dot.AddToClassList("dot");
+            header.Add(group.Dot);
 
-            group.WorldsStatus = new Label { style = { whiteSpace = WhiteSpace.Normal, marginBottom = 2, opacity = 0.85f } };
-            group.Foldout.Add(group.WorldsStatus);
+            header.Add(new Label(record.TenantLabel) { style = { unityFontStyleAndWeight = FontStyle.Bold, marginRight = 4 } });
+
+            // Production carries no chip: the chips mark the environments that are not the real one.
+            if (!group.Production)
+            {
+                group.EnvironmentChip = Chip(record.Environment ?? "?", false);
+                group.EnvironmentChip.tooltip = "The tenant's environment.";
+                if (string.Equals(record.Environment, nameof(Env.Sandbox), StringComparison.OrdinalIgnoreCase))
+                    group.EnvironmentChip.AddToClassList("chip-sandbox");
+                else if (string.Equals(record.Environment, nameof(Env.PreProduction), StringComparison.OrdinalIgnoreCase))
+                    group.EnvironmentChip.AddToClassList("chip-preproduction");
+                header.Add(group.EnvironmentChip);
+            }
+
+            bool locked = !group.Allowed;
+            group.VersionChip = Chip(locked ? $"{record.PlatformVersion ?? "no version"} · locked" : record.PlatformVersion ?? "no version", locked);
+            group.VersionChip.tooltip = PlatformVersionRule.Refusal(group.Version, projectVersion, record.PlatformVersion) ?? "The tenant's platform version.";
+            header.Add(group.VersionChip);
+
+            group.Summary = new Label { style = { flexGrow = 1, unityTextAlign = TextAnchor.MiddleRight, marginRight = 4 } };
+            group.Summary.AddToClassList("muted");
+            header.Add(group.Summary);
+
+            // Shown once the group's listing has asked whether the account may enter (LoadGroupBackofficeAccessAsync).
+            group.BackofficeButton = new Button(() => OpenBackoffice(group)) { text = "Back Office ↗", style = { flexShrink = 0, display = DisplayStyle.None } };
+            header.Add(group.BackofficeButton);
+
+            group.LoginButton = new Button(() => LoginGroup(group)) { text = "Log in", tooltip = "Logs in to this tenant in the browser.", style = { flexShrink = 0 } };
+            header.Add(group.LoginButton);
+
+            group.MenuButton = IconButton(menu_icons, "...", () => ShowGroupMenu(group));
+            group.MenuButton.tooltip = "More actions";
+            header.Add(group.MenuButton);
+
+            // A click on the header, outside its buttons, opens or closes the group.
+            header.RegisterCallback<ClickEvent>(evt =>
+            {
+                if (evt.target is not VisualElement target || target is Button || target.GetFirstAncestorOfType<Button>() != null
+                    || target == group.Arrow || group.Arrow.Contains(target))
+                    return;
+                group.Arrow.value = !group.Arrow.value;
+            });
+
+            group.Root.Add(header);
+
+            // The body: the account, why the group cannot be deployed to when it cannot, and the targets.
+            group.Body = new VisualElement { style = { marginLeft = 20 } };
+
+            VisualElement accountRow = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginBottom = 2 } };
+            group.Status = new Label { style = { whiteSpace = WhiteSpace.Normal, flexShrink = 1, flexGrow = 1, fontSize = 11 } };
+            accountRow.Add(group.Status);
+            group.LoginActions = new VisualElement { style = { flexDirection = FlexDirection.Row, flexShrink = 0, display = DisplayStyle.None } };
+            group.LoginActions.Add(new Button(() =>
+            {
+                if (pendingLogins.TryGetValue(group.Key, out PendingLogin login) && login.AuthUrl != null)
+                    EditorGUIUtility.systemCopyBuffer = login.AuthUrl;
+            }) { text = "Copy link", tooltip = "Copies the login address, to open it in another browser." });
+            group.LoginActions.Add(new Button(() =>
+            {
+                if (pendingLogins.TryGetValue(group.Key, out PendingLogin login))
+                    login.Cancellation.Cancel();
+            }) { text = "Cancel" });
+            accountRow.Add(group.LoginActions);
+            group.Body.Add(accountRow);
+
+            if (locked)
+            {
+                group.Body.Add(new Label(ShortRefusal(group.Version, projectVersion, record.PlatformVersion))
+                {
+                    tooltip = PlatformVersionRule.Refusal(group.Version, projectVersion, record.PlatformVersion),
+                    style = { color = new Color(0.9f, 0.45f, 0.45f), fontSize = 11, whiteSpace = WhiteSpace.Normal, marginBottom = 2 },
+                });
+            }
+
+            group.WorldsStatus = new Label { style = { whiteSpace = WhiteSpace.Normal, marginBottom = 2, fontSize = 11 } };
+            group.WorldsStatus.AddToClassList("muted");
+            group.Body.Add(group.WorldsStatus);
             group.WorldsList = new VisualElement();
-            group.Foldout.Add(group.WorldsList);
+            group.Body.Add(group.WorldsList);
 
-            if (!expanded)
-                group.WorldsStatus.text = "Open the group to list its worlds.";
+            group.Root.Add(group.Body);
+            group.Body.style.display = group.Expanded ? DisplayStyle.Flex : DisplayStyle.None;
 
             return group;
         }
 
-        /// <summary>
-        /// A red button for an action that ends something (a logout). An inline background replaces the theme's hover
-        /// colour, so the hover is lightened here.
-        /// </summary>
-        private static void TintRed(Button button)
+        private static readonly string[] menu_icons = { "_Menu", "d__Menu", "pane options" };
+        private static readonly string[] check_icons = { "TestPassed", "d_GreenCheckmark", "GreenCheckmark" };
+        private static readonly string[] warning_icons = { "console.warnicon.sml", "console.warnicon", "d_console.warnicon.sml" };
+        private static readonly string[] error_icons = { "console.erroricon.sml", "console.erroricon" };
+
+        /// <summary>The first of Unity's built-in icons that exists, or null.</summary>
+        private static Texture2D BuiltinIcon(string[] names)
         {
-            Color normal = new(0.62f, 0.2f, 0.2f);
-            Color hover = new(0.74f, 0.27f, 0.27f);
-            button.style.backgroundColor = normal;
-            button.style.color = Color.white;
-            button.RegisterCallback<PointerEnterEvent>(_ => button.style.backgroundColor = hover);
-            button.RegisterCallback<PointerLeaveEvent>(_ => button.style.backgroundColor = normal);
+            foreach (string name in names)
+            {
+                Texture2D texture = EditorGUIUtility.FindTexture(name);
+                if (texture != null)
+                    return texture;
+            }
+
+            return null;
         }
 
-        /// <summary>The browser login of one group's connection. It does not change the default connection.</summary>
+        private static void SetIcon(VisualElement element, string[] names)
+        {
+            Texture2D texture = BuiltinIcon(names);
+            element.style.backgroundImage = texture != null ? new StyleBackground(texture) : new StyleBackground(StyleKeyword.None);
+        }
+
+        /// <summary>A flat 18-pixel button showing a built-in icon, or <paramref name="fallback"/> as text where the icon is missing.</summary>
+        private static Button IconButton(string[] icons, string fallback, Action clicked)
+        {
+            Button button = new(clicked);
+            Texture2D texture = BuiltinIcon(icons);
+            if (texture != null)
+            {
+                button.style.backgroundImage = new StyleBackground(texture);
+                button.style.width = 18;
+                button.style.height = 18;
+                button.style.paddingLeft = button.style.paddingRight = 0;
+                button.style.backgroundColor = Color.clear;
+                button.style.borderTopWidth = button.style.borderBottomWidth = button.style.borderLeftWidth = button.style.borderRightWidth = 0;
+                button.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+            }
+            else
+            {
+                button.text = fallback;
+            }
+
+            button.style.flexShrink = 0;
+            return button;
+        }
+
+        private static Label Chip(string text, bool danger)
+        {
+            Label chip = new(text);
+            chip.AddToClassList("chip");
+            if (danger)
+                chip.AddToClassList("chip-danger");
+            return chip;
+        }
+
+        /// <summary>The version rule's refusal in one line; the full text is the tooltip.</summary>
+        private static string ShortRefusal(PlatformVersionRule.Verdict verdict, string projectVersion, string tenantVersion) =>
+            verdict == PlatformVersionRule.Verdict.TargetUnknown || string.IsNullOrEmpty(tenantVersion)
+                ? "The tenant reports no platform version: no deploy here."
+                : $"The tenant runs {tenantVersion}, the project is set up for {projectVersion}: no deploy here.";
+
+        private void SetExpanded(TargetGroup group, bool expanded)
+        {
+            group.Expanded = expanded;
+            groupExpanded[group.Key] = expanded;
+            group.Body.style.display = expanded ? DisplayStyle.Flex : DisplayStyle.None;
+            if (expanded && !group.Listed && !group.Listing)
+                LoadGroupWorlds(group);
+            RefreshLabels();
+        }
+
+        /// <summary>The group's less frequent actions.</summary>
+        private void ShowGroupMenu(TargetGroup group)
+        {
+            ConnectionRecord record = ConnectionStore.Get(group.Key);
+            bool hasSession = record?.HasSession == true;
+
+            GenericMenu menu = new();
+            if (hasSession)
+                menu.AddItem(new GUIContent("Refresh worlds"), false, () =>
+                {
+                    if (!group.Expanded)
+                        group.Arrow.value = true;
+                    else if (!group.Listing)
+                        LoadGroupWorlds(group);
+                });
+            else
+                menu.AddDisabledItem(new GUIContent("Refresh worlds"));
+
+            menu.AddSeparator(string.Empty);
+
+            if (hasSession)
+                menu.AddItem(new GUIContent("Log out"), false, async () => await EditorSessionManager.LogoutAsync(group.Key));
+            else
+                menu.AddDisabledItem(new GUIContent("Log out"));
+
+            menu.AddItem(new GUIContent("Remove from project..."), false, () =>
+            {
+                string label = PublishedEnvironmentsIndex.LabelOf(group.Key);
+                if (EditorUtility.DisplayDialog("Remove from project",
+                        $"Stop using {label} in this project? Its ticks go with it. The connection stays in your store, " +
+                        "with its login, for your other projects; importing its configuration file brings it back.",
+                        "Remove", "Cancel"))
+                    ProjectConnections.Remove(group.Key);
+            });
+
+            menu.DropDown(group.MenuButton.worldBound);
+        }
+
+        /// <summary>
+        /// The browser login of one group's connection. While it waits, the
+        /// group's account line says so, with the login address to copy and a Cancel.
+        /// </summary>
         private async void LoginGroup(TargetGroup group)
         {
-            group.LoginButton.SetEnabled(false);
+            string key = group.Key;
+            if (pendingLogins.ContainsKey(key))
+                return;
+
+            PendingLogin login = new();
+            pendingLogins[key] = login;
+            RefreshLabels();
+
             try
             {
-                LoginOutcome outcome = await ConnectionLoginService.LoginAsync(group.Key, new LoginOptions
+                LoginOptions options = new()
                 {
-                    OnStatus = status => { if (group.Status != null) group.Status.text = status; },
-                });
+                    Cancellation = login.Cancellation.Token,
+                    OnStatus = status => EditorApplication.delayCall += () => { login.Status = status; RefreshLabels(); },
+                };
+                options.Browser.OnAuthUrl = url => EditorApplication.delayCall += () => { login.AuthUrl = url; RefreshLabels(); };
 
-                if (!outcome.Success)
-                    LogDeployError($"{PublishedEnvironmentsIndex.LabelOf(group.Key)}: the login failed. {outcome.Message}");
+                LoginOutcome outcome = await ConnectionLoginService.LoginAsync(key, options);
+
+                if (!outcome.Success && outcome.Code != "cancelled" && !login.Cancellation.IsCancellationRequested)
+                    LogDeployError($"{PublishedEnvironmentsIndex.LabelOf(key)}: the login failed. {outcome.Message}");
             }
             finally
             {
-                group.LoginButton?.SetEnabled(true);
+                pendingLogins.Remove(key);
+                login.Cancellation.Dispose();
+                RefreshLabels();
             }
         }
 
@@ -509,7 +809,7 @@ namespace Virtuademy.SDK.Environments.Editor
             ConnectionRecord record = ConnectionStore.Get(group.Key);
             if (record?.HasSession != true)
             {
-                group.WorldsStatus.text = "Log in to list the worlds of this tenant.";
+                group.WorldsStatus.text = "Log in to list the worlds.";
                 RefreshButtons();
                 return;
             }
@@ -555,13 +855,17 @@ namespace Virtuademy.SDK.Environments.Editor
                     return;
                 }
 
-                group.Deployable = listing.Deployable;
+                // By name, then by id for two worlds with the same name: the order of the ticks and of the Back Office link.
+                group.Deployable = listing.Deployable
+                    .OrderBy(w => w.Label, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(w => w.Id)
+                    .ToList();
                 group.Listed = true;
                 FillGroupTargets(group, ConnectionStore.Get(group.Key) ?? record);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[AddressablesManagement] Error loading the worlds of {PublishedEnvironmentsIndex.LabelOf(group.Key)}: {ex.Message}");
+                Debug.LogError($"[PublishEnvironments] Error loading the worlds of {PublishedEnvironmentsIndex.LabelOf(group.Key)}: {ex.Message}");
                 if (generation == group.Generation)
                     group.WorldsStatus.text = $"Error: {ex.Message}";
             }
@@ -586,35 +890,42 @@ namespace Virtuademy.SDK.Environments.Editor
             if (group.Deployable.Count == 0)
                 group.WorldsStatus.text = "Your account cannot deploy to any world of this tenant.";
 
-            foreach (PublishableWorld world in group.Deployable)
-            {
-                // A group the version rule refuses shows its worlds unticked and locked; the ticks the project kept for it
-                // are left alone and come back if the versions agree again.
-                Toggle toggle = new() { text = $"{world.Label} (ID: {world.Id})", value = group.Allowed && savedWorlds.Contains(world.Id) };
-                toggle.SetEnabled(group.Allowed);
-                toggle.RegisterValueChangedCallback(evt => OnTargetTicked(group, evt));
-
-                VisualElement preview = NewDeployPreview();
-                group.WorldToggles[world.Id] = toggle;
-                group.WorldPreviews[world.Id] = preview;
-                group.WorldsList.Add(toggle);
-                group.WorldsList.Add(preview);
-            }
-
+            // A group the version rule refuses shows its targets unticked and locked; the ticks the project kept for it
+            // are left alone and come back if the versions agree again.
             if (record.IsTenantManager)
             {
                 group.TenantToggle = new Toggle
                 {
-                    text = "Tenant level",
+                    text = "Whole tenant (tenant level)",
                     tooltip = "Every world of the tenant. The interpreted scripts are not uploaded: an environment deployed at tenant level runs without them.",
                     value = group.Allowed && savedTenant,
-                    style = { marginTop = 2 },
                 };
                 group.TenantToggle.SetEnabled(group.Allowed);
                 group.TenantToggle.RegisterValueChangedCallback(evt => OnTargetTicked(group, evt));
                 group.TenantPreview = NewDeployPreview();
                 group.WorldsList.Add(group.TenantToggle);
                 group.WorldsList.Add(group.TenantPreview);
+
+                if (group.Deployable.Count > 0)
+                    group.WorldsList.Add(new VisualElement { style = { height = 1, marginTop = 2, marginBottom = 3, backgroundColor = new Color(0f, 0f, 0f, 0.3f) } });
+            }
+
+            foreach (PublishableWorld world in group.Deployable)
+            {
+                VisualElement row = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+                Toggle toggle = new() { text = world.Label, value = group.Allowed && savedWorlds.Contains(world.Id), style = { flexGrow = 1, flexShrink = 1 } };
+                toggle.SetEnabled(group.Allowed);
+                toggle.RegisterValueChangedCallback(evt => OnTargetTicked(group, evt));
+                Label id = new($"#{world.Id}") { tooltip = "The world's ID.", style = { flexShrink = 0, marginRight = 4 } };
+                id.AddToClassList("muted");
+                row.Add(toggle);
+                row.Add(id);
+
+                VisualElement preview = NewDeployPreview();
+                group.WorldToggles[world.Id] = toggle;
+                group.WorldPreviews[world.Id] = preview;
+                group.WorldsList.Add(row);
+                group.WorldsList.Add(preview);
             }
 
             RefreshDeployPreviews();
@@ -706,7 +1017,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Debug.LogWarning($"[AddressablesManagement] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {response.StatusCode}");
+                    Debug.LogWarning($"[PublishEnvironments] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {response.StatusCode}");
                     return null;
                 }
 
@@ -715,7 +1026,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"[AddressablesManagement] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {ex.Message}");
+                Debug.LogWarning($"[PublishEnvironments] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {ex.Message}");
                 return null;
             }
         }
@@ -786,28 +1097,26 @@ namespace Virtuademy.SDK.Environments.Editor
             .Where(t => t.Count > 0)
             .ToList();
 
-        /// <summary>The banner (the default connection), each group's title and status, and the session-expiry refresh.</summary>
+        /// <summary>
+        /// The section's summary, and each group's state: its dot, summary, buttons and account line; then the session-expiry
+        /// refresh.
+        /// </summary>
         private void RefreshLabels()
         {
             if (loginStatusLabel == null)
                 return;
 
-            ConnectionRecord defaultConnection = ConnectionStore.Get(ProjectConnections.DefaultKey);
-            if (defaultConnection == null)
+            List<GroupTargets> ticked = TickedTargets();
+            int targetCount = ticked.Sum(t => t.Count);
+
+            if (connectionsSummaryLabel != null)
             {
-                loginStatusLabel.text = "No default connection: choose one in Available Tenants.";
-                loginStatusLabel.style.color = new Color(0.8f, 0.4f, 0.2f);
+                connectionsSummaryLabel.text = groups.Count == 0
+                    ? string.Empty
+                    : $"{Plural(groups.Count, "connection")} · {Plural(targetCount, "target")}";
             }
-            else
-            {
-                string session = defaultConnection.HasSession
-                    ? $"logged in{(string.IsNullOrEmpty(defaultConnection.Username) ? "" : $" as {defaultConnection.Username}")}{EditorSessionManager.DescribeSession(defaultConnection, out _)}"
-                    : "not logged in";
-                loginStatusLabel.text = $"Default connection: {PublishedEnvironmentsIndex.LabelOf(defaultConnection.Key)}, {session}";
-                loginStatusLabel.style.color = !defaultConnection.HasSession
-                    ? new Color(0.8f, 0.4f, 0.2f)
-                    : defaultConnection.IsTokenValid ? new Color(0.2f, 0.8f, 0.2f) : new Color(0.9f, 0.7f, 0.2f);
-            }
+
+            loginStatusLabel.style.display = DisplayStyle.None;
 
             foreach (TargetGroup group in groups.Values)
             {
@@ -815,30 +1124,67 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (record == null)
                     continue;
 
-                string state = !record.HasSession ? "not logged in" : record.IsTokenValid ? "logged in" : "session expired";
-                bool isDefault = string.Equals(record.Key, defaultConnection?.Key, StringComparison.OrdinalIgnoreCase);
-                group.Foldout.text = $"{record.TenantLabel} · {record.Environment ?? "?"} · platform {record.PlatformVersion ?? "unknown"} · {state}" +
-                                     (isDefault ? " · default" : "");
+                pendingLogins.TryGetValue(group.Key, out PendingLogin login);
 
-                if (record.HasSession)
+                group.Dot.style.backgroundColor = login != null ? new Color(0.35f, 0.6f, 0.95f)
+                    : !record.HasSession ? new Color(0.5f, 0.5f, 0.5f)
+                    : record.IsTokenValid ? new Color(0.3f, 0.78f, 0.35f)
+                    : new Color(0.92f, 0.68f, 0.2f);
+                group.Dot.tooltip = login != null ? "Logging in" : !record.HasSession ? "Not logged in"
+                    : record.IsTokenValid ? "Logged in" : "Session expired: it is renewed on the next operation";
+
+                int groupTargets = ticked.Where(t => t.Group == group).Sum(t => t.Count);
+                group.Summary.text = login != null ? "logging in"
+                    : !record.HasSession ? "not logged in"
+                    : groupTargets > 0 && !group.Expanded ? Plural(groupTargets, "target")
+                    : string.Empty;
+
+                group.LoginButton.style.display = !record.HasSession && login == null ? DisplayStyle.Flex : DisplayStyle.None;
+                group.LoginActions.style.display = login != null ? DisplayStyle.Flex : DisplayStyle.None;
+
+                if (login != null)
                 {
-                    string user = string.IsNullOrEmpty(record.Username) ? "" : $" as {record.Username}";
-                    string role = record.IsTenantManager ? " [TenantManager]" : "";
-                    group.Status.text = $"Logged in{user}{role}{EditorSessionManager.DescribeSession(record, out bool tokenValid)}";
-                    group.Status.style.color = tokenValid ? new Color(0.2f, 0.8f, 0.2f) : new Color(0.9f, 0.7f, 0.2f);
+                    group.Status.text = login.AuthUrl != null ? "Waiting for the browser…" : login.Status ?? "Logging in…";
+                    group.Status.style.color = StyleKeyword.Null;
+                    group.Status.tooltip = string.Empty;
+                }
+                else if (record.HasSession)
+                {
+                    string user = string.IsNullOrEmpty(record.Username) ? "Logged in" : record.Username;
+                    string role = record.IsTenantManager ? " · Tenant manager" : string.Empty;
+                    group.Status.text = record.IsTokenValid
+                        ? $"{user}{role} · until {ShortTime(record.UsableUntilUtc)}"
+                        : $"{user}{role} · session expired, renewed on the next operation";
+                    group.Status.style.color = record.IsTokenValid ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.92f, 0.68f, 0.2f);
+                    group.Status.tooltip = $"Account: {record.Username}{EditorSessionManager.DescribeSession(record, out _)}\nConnection: {record.Key}";
                 }
                 else
                 {
                     group.Status.text = "Not logged in.";
-                    group.Status.style.color = new Color(0.8f, 0.4f, 0.2f);
+                    group.Status.style.color = new Color(0.6f, 0.6f, 0.6f);
+                    group.Status.tooltip = $"Connection: {record.Key}";
                 }
 
-                group.LoginButton.style.display = record.HasSession ? DisplayStyle.None : DisplayStyle.Flex;
-                group.LogoutButton.style.display = record.HasSession ? DisplayStyle.Flex : DisplayStyle.None;
                 RefreshBackofficeButton(group);
+                if (login != null || !record.HasSession)
+                    group.BackofficeButton.style.display = DisplayStyle.None;
             }
 
             ScheduleSessionExpiryRefresh();
+        }
+
+        private static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
+
+        /// <summary>A moment in local time: the hour today, the day and the hour otherwise ("3 Nov 09:32").</summary>
+        private static string ShortTime(DateTime? utc)
+        {
+            if (utc == null)
+                return "?";
+
+            DateTime local = utc.Value.ToLocalTime();
+            return local.Date == DateTime.Now.Date
+                ? local.ToString("HH:mm", CultureInfo.InvariantCulture)
+                : local.ToString("d MMM HH:mm", CultureInfo.InvariantCulture);
         }
 
         /// <summary>
@@ -891,7 +1237,7 @@ namespace Virtuademy.SDK.Environments.Editor
             List<string> scenes = GetBuiltSceneNames();
             if (scenes.Count == 0)
             {
-                Debug.LogWarning("[AddressablesManagement] No scenes marked for build.");
+                Debug.LogWarning("[PublishEnvironments] No scenes marked for build.");
                 return;
             }
 
@@ -1087,11 +1433,12 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// The build buttons wait for the build modules the included scenes need; the deploy buttons also for a ticked
-        /// target; none works while a deploy runs.
+        /// target; none works while a deploy runs. The lines beside them say what a build and a deploy would cover.
         /// </summary>
         private void RefreshButtons()
         {
-            bool hasTargets = TickedTargets().Count > 0;
+            List<GroupTargets> ticked = TickedTargets();
+            bool hasTargets = ticked.Count > 0;
             const string missingModulesTooltip =
                 "Disabled: one or more selected scenes require build modules that are not installed. " +
                 "See the warnings above.";
@@ -1100,22 +1447,80 @@ namespace Virtuademy.SDK.Environments.Editor
             if (buildAddressablesButton != null)
             {
                 buildAddressablesButton.SetEnabled(!missingModules && !deployRunning);
-                buildAddressablesButton.tooltip = missingModules ? missingModulesTooltip : string.Empty;
+                buildAddressablesButton.tooltip = missingModules ? missingModulesTooltip
+                    : "Builds the included scenes for their platforms and zips them into ServerData. The interpreted scripts are verified first, on the platform of the ticked targets' connections.";
             }
 
             if (deployButton != null)
             {
                 deployButton.SetEnabled(hasTargets && !deployRunning);
-                deployButton.tooltip = hasTargets ? "Upload the built zips of the included scenes to every ticked target." : noTargetTooltip;
+                deployButton.tooltip = hasTargets ? "Uploads the built zips of the included scenes to every ticked target." : noTargetTooltip;
             }
 
             if (buildAndDeployButton != null)
             {
                 buildAndDeployButton.SetEnabled(hasTargets && !missingModules && !deployRunning);
                 buildAndDeployButton.tooltip = missingModules ? missingModulesTooltip
-                    : hasTargets ? "Build the included scenes once, then verify and upload them to every ticked target with its own connection's login."
+                    : hasTargets ? "Builds the included scenes once, then verifies and uploads them to every ticked target with its own connection's login."
                     : noTargetTooltip;
             }
+
+            int scenes = sceneConfigurations?.SceneConfigurations?.Count(c => c != null && c.Scene != null && c.IncludeInBuild) ?? 0;
+
+            if (deploySummaryLabel != null)
+                deploySummaryLabel.text = !hasTargets ? "Tick a world, or a tenant level, to deploy."
+                    : scenes == 0 ? "No scene is included in the build."
+                    : $"{Plural(scenes, "scene")} → {DescribeTargets(ticked)}";
+
+            RefreshBuildStatus();
+
+            if (connectionsSummaryLabel != null && groups.Count > 0)
+                connectionsSummaryLabel.text = $"{Plural(groups.Count, "connection")} · {Plural(ticked.Sum(t => t.Count), "target")}";
+        }
+
+        /// <summary>"2 worlds of Virtuademy (Sandbox)", "the tenant level of …", or "3 targets in 2 tenants".</summary>
+        private static string DescribeTargets(List<GroupTargets> ticked)
+        {
+            if (ticked.Count == 1)
+            {
+                GroupTargets t = ticked[0];
+                string label = PublishedEnvironmentsIndex.LabelOf(t.Group.Key);
+                string worlds = t.Worlds.Count > 0 ? Plural(t.Worlds.Count, "world") : null;
+                return worlds != null && t.Tenant ? $"{worlds} and the tenant level of {label}"
+                    : worlds != null ? $"{worlds} of {label}"
+                    : $"the tenant level of {label}";
+            }
+
+            return $"{Plural(ticked.Sum(t => t.Count), "target")} in {ticked.Count} tenants";
+        }
+
+        /// <summary>
+        /// The Scenes section's header (how many scenes are in the build) and the line beside Build: when the zips of the
+        /// included scenes were last written to ServerData, and how many of them exist.
+        /// </summary>
+        private void RefreshBuildStatus()
+        {
+            List<SceneConfiguration> configs = sceneConfigurations?.SceneConfigurations?.Where(c => c != null && c.Scene != null).ToList();
+            if (configs == null)
+                return;
+
+            List<string> included = configs.Where(c => c.IncludeInBuild).Select(c => c.SceneNameFiltered).ToList();
+
+            if (scenesInBuildLabel != null)
+                scenesInBuildLabel.text = $"{included.Count} of {Plural(configs.Count, "scene")} in the build";
+
+            if (buildStatusLabel == null)
+                return;
+
+            List<DateTime> built = included
+                .Select(name => Path.Combine(addressables_output_folder, name + ".zip"))
+                .Where(File.Exists)
+                .Select(File.GetLastWriteTimeUtc)
+                .ToList();
+
+            buildStatusLabel.text = included.Count == 0 ? "Tick the scenes to build."
+                : built.Count == 0 ? "Not built yet."
+                : $"Last build: {ShortTime(built.Max())} · {built.Count} of {Plural(included.Count, "scene")} built";
         }
 
         #endregion
@@ -1134,9 +1539,9 @@ namespace Virtuademy.SDK.Environments.Editor
 
             VisualElement toolbar = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginBottom = 4 } };
             sceneSearchField = new TextField { style = { flexGrow = 1, marginRight = 6 } };
-            sceneSearchField.textEdition.placeholder = "Search scenes…";
+            sceneSearchField.textEdition.placeholder = "Search scenes";
             sceneSearchField.RegisterValueChangedCallback(_ => RebuildSceneList());
-            onlyInBuildToggle = new Toggle("Only in build") { style = { marginRight = 6 } };
+            onlyInBuildToggle = new Toggle("In build only") { style = { marginRight = 6 } };
             onlyInBuildToggle.RegisterValueChangedCallback(_ => RebuildSceneList());
             publicationFilter = new DropdownField(new List<string> { publication_all, publication_published, publication_not_published }, 0)
             {
@@ -1153,23 +1558,14 @@ namespace Virtuademy.SDK.Environments.Editor
             toolbar.Add(sceneCountLabel);
             container.Add(toolbar);
 
-            Label hint = new("Every scene of the project is listed; tick \"Include in build\" on the ones to publish. New scenes appear here on their own, unticked.")
-            {
-                style = { whiteSpace = WhiteSpace.Normal, fontSize = 11, opacity = 0.75f, marginBottom = 4 }
-            };
-            container.Add(hint);
-
             sceneListContainer = new ScrollView { style = { maxHeight = 360 } };
             container.Add(sceneListContainer);
 
-            // The folders whose scenes never make the list (package samples, third-party assets, plugins).
-            Foldout excluded = new() { text = "Excluded folders", value = false, style = { marginTop = 4 } };
-            excluded.tooltip = "Scenes under these folders are not the project's own and are left out of the list. Edit to fit the project.";
-            PropertyField excludedField = new(sceneSerializedObject.FindProperty("excludedFolders"), string.Empty);
-            excludedField.Bind(sceneSerializedObject);
-            excludedField.RegisterCallback<SerializedPropertyChangeEvent>(_ => SyncSceneRegistry());
-            excluded.Add(excludedField);
-            container.Add(excluded);
+            // The folders whose scenes never make the list (package samples, third-party assets, plugins, and the ones the
+            // creator excluded from a folder's header), each with Include.
+            excludedFoldersFoldout = new Foldout { value = false, style = { marginTop = 4 } };
+            excludedFoldersFoldout.tooltip = "Scenes under these folders are not listed, built or published. Include brings a folder's scenes back.";
+            root.Q<VisualElement>("excluded-folders-slot").Add(excludedFoldersFoldout);
 
             PublishedEnvironmentsIndex.Changed -= OnPublishedIndexChanged;
             PublishedEnvironmentsIndex.Changed += OnPublishedIndexChanged;
@@ -1249,6 +1645,8 @@ namespace Virtuademy.SDK.Environments.Editor
             if (sceneListContainer == null || sceneSerializedObject == null) return;
             sceneSerializedObject.Update();
             sceneListContainer.Clear();
+            RebuildExcludedFolders();
+            string currentFolder = null;
 
             SerializedProperty list = sceneSerializedObject.FindProperty("sceneConfigurations");
             List<SceneConfiguration> configs = sceneConfigurations.SceneConfigurations ?? new List<SceneConfiguration>();
@@ -1277,15 +1675,110 @@ namespace Virtuademy.SDK.Environments.Editor
                     }
                 }
 
-                PropertyField row = new(list.GetArrayElementAtIndex(i));
+                // The rows go by folder; each folder's header can exclude it.
+                string folder = SceneFolder(cfg);
+                if (folder != currentFolder)
+                {
+                    currentFolder = folder;
+                    sceneListContainer.Add(FolderHeader(folder));
+                }
+
+                PropertyField row = new(list.GetArrayElementAtIndex(i)) { style = { marginLeft = 8 } };
                 row.Bind(sceneSerializedObject);
                 // Refresh platform warnings whenever a property changes (e.g. toggling a platform flag)
-                row.RegisterCallback<SerializedPropertyChangeEvent>(_ => { RefreshPlatformWarnings(); RefreshDeployPreviews(); });
+                row.RegisterCallback<SerializedPropertyChangeEvent>(_ => { RefreshPlatformWarnings(); RefreshDeployPreviews(); RefreshButtons(); });
                 sceneListContainer.Add(row);
                 shown++;
             }
 
-            sceneCountLabel.text = shown == configs.Count ? $"{configs.Count} scenes" : $"{shown} of {configs.Count} scenes";
+            sceneCountLabel.text = shown == configs.Count ? string.Empty : $"{shown} shown";
+        }
+
+        private Foldout excludedFoldersFoldout;
+
+        private static string SceneFolder(SceneConfiguration configuration) =>
+            Path.GetDirectoryName(AssetDatabase.GetAssetPath(configuration.Scene))?.Replace('\\', '/') ?? "Assets";
+
+        /// <summary>A folder's header in the scene list: its path, how many of its scenes are listed, and Exclude.</summary>
+        private VisualElement FolderHeader(string folder)
+        {
+            VisualElement header = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginTop = 4 } };
+            Label path = new(folder) { style = { flexGrow = 1, flexShrink = 1, unityFontStyleAndWeight = FontStyle.Bold, fontSize = 11 } };
+            path.AddToClassList("muted");
+            header.Add(path);
+
+            Button exclude = new(() => ExcludeFolder(folder))
+            {
+                text = "Exclude",
+                tooltip = "Takes this folder's scenes, and its subfolders', out of the list: they are not built or published. " +
+                          "The folder goes to the excluded folders below, where Include brings it back.",
+                style = { fontSize = 10, height = 16, paddingTop = 0, paddingBottom = 0 },
+            };
+            header.Add(exclude);
+            return header;
+        }
+
+        private void ExcludeFolder(string folder)
+        {
+            int included = (sceneConfigurations.SceneConfigurations ?? new List<SceneConfiguration>())
+                .Count(c => c.Scene != null && c.IncludeInBuild && (SceneFolder(c) + "/").StartsWith(folder + "/", StringComparison.OrdinalIgnoreCase));
+            if (included > 0 && !EditorUtility.DisplayDialog("Exclude folder",
+                    $"{Plural(included, "scene")} of {folder} {(included == 1 ? "is" : "are")} in the build. Excluding the folder takes " +
+                    $"{(included == 1 ? "it" : "them")} out of the build and of the deploy.", "Exclude", "Cancel"))
+                return;
+
+            if (sceneConfigurations.ExcludeFolder(folder))
+                AfterExclusionChanged();
+        }
+
+        private void IncludeFolder(string folder)
+        {
+            if (sceneConfigurations.IncludeFolder(folder))
+                AfterExclusionChanged();
+        }
+
+        private void AfterExclusionChanged()
+        {
+            sceneConfigurations.SyncWithProject();
+            SaveAsset(sceneConfigurations);
+            RefreshPublicationFilterChoices();
+            RebuildSceneList();
+            RefreshPlatformWarnings();
+            RefreshDeployPreviews();
+            RefreshButtons();
+        }
+
+        /// <summary>
+        /// The folders the creator excluded, each with the number of scenes it holds and Include (Remove for a folder that is
+        /// no longer in the project). Hidden while there is none.
+        /// </summary>
+        private void RebuildExcludedFolders()
+        {
+            if (excludedFoldersFoldout == null || sceneConfigurations == null) return;
+            excludedFoldersFoldout.Clear();
+
+            IReadOnlyList<string> folders = sceneConfigurations.ExcludedFolders;
+            excludedFoldersFoldout.style.display = folders.Count == 0 ? DisplayStyle.None : DisplayStyle.Flex;
+            excludedFoldersFoldout.text = $"Excluded folders ({folders.Count})";
+
+            foreach (string folder in folders.ToList())
+            {
+                bool exists = AssetDatabase.IsValidFolder(folder);
+                int scenes = exists ? AssetDatabase.FindAssets("t:SceneAsset", new[] { folder }).Length : 0;
+
+                VisualElement row = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+                row.Add(new Label(folder) { style = { flexGrow = 1, flexShrink = 1 } });
+                Label count = new(!exists ? "not in the project" : scenes == 0 ? "no scenes" : Plural(scenes, "scene")) { style = { marginRight = 4 } };
+                count.AddToClassList("muted");
+                row.Add(count);
+                row.Add(new Button(() => IncludeFolder(folder))
+                {
+                    text = exists ? "Include" : "Remove",
+                    tooltip = exists ? "Lists this folder's scenes again, unticked." : "Removes this folder from the excluded ones.",
+                    style = { fontSize = 10, height = 16, paddingTop = 0, paddingBottom = 0 },
+                });
+                excludedFoldersFoldout.Add(row);
+            }
         }
 
         /// <summary>Mirrors the project's scenes into the list and redraws it when something changed.</summary>
@@ -1408,62 +1901,28 @@ namespace Virtuademy.SDK.Environments.Editor
             sceneConfigContainer.parent.Insert(sceneConfigContainer.parent.IndexOf(sceneConfigContainer) + 1, platformWarningsContainer);
             RefreshPlatformWarnings();
 
-            VisualElement addressablesSettings = root.Q<VisualElement>("addressables-settings");
-            addressablesSettings.dataSource = this;
+            blockingBanner = root.Q<VisualElement>("blocking-banner");
+            advancedFixRow = root.Q<VisualElement>("advanced-fix-row");
+            advancedFoldout = root.Q<Foldout>("addressables-settings-foldout");
+            buildStatusLabel = root.Q<Label>("build-status-label");
+            scenesInBuildLabel = root.Q<Label>("scenes-in-build-label");
 
-            List<(string, string)> settingIcons = new()
+            SetIcon(root.Q<VisualElement>("blocking-icon"), warning_icons);
+            SetIcon(root.Q<VisualElement>("folder-missing-icon"), error_icons);
+            SetIcon(root.Q<VisualElement>("binary-catalog-icon"), error_icons);
+
+            root.Q<Button>("blocking-fix-button").clicked += FixBuildSettings;
+            root.Q<Button>("advanced-fix-button").clicked += FixBuildSettings;
+            root.Q<Button>("blocking-details-button").clicked += () =>
             {
-                { ("addressables-profile-check", nameof(IsAddressablesSettingsConfigured)) },
-                { ("remote-buildpath-check", nameof(IsRemoteBuildPathConfigured)) },
-                { ("remote-loadpath-check", nameof(IsRemoteLoadPathConfigured)) },
-                { ("build-target-check", nameof(IsBuildTargetConfigured)) },
-                { ("player-version-override-check", nameof(IsPlayerVersionOverrideConfigured)) },
-                { ("default-local-group-check", nameof(AreAddressablesConfigured)) },
+                advancedFoldout.value = true;
+                VisualElement target = root.Q<VisualElement>("addressables-settings");
+                root.schedule.Execute(() => root.Q<ScrollView>("window-scroll")?.ScrollTo(target));
             };
-            foreach (var entry in settingIcons)
-            {
-                VisualElement projectSettingsItemIcon = addressablesSettings.Q<VisualElement>(entry.Item1);
-                DataBinding styleBinding = new() { dataSourcePath = PropertyPath.FromName(entry.Item2) };
-                styleBinding.sourceToUiConverters.AddConverter((ref bool value) =>
-                {
-                    projectSettingsItemIcon.RemoveFromClassList("settings-item-green-icon");
-                    projectSettingsItemIcon.RemoveFromClassList("settings-item-red-icon");
-                    projectSettingsItemIcon.AddToClassList(value ? "settings-item-green-icon" : "settings-item-red-icon");
-                    return true;
-                });
-                projectSettingsItemIcon.SetBinding(nameof(projectSettingsItemIcon.visible), styleBinding);
-            }
 
-            Label addressablesProfileValue = addressablesSettings.Q<Label>("addressables-profile-value");
-            addressablesProfileValue.SetBinding(nameof(addressablesProfileValue.text), new DataBinding()
-            {
-                dataSourcePath = PropertyPath.FromName(nameof(ActiveProfileName)),
-                bindingMode = BindingMode.ToTarget
-            });
-
-            Label remoteBuildPathValue = addressablesSettings.Q<Label>("remote-buildpath-value");
-            remoteBuildPathValue.SetBinding(nameof(remoteBuildPathValue.text), new DataBinding()
-            {
-                dataSourcePath = PropertyPath.FromName(nameof(CurrentRemoteBuildPathVariableValue)),
-                bindingMode = BindingMode.ToTarget
-            });
-
-            Label remoteLoadPathValue = addressablesSettings.Q<Label>("remote-loadpath-value");
-            remoteLoadPathValue.SetBinding(nameof(remoteLoadPathValue.text), new DataBinding()
-            {
-                dataSourcePath = PropertyPath.FromName(nameof(CurrentRemoteLoadPathVariableValue)),
-                bindingMode = BindingMode.ToTarget
-            });
-
-            Label buildTargetValue = addressablesSettings.Q<Label>("build-target-value");
-            buildTargetValue.SetBinding(nameof(buildTargetValue.text), new DataBinding()
-            {
-                dataSourcePath = PropertyPath.FromName(nameof(CurrentBuildTargetVariableValue)),
-                bindingMode = BindingMode.ToTarget
-            });
-
-            Label playerVersionOverrideValue = addressablesSettings.Q<Label>("player-version-override-value");
-            playerVersionOverrideValue.SetBinding(nameof(playerVersionOverrideValue.text), new DataBinding() { dataSourcePath = PropertyPath.FromName(nameof(CurrentPlayerVersionOverrideVariableValue)) });
+            // The checks are read again every two seconds: someone can change the Addressables settings in their own windows.
+            RefreshSettingsChecks();
+            root.schedule.Execute(RefreshSettingsChecks).Every(2000);
 
             Button topLevelSettingsButton = root.Q<Button>("top-level-settings-button");
             topLevelSettingsButton.clicked += () => EditorApplication.ExecuteMenuItem("Window/Asset Management/Addressables/Settings");
@@ -1477,28 +1936,9 @@ namespace Virtuademy.SDK.Environments.Editor
             Button defaultLocalGroupButton = root.Q<Button>("default-local-group-button");
             defaultLocalGroupButton.clicked += () => Selection.activeObject = settings.DefaultGroup;
 
-            // Build button — always visible (logged in or not)
+            // Build only builds: when the settings are not the SDK's, it says so and offers the fix.
             buildAddressablesButton = root.Q<Button>("build-addressables-button");
-            buildAddressablesButton.dataSource = this;
-            DataBinding buildAddressablesButtonDataBinding = new()
-            {
-                dataSourcePath = PropertyPath.FromName(nameof(AreAddressablesConfigured)),
-                bindingMode = BindingMode.ToTarget
-            };
-            buildAddressablesButtonDataBinding.sourceToUiConverters.AddConverter((ref bool value) => AreAddressablesConfigured ? "Build Addressables" : "Fix Addressables configurations");
-            buildAddressablesButton.SetBinding(nameof(buildAddressablesButton.text), buildAddressablesButtonDataBinding);
-            buildAddressablesButton.clicked += async () =>
-            {
-                if (AreAddressablesConfigured)
-                {
-                    await RunBuildAddressablesAsync();
-                }
-                else
-                {
-                    AddressablesConfiguration.Apply();
-                    settings = AddressablesConfiguration.GetOrCreateSettings();
-                }
-            };
+            buildAddressablesButton.clicked += async () => await RunBuildAddressablesAsync();
 
             VisualElement buildErrors = root.Q<VisualElement>("build-result-errors");
             buildErrors.dataSource = this;
@@ -1536,6 +1976,89 @@ namespace Virtuademy.SDK.Environments.Editor
 
         [CreateProperty]
         public bool IsAddressablesSettingsConfigured => AddressablesConfiguration.IsSettingsConfigured(settings);
+
+        /// <summary>
+        /// The advanced section's items, each with a check or a warning icon and, in its tooltip, what the SDK expects; the
+        /// count of items to fix in the section's title; and the banner at the top while anything differs.
+        /// </summary>
+        private void RefreshSettingsChecks()
+        {
+            if (root == null || blockingBanner == null)
+                return;
+
+            if (settings == null)
+                settings = AddressablesConfiguration.GetOrCreateSettings();
+
+            (string Icon, string Value, Func<string> Current, bool Ok, string Expected)[] items =
+            {
+                ("addressables-profile-check", "addressables-profile-value", () => ActiveProfileName, IsAddressablesSettingsConfigured,
+                    "The top-level settings the SDK sets: the remote catalog on Remote.BuildPath and Remote.LoadPath, a JSON catalog " +
+                    $"(with the {AddressablesConfiguration.JsonCatalogDefine} define), custom bundle naming, contiguous and non-recursive bundles."),
+                ("remote-buildpath-check", "remote-buildpath-value", () => CurrentRemoteBuildPathVariableValue, IsRemoteBuildPathConfigured,
+                    "Expected: " + AddressablesConfiguration.RemoteBuildPath),
+                ("remote-loadpath-check", "remote-loadpath-value", () => CurrentRemoteLoadPathVariableValue, IsRemoteLoadPathConfigured,
+                    "Expected: " + AddressablesConfiguration.RemoteLoadPath),
+                ("build-target-check", "build-target-value", () => CurrentBuildTargetVariableValue, IsBuildTargetConfigured,
+                    "Expected: " + AddressablesConfiguration.BuildTargetVariableValue),
+                ("player-version-override-check", "player-version-override-value", () => CurrentPlayerVersionOverrideVariableValue, IsPlayerVersionOverrideConfigured,
+                    "Expected: " + AddressablesConfiguration.PlayerVersionOverrideVariableValue),
+                ("default-local-group-check", null, null, AddressablesConfiguration.AreGroupsConfigured(settings),
+                    "Expected: one default group, built and loaded from the remote paths. Fix build settings resets the groups to it."),
+            };
+
+            int toFix = 0;
+            foreach ((string icon, string value, Func<string> current, bool ok, string expected) in items)
+            {
+                VisualElement element = root.Q<VisualElement>(icon);
+                SetIcon(element, ok ? check_icons : warning_icons);
+                element.tooltip = (ok ? "As the SDK expects. " : "Not what the SDK expects. ") + expected;
+
+                if (value != null)
+                {
+                    Label label = root.Q<Label>(value);
+                    label.text = current() ?? "(missing)";
+                    label.tooltip = element.tooltip;
+                }
+
+                if (!ok)
+                    toFix++;
+            }
+
+            // The banner follows the same check the build makes, so the two never disagree.
+            bool configured = AddressablesConfiguration.IsConfiguredFor(settings);
+            if (!configured && toFix == 0)
+                toFix = 1;
+
+            DisplayStyle show = configured ? DisplayStyle.None : DisplayStyle.Flex;
+            blockingBanner.style.display = show;
+            advancedFixRow.style.display = show;
+            advancedFoldout.text = configured ? "Advanced settings" : $"Advanced settings ({toFix} to fix)";
+        }
+
+        /// <summary>
+        /// Applies the build settings the SDK needs (<see cref="AddressablesConfiguration.Apply"/>), which resets the project's
+        /// asset groups to a single default group, after a confirmation.
+        /// </summary>
+        private void FixBuildSettings()
+        {
+            if (!EditorUtility.DisplayDialog("Fix build settings",
+                    "Apply the build settings the SDK needs? It resets the project's asset groups to a single default group " +
+                    "(the scenes are added again at the next build).", "Fix", "Cancel"))
+                return;
+
+            try
+            {
+                AddressablesConfiguration.Apply();
+            }
+            catch (InvalidOperationException ex)
+            {
+                Debug.LogError("[PublishEnvironments] " + ex.Message);
+                EditorUtility.DisplayDialog("Fix build settings", ex.Message, "OK");
+            }
+
+            settings = AddressablesConfiguration.GetOrCreateSettings();
+            RefreshSettingsChecks();
+        }
 
         #endregion
 
@@ -1627,13 +2150,13 @@ namespace Virtuademy.SDK.Environments.Editor
             int problems = deployErrorCount - errorsBefore;
             if (problems == 0)
             {
-                Debug.Log($"[AddressablesManagement] {what} completed: {importsStarted} scene import(s) started on the platform.");
+                Debug.Log($"[PublishEnvironments] {what} completed: {importsStarted} scene import(s) started on the platform.");
                 return;
             }
 
             string summary = $"{what} finished with {problems} problem(s): {importsStarted} of {expected} scene import(s) " +
-                             "started on the platform. The problems are listed in the Addressables window and in the Console.";
-            Debug.LogWarning("[AddressablesManagement] " + summary);
+                             "started on the platform. The problems are listed in the Publish Environments window and in the Console.";
+            Debug.LogWarning("[PublishEnvironments] " + summary);
             EditorUtility.DisplayDialog($"{what} finished with problems", summary, "OK");
         }
 
@@ -1654,18 +2177,37 @@ namespace Virtuademy.SDK.Environments.Editor
 
         #region Build
 
-        /// <summary>Builds the interpreted DLL, verifies it, and builds the addressables only if it passed.</summary>
+        /// <summary>Builds the interpreted DLL, verifies it, and builds the scenes only if it passed.</summary>
         private async Task RunBuildAddressablesAsync()
         {
-            if (!RequireAddressablesConfigured("Build Addressables"))
+            if (!RequireAddressablesConfigured("Build"))
                 return;
 
-            // The build alone has no target: the scripts are verified on the default connection's platform.
-            if (!await BuildAndVerifyInterpretedDLLAsync(ProjectConnections.DefaultKey))
+            // The script policy lives per platform: the interpreted scripts are verified on the connections of the ticked
+            // targets, or on the project's only connection when nothing is ticked.
+            List<string> keys = TickedTargets().Select(t => t.Group.Key).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (keys.Count == 0)
             {
+                if (ProjectConnections.DefaultKey == null && groups.Count > 1 && EnvironmentsBuild.HasInterpretedScripts)
+                {
+                    EditorUtility.DisplayDialog("Build",
+                        $"The project uses {groups.Count} connections, and its interpreted scripts are verified on the platform they go to. " +
+                        "Tick a target in the group of the connection to verify on, then build again. Nothing was built.", "OK");
+                    return;
+                }
+
+                keys.Add(ProjectConnections.DefaultKey);
+            }
+
+            foreach (string key in keys)
+            {
+                if (await BuildAndVerifyInterpretedDLLAsync(key))
+                    continue;
+
+                string label = key == null ? "the platform" : PublishedEnvironmentsIndex.LabelOf(key);
                 EditorUtility.DisplayDialog("Build blocked",
-                    "The interpreted script DLL did not pass the security checks. " +
-                    "See the Console for the offending lines. Addressables were NOT built.",
+                    $"The interpreted script DLL did not pass the security checks of {label}. " +
+                    "See the Console for the offending lines. The scenes were NOT built.",
                     "OK");
                 return;
             }
@@ -1686,13 +2228,26 @@ namespace Virtuademy.SDK.Environments.Editor
             if (AddressablesConfiguration.IsConfigured)
                 return true;
 
-            LogDeployError($"{what} aborted: the project's Addressables are not configured the way the SDK needs. " +
-                           "Press \"Fix Addressables configurations\" (the Build Addressables button turns into it; " +
-                           "\"Show advanced addressables configurations\" lists what is wrong), then try again. Nothing was built.");
-            EditorUtility.DisplayDialog($"{what} blocked",
-                "The project's Addressables are not configured the way the SDK needs, so a build would fail " +
-                "at the end. Press \"Fix Addressables configurations\" in this window first (it resets the " +
-                "Addressables groups to a single default group), then try again. Nothing was built.", "OK");
+            LogDeployError($"{what} aborted: the project's build settings are not the ones the SDK needs. " +
+                           "Press Fix in the banner at the top of the window (\"Advanced settings\" lists what is wrong), then try again. Nothing was built.");
+            if (EditorUtility.DisplayDialog($"{what} blocked",
+                    "The project's build settings are not the ones the SDK needs, so a build would fail at the end. Nothing was built.\n\n" +
+                    "Fix them now? It resets the project's asset groups to a single default group. Then start again.",
+                    "Fix build settings", "Cancel"))
+            {
+                try
+                {
+                    AddressablesConfiguration.Apply();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Debug.LogError("[PublishEnvironments] " + ex.Message);
+                }
+
+                settings = AddressablesConfiguration.GetOrCreateSettings();
+                RefreshSettingsChecks();
+            }
+
             return false;
         }
 
@@ -1704,8 +2259,8 @@ namespace Virtuademy.SDK.Environments.Editor
         private static Task<bool> BuildAndVerifyInterpretedDLLAsync(string connectionKey) => EnvironmentsBuild.VerifyInterpretedScriptsAsync(connectionKey);
 
         /// <summary>
-        /// Builds addressables for all platforms and creates zip files.
-        /// Does NOT upload — used by both "Build Addressables" button and "Build & Deploy".
+        /// Builds the included scenes for all platforms and creates zip files.
+        /// Does NOT upload — used by both the "Build" button and "Build & Deploy".
         /// </summary>
         private void BuildAndZipScenes()
         {
@@ -1719,6 +2274,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 EditorUtility.DisplayDialog("Scene names", result.Message, "OK");
             else if (result.Failure == EnvironmentsBuildFailure.BuildFailed)
                 EditorUtility.DisplayDialog("Build failed", result.Message, "OK");
+
+            RefreshButtons();
 
             buildResult = result.Failure switch
             {

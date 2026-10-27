@@ -13,7 +13,7 @@ namespace Virtuademy.SDK.Environments.Editor
     /// <summary>
     /// Where each environment name is already published, as the Application API of each connection sees it: the worlds
     /// holding an environment with that name and whether one exists at tenant level. Filled per connection by the
-    /// Addressables management window right after it loads that connection's worlds (and by the command line for the
+    /// Publish Environments window right after it loads that connection's worlds (and by the command line for the
     /// connection it acts on), read by <see cref="SceneConfigurationDrawer"/> to say, next to every scene,
     /// "Published in …", and by the deploy previews under each ticked world.
     /// </summary>
@@ -149,7 +149,7 @@ namespace Virtuademy.SDK.Environments.Editor
             catch (Exception ex)
             {
                 if (started == state.Generation)
-                    Debug.LogWarning($"[AddressablesManagement] Could not read where the environments are published ({LabelOf(connectionKey)}): {ex.Message}");
+                    Debug.LogWarning($"[PublishEnvironments] Could not read where the environments are published ({LabelOf(connectionKey)}): {ex.Message}");
             }
             finally
             {
