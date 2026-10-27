@@ -85,6 +85,10 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
   Rigging brings Burst with it. Warrants a minor bump.
 
 #### Fixed
+- **A build from the editor no longer stops on Addressables' "Addressables Build Report" dialog.** Addressables asks once
+  per project, in a modal dialog, whether to turn on "Debug Build Layout"; left behind the editor it held the build
+  until someone found it. `AddressablesBuildScript` records that the question was answered before it builds (an
+  internal Addressables flag, set by reflection); "Debug Build Layout" itself is left as it is. Batch runs never showed it.
 - **The Deploy errors panel kept the errors of the connection the window had shown before.** A login, a logout or another
   default connection now clears it, except while a deploy runs; a logout also drops what the scene rows and the
   publication filter knew about that connection.
