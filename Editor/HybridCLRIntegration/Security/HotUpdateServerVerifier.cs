@@ -42,10 +42,10 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             public string Error;
         }
 
-        /// <param name="connectionKey">The connection to verify on; null is the project's active one, read once here.</param>
+        /// <param name="connectionKey">The connection to verify on; null is the project's default one, read once here.</param>
         public static async Task<Result> VerifyAsync(byte[] dll, string fileName, string connectionKey = null)
         {
-            connectionKey ??= ProjectConnections.ActiveKey;
+            connectionKey ??= ProjectConnections.DefaultKey;
             string baseUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
 
             if (string.IsNullOrEmpty(baseUrl) || ConnectionStore.Get(connectionKey)?.HasSession != true)
@@ -54,7 +54,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                 {
                     Reachable = false,
                     Error = "Not logged in (no Application API URL / token). " +
-                            "Log in via 'Virtuademy / Available Tenants'."
+                            "Log in via 'Virtuademy / Publish Environments'."
                 };
             }
 
@@ -88,7 +88,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                     {
                         Reachable = false,
                         Error = "The editor session expired and could not be renewed. " +
-                                "Log in again via 'Virtuademy / Available Tenants'."
+                                "Log in again via 'Virtuademy / Publish Environments'."
                     };
                 }
 

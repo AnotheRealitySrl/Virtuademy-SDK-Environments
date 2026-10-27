@@ -4,8 +4,10 @@
 
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
 classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four
-`EnvironmentsCli` commands, one option on every command and three exit codes (minor, additive; `ExitApiHostMismatch` stays defined and is no
-longer returned).
+`EnvironmentsCli` commands, one option on every command and five exit codes (minor; `ExitApiHostMismatch` stays defined and is no
+longer returned, and a `-vdExpectTenant` that names another tenant is now 30 instead of 24). The window's menu path
+(Publish Environments, was Addressables management) and `tenant-config`, which now writes the connection store and reports
+connections instead of a file, change for a script that drives them: that warrants a major bump at the release cut.
 
 #### Added
 - **`EnvironmentsCli` commands `login`, `logout`, `connections` and `whoami`** (meta-repo ADR 0037, first slice), over the
@@ -15,7 +17,7 @@ longer returned).
   `AUTH_URL <url>` the moment it has it, opens the system browser unless `-vdNoBrowser`, and gives up 180 s (or
   `-vdLoginTimeoutSeconds`) after the URL is issued with the new exit code 27. `logout`, `connections` (needs no network) and
   `whoami` (exit 11 when there is no session) answer from the store; `connections` and `whoami` are also in the store's
-  `status.json` (`%LOCALAPPDATA%\Virtuademy\SDK\`), readable without starting Unity. A connection is named by its key, its
+  `status.json` (`%USERPROFILE%\.virtuademy\sdk\`), readable without starting Unity. A connection is named by its key, its
   tenant key, its tenant label or `app/env`; one that fits none or several is exit 26. New exit codes: 26 connection unknown,
   27 login timed out, 28 login failed.
 - **`-vdResultFile <path>`, on every command**: the REPORT (and only it, never the editor log) is also written to that file
@@ -29,33 +31,121 @@ longer returned).
   `Assembly-CSharp-firstpass` (nor `Assembly-UnityScript-firstpass` or `Assembly-CSharp-Editor-firstpass`): scripts
   under a creator's `Assets/Plugins` or `Assets/Standard Assets` compile into it, so each of their components
   arrived in the app as a missing script (seen with the SALSA add-ons `Amplitude` and `AmplitudeSALSA`, which the app
-  holds in `Assembly-CSharp`). `EnvironmentsBuild.BuildAndZip`, behind **Build Addressables** and **Build & Deploy**
+  holds in `Assembly-CSharp`). `EnvironmentsBuild.BuildAndZip`, behind **Build** and **Build & Deploy**
   in the window and `EnvironmentsCli`'s `build` and `deploy -vdBuild`, now reads the included scenes' dependencies
   before it builds, and stops with a dialog and a Console error that name every such component (scene or prefab,
   GameObject path, type, script) and say how to fix it: move the plugin's runtime scripts, with their `.meta` files,
   out of those folders to a normal one (the vendor's own folder, for example), which compiles into `Assembly-CSharp`.
   In the command line it is `ExitBuildFailed` with `build.failure` `FirstpassScripts`, and the components in
   `build.firstpassComponents`. Warrants a minor bump.
+- **A Back Office button (`Back Office ↗`), per connection, in the Publish Environments window** (meta-repo
+  ADR 0038, decision 7). Each logged-in group asks its own Application API, with that connection's token,
+  `GET /tenants/backoffice-access/my` while it lists its worlds, and shows the button when the answer says the account
+  may enter and the tenant's
+  `config-public` gives a Back Office address (`ConnectionRecord.BackofficeUrl` of `Virtuademy-SDK-Core`). The button
+  opens the Back Office in the browser on the first ticked world the access covers (`?world=<id>`), or on its home page,
+  with no world parameter, when no such world is ticked (the tenant level alone included). An API that predates the
+  route answers 404 or 405 and the group shows no button, with no message. The group's **Log out** button is red.
 
 #### Changed
-- **The CLI works on the project's active connection and takes its Application API address from it.** The session, `worlds`,
-  `preview` and `deploy` use the connection the project last logged in to (`session` reports its key); the address comes from the
+- **The Addressables management window is "Publish Environments"** (meta-repo ADR 0037, "Windows per kind of project"):
+  menu **Virtuademy > Publish Environments** (was Virtuademy > Addressables management), window title and header; the class
+  keeps its name, `AddressablesManagementWindow`. **Build Addressables** is **Build**, beside Deploy and Build & Deploy, and
+  "Fix Addressables configurations" is **Fix build settings**. The window's messages, the command line's and the Console
+  prefix (`[PublishEnvironments]`, was `[AddressablesManagement]`) stop naming Addressables, which is how the build works,
+  not what the creator does; the advanced section keeps the Unity Addressables names, because those are the settings it
+  shows, and so do Unity's menu paths.
+  - **Connections come in here.** The banner's **Import configuration file...** puts the file the Back Office downloads
+    into the encrypted connection store (`ConfigurationFileImport` of `Virtuademy-SDK-Core`): one connection per
+    environment of the file, each one the project uses. No file is written to the project. It replaces the banner's button
+    to Available Tenants, which an environment project no longer shows.
+  - **The window follows the work, top to bottom**: a banner only while something blocks a build (the build settings are
+    not the SDK's, with **Fix** and **Details**), then **Scenes** with **Build**, **Publish** with the connections and
+    Deploy and Build & Deploy, then **Advanced settings**, closed. The big title and the default-connection banner are gone;
+    the Virtuademy logo heads the window, as in the setup window (`Editor/Icons/virtuademy-logo-light|dark.png`, by editor
+    skin, scaled to twice the size shown and mipmapped, so it stays sharp).
+  - **Scenes**: grouped by folder, each folder's header with **Exclude** (its scenes, and its subfolders', leave the list;
+    `SceneListScriptableObject.ExcludeFolder` / `IncludeFolder`), and the excluded folders at the bottom of the section,
+    collapsed, each with its number of scenes and **Include** (they were an editable list in the advanced section).
+    **Nothing is excluded unless the creator excludes it** (behaviour change): the seven folders the list left out by
+    default up to 2026.6 (`Assets/Samples`, `Assets/Plugins`, the third-party folders, `Assets/StreamingAssets`,
+    `Assets/TextMesh Pro`) are taken out of an existing list once, and their scenes appear unticked; the scenes of packages
+    are listed too (a package may carry examples to build), except Unity's own `com.unity.*` packages, whose scenes are scene
+    templates and tests. The list is ordered by folder, then by name. One row
+    per scene, the "include in build" tick, the name (a double click selects the scene) and the
+    platforms as three toggles (VR, WebGL, Mobile), with where the scene is published under it. The section's header says
+    how many scenes are in the build, and the line beside **Build** when the included scenes were last built and how many
+    have a zip. The build errors are shown there, not at the top. **Build** only builds: when the settings are not the
+    SDK's it says so and offers the fix (the button no longer turns into "Fix build settings").
+  - **Publish**: the header counts the connections and the ticked targets, beside **Import configuration file...**. Each
+    connection is one row: a state dot (logged in, session to renew, logged out, logging in), the tenant, its environment
+    as a coloured chip (blue for Sandbox, orange for PreProduction, none for Production) and its platform version (in red, "locked", when the version rule refuses it, with the reason in one line below),
+    **Back Office ↗** or **Log in**, and a menu with **Refresh worlds**, **Log out** and **Remove from project...**
+    (`ProjectConnections.Remove` of `Virtuademy-SDK-Core`; the connection stays in the store). The account line is grey,
+    "user · Tenant manager · until 3 Nov 09:32", amber only when the session must be renewed; the details are in its
+    tooltip. While a login waits for the browser, the line says so, with **Copy link** and **Cancel**. The tenant level
+    comes first ("Whole tenant"), the worlds after it with their ID on the right. The line beside Deploy says what a deploy
+    would send ("2 scenes → 2 worlds of Virtuademy (Sandbox)"), and the deploy errors are listed right under it (they were
+    at the bottom of the window).
+  - **Advanced settings**: each item shows Unity's own check or warning icon (the icons came from two packages a project
+    may not have: Multiplayer Center and Version Control), with what the SDK expects in its tooltip; the title counts the
+    items to fix, and a **Fix build settings** row appears while any differs. The
+    checks are read again every two seconds, and the banner follows the same check the build makes.
+  - **The move of the project's old configuration files into the store** runs here, the first time the window opens in an
+    editor session, as it did in Available Tenants; the files are left in place, and the Console says that an environment
+    project no longer needs them.
+  - The menu is not compiled where `VIRTUADEMY_APPLICATION` is defined: the Virtuademy application, which has this package
+    installed, switches tenant in Available Tenants and publishes no environment.
+- **`tenant-config` writes the connection store, not the project** (behaviour change). It imports the file's credentials as
+  the window's import does: one connection per environment of the file, or only `-vdEnv`'s, each recorded as one the project
+  uses. Nothing is written to the project. It needs the network, because a
+  connection is named by the tenant key the platform gives (exit 19 when the platform cannot be read). The REPORT's
+  `tenantConfig` lists `app`, `envs`, `connections`, `defaultConnection` and `failures` (it listed the file's `assetPath` and
+  the settings asset). `-vdConfigFolder` and `-vdAllowTracked` are accepted and ignored, and exit 23 (file not ignored by
+  git) is no longer returned and stays reserved. `login -vdApp <app> [-vdEnv <key>]` also finds a connection the project
+  uses by its app and environment, now that the file is no longer in the project.
+- **The CLI works on a connection and takes its Application API address from it.** `worlds`, `preview` and `deploy` act on the
+  connection `-vdConnection` names, or, when it names none, on the project's only connection: nobody chooses a default
+  one, and with two or more a command must name its connection (exit 26). `status` and `session` act on the only one
+  (`session` reports its key), `build` on the one `-vdConnection` names or the only one. The address comes from the
   tenant that connection reported at login, not from the project's generated `PlatformEndpoints` asset, so `ExitApiHostMismatch`
   (25) is no longer returned (the number stays reserved) and the `target` of the REPORT lists the connection instead of two
-  hosts. The messages that sent the user to the Addressables management window for a login now say `-vdCommand login` or
-  Virtuademy > Available Tenants.
-- **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and refuse (exit 30, *target mismatch*) when
-  it is not the project's active connection, with nothing built or sent. The name is checked before the session, so a run
-  aimed at another connection gets 30 even when the active one has no session, not a request to log in. The run takes the active connection once, when it
+  hosts. The messages that sent the user to the window for a login now say `-vdCommand login` or
+  Virtuademy > Publish Environments.
+- **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and act on that connection; a name that fits no connection, or several, is exit 26. The run takes its connection once, when it
   starts, and every request of it (the world list, the script verification, the uploads and imports) goes to that connection;
-  the `target` of the REPORT lists the connection and the Configuration-API host. `-vdExpectTenant` still compares the label.
-  A `login` in batch mode on an OS with no encrypted store is exit 29.
-- **The Addressables management window keeps its connection per operation.** Build, verify and deploy take the project's
-  active connection when they start and use it to the end; the worlds it lists belong to one connection and a deploy refuses
-  when the active one changed since. The ticked worlds are kept per project and connection
-  (`Virtuademy_AddressablesManagement_SelectedWorlds_<hash>`): the old machine-wide value, which could tick a world of another
-  tenant, is no longer read. `EnvironmentsDeploy`, `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync`
-  and the hot-update verifier take an optional `connectionKey`.
+  the `target` of the REPORT lists the connection, whether it is the project's only one (`default`) and the Configuration-API host.
+  **A `-vdExpectTenant` that is not that connection's tenant label is exit 30** (*target mismatch*; it was 24 up to 2026.6),
+  checked before the session, so a run aimed at the wrong tenant gets 30 even when its connection has no session, not a
+  request to log in. 24 now means only a `deploy` without `-vdExpectTenant`. A command that names no connection in a
+  project that uses two or more is exit 26, not 11. The `connections` command marks the project's only connection with
+  `default` (and `session` and the `target` say `default` too). A `login` in batch mode on an OS with no
+  encrypted store is exit 29.
+- **The Publish Environments window deploys to targets grouped per connection** (meta-repo ADR 0037). It shows one
+  collapsible group per connection the project uses (its tenant label, environment, platform version and login state, with
+  Log in and Log out), and in it the worlds the account can deploy to and, for a TenantManager, the tenant level, each with a
+  tick. The ticks are kept per project and connection in `UserSettings/Virtuademy/connections.json`: the machine-wide
+  `Virtuademy_AddressablesManagement_SelectedWorlds` value, which could tick a world of another tenant, is no longer read.
+  A group whose platform version does not have the year and release of the project's (the registry entry the project was set
+  up from), or that reports none, shows its worlds locked and cannot be ticked (`PlatformVersionRule`); a project set up from
+  an entry that is not a version, such as `develop`, says so and does not apply the rule. The tenant's version is read
+  again over HMAC (`ConnectionLoginService.RefreshConnectionAsync`) when a group lists its worlds and right before a deploy,
+  which stops with nothing built or sent when a target no longer matches. On the command line `preview` and `deploy` apply
+  the same rule before the session and the build, with the new exit code 31 (*platform version mismatch*, nothing built or
+  sent; the REPORT's `platformVersion` says what was compared).
+  A Production group starts closed,
+  and a deploy that includes it asks for a confirmation of its own; a deploy to more than one target lists them per tenant and
+  environment and asks first. **Build & Deploy** verifies the interpreted scripts on the platform of every target
+  connection before anything is built, builds once, then deploys each target with its own connection's token; the errors in
+  the panel carry the tenant. The **Deploy to Tenant** buttons are gone (the tenant level is a tick), a single deployable world
+  is no longer ticked on its own, and the section has the import of a configuration file instead of a login of its own.
+  **Build** verifies the scripts on the connections of the ticked targets, or on the project's only connection when
+  nothing is ticked (with two or more connections and interpreted scripts it asks for a tick); `EnvironmentsCli build`
+  takes `-vdConnection` for the same reason. `EnvironmentsDeploy`,
+  `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync` and the hot-update verifier take an optional
+  `connectionKey`, and `EnvironmentsDeploy.Preview` an overload with the connection whose world it previews.
+  `PublishedEnvironmentsIndex` keeps one index per connection; the scenes' "Published in" line and the publication filter go
+  across them, with the tenant when there are several.
 - **A run ends from the editor's update loop**, not from the continuation of the async work: the exit code is set when the run
   finishes and the update calls `EditorApplication.Exit`. No `-quit`, as before.
 - **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
@@ -65,6 +155,19 @@ longer returned).
   Rigging brings Burst with it. Warrants a minor bump.
 
 #### Fixed
+- The advanced section's tooltip of the window named a button that no longer exists
+  ("Configure Addressables settings"; it is "Fix build settings"), and the binary-catalog message read "Plese".
+- **A build from the editor no longer stops on Addressables' "Addressables Build Report" dialog.** Addressables asks once
+  per project, in a modal dialog, whether to turn on "Debug Build Layout"; left behind the editor it held the build
+  until someone found it. `AddressablesBuildScript` records that the question was answered before it builds (an
+  internal Addressables flag, set by reflection); "Debug Build Layout" itself is left as it is. Batch runs never showed it.
+- **The Deploy errors panel kept the errors of the connection the window had shown before.** A login, a logout, or a connection added
+  or removed now clears it, except while a deploy runs; a logout also drops what the scene rows and the
+  publication filter knew about that connection.
+- **The interpreted scripts' server check could be skipped on another tenant.** The marker that skips the compile and the
+  verification when nothing changed since the last publish was per project: a deploy to a second tenant, whose script
+  policy lives in its own Platform DB, reused the first tenant's verdict when the whitelists matched. The marker now
+  includes the connection the check runs on.
 - **Build: a failed build no longer zips and deploys a previous run's output.** `EnvironmentsBuild.BuildAndZip`
   checks the build-target switch and the Addressables build result, empties each scene's platform folders and
   old zip before building, and restores the Addressables settings and the original active build target in

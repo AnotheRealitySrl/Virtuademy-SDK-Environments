@@ -187,7 +187,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             EditorGUILayout.HelpBox(
                 hasToken
                     ? "Editor login token found. Server verification is not wired yet (stub)."
-                    : "No editor login token found — log in via 'Virtuademy / Available Tenants' first.",
+                    : "No editor login token found — log in via 'Virtuademy / Publish Environments' first.",
                 hasToken ? MessageType.Info : MessageType.Warning);
 
             using (new EditorGUI.DisabledScope(true))

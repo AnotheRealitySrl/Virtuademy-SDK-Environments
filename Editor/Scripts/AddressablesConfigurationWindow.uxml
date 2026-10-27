@@ -1,99 +1,105 @@
 <engine:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:engine="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Editor/Scripts/AddressablesConfigurationWindow.uss?fileID=7433441132597879392&amp;guid=515b32a0c8a91b84482ae7efefc66dfe&amp;type=3#AddressablesConfigurationWindow" />
-    <engine:ScrollView>
-        <engine:Label text="Addressables management window" name="Header" style="-unity-text-align: upper-center; -unity-font-style: bold; font-size: 24px;" />
-        <engine:VisualElement name="login-status-banner" style="flex-direction: row; align-items: center; justify-content: center; padding: 6px; margin-top: 4px; margin-bottom: 4px;">
-            <engine:Label text="Not logged in" name="login-status-label" style="font-size: 12px; white-space: normal; flex-shrink: 1; -unity-text-align: middle-center;" />
-            <engine:Button text="Login" name="open-tenant-selection-button" style="margin-left: 8px; flex-shrink: 0;" />
+    <engine:ScrollView name="window-scroll">
+        <engine:VisualElement name="window-header" class="window-header">
+            <engine:VisualElement name="header-logo" class="header-logo" />
+            <engine:Label text="Publish Environments" name="header-subtitle" class="header-subtitle" />
         </engine:VisualElement>
-        <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
-        <engine:VisualElement name="build-result-errors" style="flex-grow: 1;">
-            <engine:VisualElement name="folder-missing" class="build-error-item">
-                <engine:VisualElement name="folder-missing-icon" class="build-error-item-icon" />
-                <engine:Label text="There was an issue building the scene for one or more platforms. Please restart the Editor, and try building again" name="folder-missing-text" class="build-error-item-text" />
-            </engine:VisualElement>
-            <engine:VisualElement name="binary-catalog" class="build-error-item">
-                <engine:VisualElement name="binary-catalog-icon" class="build-error-item-icon" />
-                <engine:Label text="Unable to build Addressables correctly. Plese go to &lt;i&gt;&quot;Asset Management/Addressables/Settings&quot;&lt;/i&gt;, remove the check from the &quot;Enable Json catalog&quot;, add it again, save the project, and then restart the Editor. Finally, launch the build again." name="binary-catalog-text" class="build-error-item-text" style="white-space: normal;" />
-            </engine:VisualElement>
+        <engine:VisualElement name="blocking-banner" class="banner banner-warning" style="display: none;">
+            <engine:VisualElement name="blocking-icon" class="row-icon" />
+            <engine:Label text="The build settings are not the ones the SDK needs: a build would fail at the end." name="blocking-text" class="banner-text" />
+            <engine:Button text="Fix" name="blocking-fix-button" tooltip="Applies the build settings the SDK needs. It resets the project's asset groups to a single default group." />
+            <engine:Button text="Details" name="blocking-details-button" tooltip="Opens the advanced settings, where each item says what the SDK expects." />
         </engine:VisualElement>
-        <engine:GroupBox name="scene-configuration">
-            <engine:VisualElement name="scene-configuration-scriptable" style="flex-grow: 1; margin-top: 8px; margin-right: 4px; margin-bottom: 8px; margin-left: 4px;" />
-            <engine:Button text="Build Addressables" name="build-addressables-button" tooltip="Build addressable scenes and create zip files: one per scene, plus the interpreted-scripts bundle when the project has one. To publish by hand, upload them all to the same folder and import the scene zips from the Backoffice." />
-        </engine:GroupBox>
-        <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
-        <engine:VisualElement name="deploy-section" style="display: none;">
-            <engine:Label text="Deploy to worlds" style="-unity-font-style: bold; font-size: 14px; margin-top: 4px; margin-bottom: 4px; -unity-text-align: upper-center;" />
-            <engine:Label text="Loading worlds..." name="worlds-loading-label" style="-unity-text-align: upper-center; margin-bottom: 4px;" />
-            <engine:ScrollView name="worlds-list" style="max-height: 200px; margin-bottom: 4px;" />
-            <engine:VisualElement name="deploy-buttons" style="flex-direction: row; align-items: center; justify-content: center;">
-                <engine:Button text="Deploy" name="deploy-button" tooltip="Upload existing zip files for selected scenes to the selected worlds." />
-                <engine:Button text="Build &amp; Deploy" name="build-and-deploy-button" tooltip="Build addressable scenes, then upload to selected worlds one by one." />
+        <engine:VisualElement name="scenes-section" class="section">
+            <engine:VisualElement class="section-header">
+                <engine:Label text="Scenes" name="scenes-title" class="section-title" tooltip="Every scene of the project is listed: tick the ones to publish. New scenes appear here on their own, unticked." />
+                <engine:Label text="" name="scenes-in-build-label" class="section-note" />
             </engine:VisualElement>
-        </engine:VisualElement>
-        <engine:VisualElement name="tenant-deploy-section" style="display: none;">
-            <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
-            <engine:Label text="Deploy to tenant" style="-unity-font-style: bold; font-size: 14px; margin-top: 4px; margin-bottom: 4px; -unity-text-align: upper-center;" />
-            <engine:VisualElement name="tenant-deploy-buttons" style="flex-direction: row; align-items: center; justify-content: center;">
-                <engine:Button text="Deploy to Tenant" name="tenant-deploy-button" tooltip="Upload existing zip files for selected scenes to the tenant." />
-                <engine:Button text="Build &amp; Deploy to Tenant" name="tenant-build-and-deploy-button" tooltip="Build addressable scenes, then upload to tenant." />
+            <engine:VisualElement name="scene-configuration-scriptable" class="section-body" />
+            <engine:VisualElement name="excluded-folders-slot" class="section-body" />
+            <engine:VisualElement name="build-result-errors">
+                <engine:VisualElement name="folder-missing" class="build-error-item">
+                    <engine:VisualElement name="folder-missing-icon" class="row-icon" />
+                    <engine:Label text="The scene could not be built for one or more platforms. Restart the Editor and build again." name="folder-missing-text" class="build-error-item-text" />
+                </engine:VisualElement>
+                <engine:VisualElement name="binary-catalog" class="build-error-item">
+                    <engine:VisualElement name="binary-catalog-icon" class="row-icon" />
+                    <engine:Label text="The build wrote its catalog in the wrong format. Open &lt;i&gt;&quot;Window/Asset Management/Addressables/Settings&quot;&lt;/i&gt;, untick &quot;Enable Json Catalog&quot;, tick it again, save the project and restart the Editor. Then build again." name="binary-catalog-text" class="build-error-item-text" />
+                </engine:VisualElement>
+            </engine:VisualElement>
+            <engine:VisualElement class="section-bar">
+                <engine:Label text="" name="build-status-label" class="section-note bar-text" />
+                <engine:Button text="Build" name="build-addressables-button" />
             </engine:VisualElement>
         </engine:VisualElement>
-        <engine:VisualElement name="separator" class="separator" style="flex-grow: 1;" />
-        <engine:GroupBox name="addressables-settings">
-            <engine:Foldout text="Show advanced addressables configurations" name="addressables-settings-foldout" value="false" tooltip="If one or more misconfigurations of the project occurs, you can fix them by clicking the button &quot;Configure Addressables settings&quot;" style="-unity-font-style: bold;">
-                <engine:GroupBox name="top-level-settings" class="settings-group" style="flex-direction: row; align-items: flex-start;">
-                    <engine:Foldout text="Top-level settings" name="top-level-settings-foldout" style="-unity-font-style: bold;">
+        <engine:VisualElement name="deploy-section" class="section">
+            <engine:VisualElement class="section-header">
+                <engine:Label text="Publish" name="publish-title" class="section-title" tooltip="One group per connection the project uses: tick its worlds, or its tenant level, to deploy there with that connection's login." />
+                <engine:Label text="" name="connections-summary-label" class="section-note" />
+                <engine:Button text="Import configuration file..." name="import-configuration-button" tooltip="Imports the file a tenant's Back Office downloads (Download SDK Environments Config) into your encrypted connection store. Nothing is written to the project; the connection gets its group below, where you log in." />
+            </engine:VisualElement>
+            <engine:Label text="" name="login-status-label" class="section-notice" />
+            <engine:VisualElement name="deploy-targets" class="section-body" />
+            <engine:VisualElement class="section-bar">
+                <engine:Label text="" name="deploy-summary-label" class="section-note bar-text" />
+                <engine:Button text="Deploy" name="deploy-button" />
+                <engine:Button text="Build &amp; Deploy" name="build-and-deploy-button" />
+            </engine:VisualElement>
+            <engine:VisualElement name="deploy-errors-slot" />
+        </engine:VisualElement>
+        <engine:VisualElement name="addressables-settings" class="section">
+            <engine:Foldout text="Advanced settings" name="addressables-settings-foldout" value="false" tooltip="The Unity Addressables settings the build relies on. A warning icon marks an item that is not what the SDK expects: its tooltip says what is expected, and Fix build settings applies it." class="section-foldout">
+                <engine:VisualElement name="advanced-fix-row" class="banner banner-warning" style="display: none;">
+                    <engine:Label text="Some settings are not the ones the SDK needs." class="banner-text" />
+                    <engine:Button text="Fix build settings" name="advanced-fix-button" tooltip="Applies the build settings the SDK needs. It resets the project's asset groups to a single default group." />
+                </engine:VisualElement>
+                <engine:VisualElement name="top-level-settings" class="settings-group">
+                    <engine:Foldout text="Top-level settings" name="top-level-settings-foldout" class="settings-foldout">
                         <engine:VisualElement name="project-settings-git-instance" class="settings-item">
-                            <engine:VisualElement name="addressables-profile-check" class="settings-item-green-icon" />
-                            <engine:Label text="Active addressables profile:" name="addressables-profile-label" style="-unity-font-style: normal;" />
-                            <engine:Label text="&lt;value&gt;" name="addressables-profile-value" />
+                            <engine:VisualElement name="addressables-profile-check" class="row-icon" />
+                            <engine:Label text="Active addressables profile:" name="addressables-profile-label" />
+                            <engine:Label text="&lt;value&gt;" name="addressables-profile-value" class="settings-value" />
                         </engine:VisualElement>
                     </engine:Foldout>
-                    <engine:GroupBox name="top-level-settings-button-container" class="settings-button-container" style="max-height: 30px; margin-top: 0; margin-bottom: 0;">
-                        <engine:Button text="Select" name="top-level-settings-button" />
-                    </engine:GroupBox>
-                </engine:GroupBox>
-                <engine:GroupBox name="profile-settings" class="settings-group" style="flex-direction: row;">
-                    <engine:Foldout text="Profile settings" name="profile-settings-foldout" style="-unity-font-style: bold;">
+                    <engine:Button text="Select" name="top-level-settings-button" class="settings-button" />
+                </engine:VisualElement>
+                <engine:VisualElement name="profile-settings" class="settings-group">
+                    <engine:Foldout text="Profile settings" name="profile-settings-foldout" class="settings-foldout">
                         <engine:VisualElement name="remote-buildpath" class="settings-item">
-                            <engine:VisualElement name="remote-buildpath-check" class="settings-item-green-icon" />
+                            <engine:VisualElement name="remote-buildpath-check" class="row-icon" />
                             <engine:Label text="Remote.BuildPath:" name="remote-buildpath-text" />
-                            <engine:Label text="&lt;value&gt;" name="remote-buildpath-value" style="-unity-font-style: normal;" />
+                            <engine:Label text="&lt;value&gt;" name="remote-buildpath-value" class="settings-value" />
                         </engine:VisualElement>
                         <engine:VisualElement name="remote-loadpath" class="settings-item">
-                            <engine:VisualElement name="remote-loadpath-check" class="settings-item-green-icon" />
+                            <engine:VisualElement name="remote-loadpath-check" class="row-icon" />
                             <engine:Label text="Remote.LoadPath:" name="remote-loadpath-text" />
-                            <engine:Label text="&lt;value&gt;" name="remote-loadpath-value" style="-unity-font-style: normal;" />
+                            <engine:Label text="&lt;value&gt;" name="remote-loadpath-value" class="settings-value" />
                         </engine:VisualElement>
                         <engine:VisualElement name="build-target" class="settings-item">
-                            <engine:VisualElement name="build-target-check" class="settings-item-green-icon" />
+                            <engine:VisualElement name="build-target-check" class="row-icon" />
                             <engine:Label text="BuildTarget:" name="build-target-text" />
-                            <engine:Label text="&lt;value&gt;" name="build-target-value" style="-unity-font-style: normal;" />
+                            <engine:Label text="&lt;value&gt;" name="build-target-value" class="settings-value" />
                         </engine:VisualElement>
                         <engine:VisualElement name="player-version-override" class="settings-item">
-                            <engine:VisualElement name="player-version-override-check" class="settings-item-green-icon" />
+                            <engine:VisualElement name="player-version-override-check" class="row-icon" />
                             <engine:Label text="PlayerVersionOverride:" name="player-version-override-text" />
-                            <engine:Label text="&lt;value&gt;" name="player-version-override-value" style="-unity-font-style: normal;" />
+                            <engine:Label text="&lt;value&gt;" name="player-version-override-value" class="settings-value" />
                         </engine:VisualElement>
                     </engine:Foldout>
-                    <engine:GroupBox name="profile-settings-button-container" class="settings-button-container" style="justify-content: space-between; align-items: auto; margin-top: 0; margin-bottom: 0;">
-                        <engine:Button text="Open" name="profile-settings-button" />
-                    </engine:GroupBox>
-                </engine:GroupBox>
-                <engine:GroupBox name="groups-settings" class="settings-group" style="flex-direction: row;">
-                    <engine:Foldout text="Groups settings" name="groups-settings-foldout" style="-unity-font-style: bold;">
+                    <engine:Button text="Open" name="profile-settings-button" class="settings-button" />
+                </engine:VisualElement>
+                <engine:VisualElement name="groups-settings" class="settings-group">
+                    <engine:Foldout text="Groups settings" name="groups-settings-foldout" class="settings-foldout">
                         <engine:VisualElement name="default-local-group" class="settings-item">
-                            <engine:VisualElement name="default-local-group-check" class="settings-item-green-icon" />
+                            <engine:VisualElement name="default-local-group-check" class="row-icon" />
                             <engine:Label text="Default Local Group" name="default-local-group-text" />
                             <engine:Button text="Select" name="default-local-group-button" />
                         </engine:VisualElement>
                     </engine:Foldout>
-                    <engine:GroupBox name="default-local-group-button-container" class="settings-button-container" style="justify-content: space-between; align-items: auto; margin-top: 0; margin-bottom: 0;">
-                        <engine:Button text="Select" name="addressables-groups-button" />
-                    </engine:GroupBox>
-                </engine:GroupBox>
+                    <engine:Button text="Select" name="addressables-groups-button" class="settings-button" />
+                </engine:VisualElement>
             </engine:Foldout>
-        </engine:GroupBox>
+        </engine:VisualElement>
     </engine:ScrollView>
 </engine:UXML>
