@@ -99,15 +99,15 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 
         [Header("Inventory")]
         [Tooltip("The equipment slots, each with its type: the hand (the tools) and the custom wear slots (Head, "
-                 + "Hands...). A wearable whose Wear Slot is not declared here is refused. Empty: the wear slots are "
-                 + "counted by Wear Slots Count instead, as before 2026.7")]
+                 + "Hands...), shown from the start. A wearable whose Wear Slot is not declared here adds it. Empty: the "
+                 + "wear slots are counted by Wear Slots Count instead")]
         public List<EquipmentSlotDefinition> equipmentSlots = new();
 
-        [Tooltip("Number of wear slots in the wear inventory, used when no Equipment Slots are declared. You cannot "
-                 + "equip or hold more that this value items")]
+        [Tooltip("Number of wear slots in the wear inventory to start with, used when no Equipment Slots are declared. "
+                 + "A wearable that does not fit adds a slot")]
         public int wearSlotsCount = 1;
 
-        [Tooltip("Number of slots in the inventory. You cannot equip or hold more that this value items")]
+        [Tooltip("Number of slots in the inventory to start with. An item that does not fit adds a slot")]
         public int inventorySlotsCount = 2;
 
         [Tooltip("Whether or not I want the inventory to show how many items the user has of a certain type")]
