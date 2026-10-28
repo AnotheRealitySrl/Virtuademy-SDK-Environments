@@ -6,6 +6,9 @@ The review fixes below warrant a minor bump: fixes, two values appended to `Envi
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 #### Added
+- **`TaskUIPlaceholder.vrPlacement`** (2026.7, minor): in VR the task panel stays where the placeholder is (`Fixed`, the
+  default, as before) or goes with the player, low on their left, moving and turning with their body
+  (`FollowPlayer`). Existing environments keep `Fixed`.
 - **The inventory's item slots round up so the grid has no holes** (2026.7, minor): on the first page to whole columns
   once a second column starts (whole rows in VR), past it to whole pages, with empty, usable slots;
   `InventoryPlaceholder.inventorySlotsCount` follows (with `SlotCountsChanged`), as it does when an item that does not
