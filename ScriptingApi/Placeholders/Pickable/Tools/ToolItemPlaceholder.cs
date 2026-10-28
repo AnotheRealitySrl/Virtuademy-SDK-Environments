@@ -56,8 +56,9 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [Tooltip("Hold only: the use key was released. The use itself raises the Pickable's On Item Used.")]
         public UnityEvent onUseEnded = new();
 
-        [Tooltip("Desktop and mobile: also show the tool's 3D model in front of the camera, as if in hand, while it is held. "
-                 + "The Pickable's icon still follows the pointer when it has one. Off: icon only (as before 2026.7).")]
+        [Tooltip("Desktop and mobile, first person: also show the tool's 3D model in front of the camera, as if in hand, "
+                 + "while it is held; the Pickable's icon still follows the pointer when it has one. Off: icon only. In third "
+                 + "person the model is in the avatar's right hand whatever this says.")]
         public bool showModelInHand = false;
 
         [Tooltip("Multiplayer: whose wheel the tool goes to when a player picks it up. As Inventory uses the tool inventory's setting.")]
