@@ -175,6 +175,9 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// Gives the inventory more slots during the experience (for example a slot unlocked by a task). Counts only
         /// grow: a value below the current one is ignored, since the slots may hold items. Takes effect at once when
         /// the inventory is shown, otherwise when it is first shown.
+        /// <paramref name="wearSlots"/> is the wear inventory's number of generic cells, which counts only when no
+        /// <see cref="equipmentSlots"/> are declared (as <see cref="wearSlotsCount"/>): with declared slots the
+        /// equipment column shows one cell per declared slot, and a slot is added with <see cref="AddEquipmentSlot"/>.
         /// </summary>
         /// <remarks>Node: <c>Virtuademy Inventory: Set Slot Counts</c>.</remarks>
         public void SetSlotCounts(int wearSlots, int inventorySlots)

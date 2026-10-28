@@ -123,6 +123,8 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   SDK's texts no longer render magenta in a new creator project.
 
 #### Changed
+- `InventoryPlaceholder.SetSlotCounts` documents what its wear count is: the wear inventory's generic cells, counted only
+  when no equipment slots are declared; with declared slots, `AddEquipmentSlot` adds a slot.
 - **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
   Virtuademy app ships. A creator project now gets them with the SDK, at the app's versions, so the NavMesh, rig
   and spline components of an environment carry the fields the app reads. A project that lists one of them at
