@@ -27,9 +27,9 @@ namespace Virtuademy.SDK.Environments.Editor
 {
     /// <summary>
     /// The Publish Environments window (menu Virtuademy > Publish Environments; the class kept its old name): build the
-    /// project's scenes, and deploy them to the worlds and tenant levels of the connections the project uses (meta-repo
+    /// project's scenes, and deploy them to the worlds and tenant levels of the connections on this computer (meta-repo
     /// ADR 0037). Connections come in here: the file the Back Office downloads goes into the encrypted connection store,
-    /// and each connection gets a group where it is logged in and ticked.
+    /// and each connection of the store gets a group where it is logged in and ticked.
     /// </summary>
     /// <remarks>
     /// The window is an environment project's. The Virtuademy application, which has this package installed too, defines
@@ -97,26 +97,33 @@ namespace Virtuademy.SDK.Environments.Editor
         }
         private static string _legacyToken = "";
 
-        // The deploy targets: one group per connection the project uses (meta-repo ADR 0037), each with its worlds and its
+        // The deploy targets: one group per connection in the store (meta-repo ADR 0037), each with its worlds and its
         // tenant level. A group's key is fixed when it is built, and a deploy to its targets goes with that connection's
-        // token and to that connection's hosts only, whatever the default connection becomes meanwhile.
+        // token and to that connection's hosts only.
         private readonly Dictionary<string, TargetGroup> groups = new(StringComparer.OrdinalIgnoreCase);
 
-        // Which groups were opened or closed in this window; a group not in it starts open, a Production one closed.
+        // Which groups were opened or closed in this window; a group not in it starts closed when it is a Production one or
+        // has no target ticked in this project, open otherwise.
         private readonly Dictionary<string, bool> groupExpanded = new(StringComparer.OrdinalIgnoreCase);
 
-        // What the groups were built from: the connections the project uses, whether each has a session, and the default one.
+        // What the groups were built from: the connections of the store, whether each has a session, and whether its app is a
+        // CreatorKit app.
         private string groupsSignature;
 
         // The registry entry the project was set up from, read when the groups are built.
         private string projectVersion;
 
-        private bool deployRunning;
+        // Static: the confirmation of a removal (RemoveConnectionWindow) asks it, and it is not tied to this window's instance,
+        // which a domain reload or a reopening replaces.
+        private static bool deployRunning;
         private bool rebuildPending;
         private bool missingModules;
 
         // Logins started from a group, by connection key: they outlive a rebuild of the groups.
         private readonly Dictionary<string, PendingLogin> pendingLogins = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>True while a deploy runs from a Publish Environments window: it holds on to the connections' tokens.</summary>
+        internal static bool DeployRunning => deployRunning;
 
         // UI references
         private Label loginStatusLabel;
@@ -150,8 +157,8 @@ namespace Virtuademy.SDK.Environments.Editor
         private ScrollView deployErrorsScrollView;
 
         /// <summary>
-        /// One connection the project uses, as the window shows it: a header row (state, tenant, environment, platform
-        /// version, default star, the main action and a menu) and a body with the account and the targets.
+        /// One connection of the store, as the window shows it: a header row (state, tenant, environment, platform
+        /// version, the main action and a menu) and a body with the account and the targets.
         /// </summary>
         private sealed class TargetGroup
         {
@@ -179,6 +186,9 @@ namespace Virtuademy.SDK.Environments.Editor
             public bool Production;
             public PlatformVersionRule.Verdict Version;
 
+            /// <summary>The connection's app is not a CreatorKit app, so an environment project cannot deploy through it.</summary>
+            public bool PlatformMismatch;
+
             /// <summary>What the account may open in this tenant's Back Office; null shows no Back Office button.</summary>
             public BackofficeAccess Backoffice;
 
@@ -189,7 +199,7 @@ namespace Virtuademy.SDK.Environments.Editor
             /// <summary>Bumped when the group is dropped: a listing that started before drops its result.</summary>
             public int Generation;
 
-            public bool Allowed => PlatformVersionRule.Allows(Version);
+            public bool Allowed => !PlatformMismatch && PlatformVersionRule.Allows(Version);
         }
 
         /// <summary>A browser login started from a group: it can be cancelled, and its authorization URL copied.</summary>
@@ -362,7 +372,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// A login or a logout on any connection, or a connection added or removed. The errors in the panel belong to the
-        /// connections as they were, so they go; the groups are built again from the project's connections.
+        /// connections as they were, so they go; the groups are built again from the store's connections.
         /// </summary>
         private void OnLoginStateChanged()
         {
@@ -371,8 +381,8 @@ namespace Virtuademy.SDK.Environments.Editor
 
             // Where the scenes are published belongs to the session that read it: a connection logged out forgets it,
             // and with it the filter choices it fed.
-            foreach (string key in ProjectConnections.Used.Where(k => ConnectionStore.Get(k)?.HasSession != true))
-                PublishedEnvironmentsIndex.Clear(key);
+            foreach (ConnectionRecord record in ProjectConnections.All().Where(r => !r.HasSession))
+                PublishedEnvironmentsIndex.Clear(record.Key);
 
             RebuildTargets();
         }
@@ -383,7 +393,8 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// The file the Back Office downloads, into the encrypted connection store (<see cref="ConfigurationFileImport"/>): one
-        /// connection per environment of the file, each one the project uses from now on. No file is written to the project.
+        /// connection per environment of the file, each one every environment project of the computer uses from now on. No
+        /// file is written to the project.
         /// It needs the network, because a connection is named by the tenant key the platform gives; it makes no login.
         /// </summary>
         private async void OnImportConfigurationClicked()
@@ -446,15 +457,11 @@ namespace Virtuademy.SDK.Environments.Editor
             RebuildTargets();
         }
 
-        /// <summary>The connections the project uses that are in the store, in the order the project first used them.</summary>
-        private static List<ConnectionRecord> UsedConnections() =>
-            ProjectConnections.Used.Select(ConnectionStore.Get).Where(r => r != null).ToList();
-
         private static string GroupsSignature() =>
-            string.Join("|", UsedConnections().Select(r => $"{r.Key}#{r.HasSession}")) + "|play:" + ProjectConnections.DefaultKey;
+            string.Join("|", ProjectConnections.All().Select(r => $"{r.Key}#{r.HasSession}#{r.PlatformMismatch}"));
 
         /// <summary>
-        /// Builds one group per connection the project uses. A group remembers nothing of its own: the ticks are read back
+        /// Builds one group per connection in the store, in the order <see cref="ProjectConnections.All"/> gives. A group remembers nothing of its own: the ticks are read back
         /// from the project's settings (<see cref="ProjectConnections.TargetsOf"/>) once its worlds are listed. Deferred
         /// while a deploy runs, which holds on to the groups it was started with.
         /// </summary>
@@ -478,10 +485,10 @@ namespace Virtuademy.SDK.Environments.Editor
             projectVersion = PlatformVersionRule.ProjectVersion;
             RefreshVersionNotice(projectVersion);
 
-            List<ConnectionRecord> connections = UsedConnections();
+            IReadOnlyList<ConnectionRecord> connections = ProjectConnections.All();
             if (connections.Count == 0)
             {
-                targetsContainer.Add(new Label("No connection yet. Download the configuration file of a tenant from its Back Office " +
+                targetsContainer.Add(new Label("No connection on this computer yet. Download the configuration file of a tenant from its Back Office " +
                                                "(Download SDK Environments Config) and import it with the button above: each connection " +
                                                "then gets its group here, where you log in.")
                 {
@@ -495,7 +502,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 groups[record.Key] = group;
                 targetsContainer.Add(group.Root);
 
-                if (group.Expanded)
+                // A group of another platform is checked again even when closed: its flag may be stale.
+                if (group.Expanded || group.PlatformMismatch)
                     LoadGroupWorlds(group);
             }
 
@@ -529,8 +537,14 @@ namespace Virtuademy.SDK.Environments.Editor
                 Key = record.Key,
                 Production = IsProduction(record),
                 Version = PlatformVersionRule.Check(projectVersion, record.PlatformVersion),
+                PlatformMismatch = record.PlatformMismatch,
             };
-            group.Expanded = groupExpanded.TryGetValue(record.Key, out bool open) ? open : !group.Production;
+
+            // Closed until the user opens it: a Production group, and a group this project has no target in, so a computer
+            // with many connections keeps the window short.
+            group.Expanded = groupExpanded.TryGetValue(record.Key, out bool open)
+                ? open
+                : !group.Production && ProjectConnections.TargetsOf(record.Key).Count > 0;
 
             group.Root = new VisualElement
             {
@@ -566,7 +580,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 header.Add(group.EnvironmentChip);
             }
 
-            bool locked = !group.Allowed;
+            bool locked = !PlatformVersionRule.Allows(group.Version);
             group.VersionChip = Chip(locked ? $"{record.PlatformVersion ?? "no version"} · locked" : record.PlatformVersion ?? "no version", locked);
             group.VersionChip.tooltip = PlatformVersionRule.Refusal(group.Version, projectVersion, record.PlatformVersion) ?? "The tenant's platform version.";
             header.Add(group.VersionChip);
@@ -617,7 +631,16 @@ namespace Virtuademy.SDK.Environments.Editor
             accountRow.Add(group.LoginActions);
             group.Body.Add(accountRow);
 
-            if (locked)
+            if (group.PlatformMismatch)
+            {
+                group.Body.Add(new Label($"This is {AppPlatforms.Describe(record.Platform)}: an environment project needs a CreatorKit app. " +
+                                         "Remove it from this computer, or import the CreatorKit configuration file.")
+                {
+                    tooltip = $"The platform of this connection's app is {record.Platform}; an environment project accepts only {AppPlatforms.CreatorKit}.",
+                    style = { color = new Color(0.9f, 0.45f, 0.45f), fontSize = 11, whiteSpace = WhiteSpace.Normal, marginBottom = 2 },
+                });
+            }
+            else if (locked)
             {
                 group.Body.Add(new Label(ShortRefusal(group.Version, projectVersion, record.PlatformVersion))
                 {
@@ -718,7 +741,7 @@ namespace Virtuademy.SDK.Environments.Editor
             bool hasSession = record?.HasSession == true;
 
             GenericMenu menu = new();
-            if (hasSession)
+            if (hasSession || group.PlatformMismatch)
                 menu.AddItem(new GUIContent("Refresh worlds"), false, () =>
                 {
                     if (!group.Expanded)
@@ -736,17 +759,29 @@ namespace Virtuademy.SDK.Environments.Editor
             else
                 menu.AddDisabledItem(new GUIContent("Log out"));
 
-            menu.AddItem(new GUIContent("Remove from project..."), false, () =>
-            {
-                string label = PublishedEnvironmentsIndex.LabelOf(group.Key);
-                if (EditorUtility.DisplayDialog("Remove from project",
-                        $"Stop using {label} in this project? Its ticks go with it. The connection stays in your store, " +
-                        "with its login, for your other projects; importing its configuration file brings it back.",
-                        "Remove", "Cancel"))
-                    ProjectConnections.Remove(group.Key);
-            });
+            if (deployRunning)
+                menu.AddDisabledItem(new GUIContent("Remove from this computer..."));
+            else
+                menu.AddItem(new GUIContent("Remove from this computer..."), false,
+                    () => RemoveConnectionWindow.Open(ConnectionStore.Get(group.Key)));
 
             menu.DropDown(group.MenuButton.worldBound);
+        }
+
+        /// <summary>
+        /// Cancels a login still waiting in the browser for a connection, in every Publish Environments window that is open: the
+        /// confirmation of a removal calls it, for "Log out only" and for the removal.
+        /// </summary>
+        internal static void CancelPendingLogins(string key)
+        {
+            foreach (AddressablesManagementWindow window in Resources.FindObjectsOfTypeAll<AddressablesManagementWindow>())
+            {
+                if (window.pendingLogins.TryGetValue(key, out PendingLogin login))
+                {
+                    login.Cancellation.Cancel();
+                    window.pendingLogins.Remove(key);
+                }
+            }
         }
 
         /// <summary>
@@ -799,6 +834,39 @@ namespace Virtuademy.SDK.Environments.Editor
             group.Listed = false;
             group.WorldsStatus.style.display = DisplayStyle.Flex;
 
+            // A connection of another platform has nothing to tick: the group says why, and its worlds are not listed. The flag
+            // can be stale (the key was changed since, or an earlier import wrote it wrongly), so the platform is asked again
+            // with the connection's own credential first; when it cannot be reached, the stored flag stays.
+            if (group.PlatformMismatch)
+            {
+                int checkedGeneration = group.Generation;
+                group.Listing = true;
+                group.WorldsStatus.text = "Checking the app key...";
+
+                try
+                {
+                    await ConnectionLoginService.RefreshConnectionAsync(group.Key);
+                }
+                finally
+                {
+                    if (checkedGeneration == group.Generation)
+                        group.Listing = false;
+                }
+
+                if (checkedGeneration != group.Generation)
+                    return;
+
+                if (!PlatformMismatchOf(group.Key))
+                {
+                    RebuildTargets();
+                    return;
+                }
+
+                group.WorldsStatus.style.display = DisplayStyle.None;
+                RefreshButtons();
+                return;
+            }
+
             ConnectionRecord record = ConnectionStore.Get(group.Key);
             if (record?.HasSession != true)
             {
@@ -815,7 +883,7 @@ namespace Virtuademy.SDK.Environments.Editor
             {
                 // The platform version can change at any time (an upgrade of the tenant): read it again before the ticks
                 // are offered, and rebuild the group when the version rule's verdict moved.
-                if (await RefreshVersionAsync(group.Key) != group.Version)
+                if (await RefreshVersionAsync(group.Key) != group.Version || PlatformMismatchOf(group.Key) != group.PlatformMismatch)
                 {
                     if (generation == group.Generation)
                     {
@@ -937,6 +1005,9 @@ namespace Virtuademy.SDK.Environments.Editor
             return PlatformVersionRule.Check(projectVersion, ConnectionStore.Get(connectionKey)?.PlatformVersion);
         }
 
+        /// <summary>The connection's app, as the store last had it, is not a CreatorKit app (the refresh above reads it again).</summary>
+        private static bool PlatformMismatchOf(string connectionKey) => ConnectionStore.Get(connectionKey)?.PlatformMismatch == true;
+
         /// <summary>
         /// Right before a deploy: every target connection's platform version read again. A target the rule no longer
         /// allows stops the deploy (nothing is built or sent), with a dialog that names it, and the groups are built again.
@@ -946,14 +1017,14 @@ namespace Virtuademy.SDK.Environments.Editor
             List<string> refused = new();
             foreach (GroupTargets target in targets)
             {
-                if (!PlatformVersionRule.Allows(await RefreshVersionAsync(target.Group.Key)))
+                if (!PlatformVersionRule.Allows(await RefreshVersionAsync(target.Group.Key)) || PlatformMismatchOf(target.Group.Key))
                     refused.Add(PublishedEnvironmentsIndex.LabelOf(target.Group.Key));
             }
 
             if (refused.Count == 0)
                 return true;
 
-            string message = $"The platform version of {string.Join(", ", refused)} changed and no longer matches the project's. Nothing was built or sent.";
+            string message = $"The platform version or the app of {string.Join(", ", refused)} changed and no longer matches the project's. Nothing was built or sent.";
             LogDeployError(message);
             EditorUtility.DisplayDialog("Deploy blocked", message + " The groups were read again: check the ticks.", "OK");
             RebuildTargets();
@@ -1128,11 +1199,12 @@ namespace Virtuademy.SDK.Environments.Editor
 
                 int groupTargets = ticked.Where(t => t.Group == group).Sum(t => t.Count);
                 group.Summary.text = login != null ? "logging in"
+                    : group.PlatformMismatch ? "not a CreatorKit app"
                     : !record.HasSession ? "not logged in"
                     : groupTargets > 0 && !group.Expanded ? Plural(groupTargets, "target")
                     : string.Empty;
 
-                group.LoginButton.style.display = !record.HasSession && login == null ? DisplayStyle.Flex : DisplayStyle.None;
+                group.LoginButton.style.display = !record.HasSession && login == null && !group.PlatformMismatch ? DisplayStyle.Flex : DisplayStyle.None;
                 group.LoginActions.style.display = login != null ? DisplayStyle.Flex : DisplayStyle.None;
 
                 if (login != null)
@@ -1182,14 +1254,14 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// The labels go stale on their own when a token expires while the window sits idle: re-render them once, right
-        /// after the first such moment among the project's connections. Re-armed on every render.
+        /// after the first such moment among the store's connections. Re-armed on every render.
         /// </summary>
         private void ScheduleSessionExpiryRefresh()
         {
             sessionExpiryRefresh?.Pause();
             sessionExpiryRefresh = null;
 
-            DateTime? next = UsedConnections()
+            DateTime? next = ProjectConnections.All()
                 .Where(r => r.IsTokenValid && r.UsableUntilUtc != null)
                 .Select(r => r.UsableUntilUtc)
                 .OrderBy(t => t)
@@ -2177,14 +2249,14 @@ namespace Virtuademy.SDK.Environments.Editor
                 return;
 
             // The script policy lives per platform: the interpreted scripts are verified on the connections of the ticked
-            // targets, or on the project's only connection when nothing is ticked.
+            // targets, or on the computer's only usable connection when nothing is ticked.
             List<string> keys = TickedTargets().Select(t => t.Group.Key).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (keys.Count == 0)
             {
-                if (ProjectConnections.DefaultKey == null && groups.Count > 1 && EnvironmentsBuild.HasInterpretedScripts)
+                if (ProjectConnections.DefaultKey == null && ProjectConnections.UsableCount > 1 && EnvironmentsBuild.HasInterpretedScripts)
                 {
                     EditorUtility.DisplayDialog("Build",
-                        $"The project uses {groups.Count} connections, and its interpreted scripts are verified on the platform they go to. " +
+                        $"This computer has {ProjectConnections.UsableCount} connections, and the project's interpreted scripts are verified on the platform they go to. " +
                         "Tick a target in the group of the connection to verify on, then build again. Nothing was built.", "OK");
                     return;
                 }

@@ -4,10 +4,12 @@
 
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
 classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four
-`EnvironmentsCli` commands, one option on every command and five exit codes (minor; `ExitApiHostMismatch` stays defined and is no
+`EnvironmentsCli` commands, one option on every command and the exit codes 26 to 32 (minor; `ExitApiHostMismatch` stays defined and is no
 longer returned, and a `-vdExpectTenant` that names another tenant is now 30 instead of 24). The window's menu path
 (Publish Environments, was Addressables management) and `tenant-config`, which now writes the connection store and reports
-connections instead of a file, change for a script that drives them: that warrants a major bump at the release cut.
+connections instead of a file, change for a script that drives them: that warrants a major bump at the release cut. Every
+environment project now uses every connection of the computer and a command that names none works only on a computer with
+one usable connection, which changes what a script that relied on the project's list gets.
 
 #### Added
 - **`EnvironmentsCli` commands `login`, `logout`, `connections` and `whoami`** (meta-repo ADR 0037, first slice), over the
@@ -38,6 +40,27 @@ connections instead of a file, change for a script that drives them: that warran
   out of those folders to a normal one (the vendor's own folder, for example), which compiles into `Assembly-CSharp`.
   In the command line it is `ExitBuildFailed` with `build.failure` `FirstpassScripts`, and the components in
   `build.firstpassComponents`. Warrants a minor bump.
+- **Each kind of project accepts only the app keys made for it** (meta-repo ADR 0037, "The app key's platform"). An environment
+  project accepts only a CreatorKit app: the import of a configuration file whose app has another platform is refused, and
+  `config-public`'s `app.platform` is read again at each login and refresh. A connection already in the store whose app turns
+  out to be of another platform stays in the window, cannot be ticked, shows "This is a WebGL app: an environment project needs
+  a CreatorKit app. Remove it from this computer, or import the CreatorKit configuration file.", and cannot log in. On the
+  command line `worlds`, `preview`, `deploy` and `build` refuse such a connection, and `login` or `tenant-config` with such a
+  key fails, with the new exit code **32** (`ExitPlatformMismatch`, *platform mismatch*; the message names the platform found).
+  A server that does not return the platform is accepted. `connections` and `whoami` carry the connection's `platform`.
+  A platform the store has as another one is not taken as final: before the window or the command line refuses the
+  connection, the platform is read again with the connection's own credential (opening or refreshing its group, closed groups
+  of this kind included; `worlds`, `build`, `preview` and `deploy`), so a stale flag heals. When the platform cannot be
+  reached, the stored value stands.
+- **A confirmation window for "Remove from this computer..."** (`RemoveConnectionWindow`). It names the tenant, its environment
+  and the account (or "never logged in"), says that the removal applies to every Virtuademy project on the computer and that
+  using the tenant again takes its configuration file from the Back Office and a new login, and offers **Cancel** (the
+  default), **Log out only** (the connection and its targets stay) and a red **Remove from this computer**, enabled only once
+  the tenant's name is typed. Both cancel a login waiting in the browser for the connection, and the removal is refused while
+  a deploy runs (the window asks the Publish Environments window directly, so a reopened window or a domain reload changes
+  nothing). For a connection that is no longer in the store the menu item says so, with no window. It logs the connection out, deletes it from the store
+  (`ConnectionLoginService.RemoveFromComputerAsync` of `Virtuademy-SDK-Core`) and forgets what the window knew about where
+  its scenes are published. The command line has no removal.
 - **A Back Office button (`Back Office ↗`), per connection, in the Publish Environments window** (meta-repo
   ADR 0038, decision 7). Each logged-in group asks its own Application API, with that connection's token,
   `GET /tenants/backoffice-access/my` while it lists its worlds, and shows the button when the answer says the account
@@ -62,7 +85,7 @@ connections instead of a file, change for a script that drives them: that warran
   shows, and so do Unity's menu paths.
   - **Connections come in here.** The banner's **Import configuration file...** puts the file the Back Office downloads
     into the encrypted connection store (`ConfigurationFileImport` of `Virtuademy-SDK-Core`): one connection per
-    environment of the file, each one the project uses. No file is written to the project. It replaces the banner's button
+    environment of the file, each one every environment project of the computer uses. No file is written to the project. It replaces the banner's button
     to Available Tenants, which an environment project no longer shows.
   - **The window follows the work, top to bottom**: a banner only while something blocks a build (the build settings are
     not the SDK's, with **Fix** and **Details**), then **Scenes** with **Build**, **Publish** with the connections and
@@ -85,8 +108,8 @@ connections instead of a file, change for a script that drives them: that warran
   - **Publish**: the header counts the connections and the ticked targets, beside **Import configuration file...**. Each
     connection is one row: a state dot (logged in, session to renew, logged out, logging in), the tenant, its environment
     as a coloured chip (blue for Sandbox, orange for PreProduction, none for Production) and its platform version (in red, "locked", when the version rule refuses it, with the reason in one line below),
-    **Back Office ↗** or **Log in**, and a menu with **Refresh worlds**, **Log out** and **Remove from project...**
-    (`ProjectConnections.Remove` of `Virtuademy-SDK-Core`; the connection stays in the store). The account line is grey,
+    **Back Office ↗** or **Log in**, and a menu with **Refresh worlds**, **Log out** and **Remove from this computer...**
+    (a confirmation window of its own, below; disabled while a deploy runs). The account line is grey,
     "user · Tenant manager · until 3 Nov 09:32", amber only when the session must be renewed; the details are in its
     tooltip. While a login waits for the browser, the line says so, with **Copy link** and **Cancel**. The tenant level
     comes first ("Whole tenant"), the worlds after it with their ID on the right. The line beside Deploy says what a deploy
@@ -102,32 +125,32 @@ connections instead of a file, change for a script that drives them: that warran
   - The menu is not compiled where `VIRTUADEMY_APPLICATION` is defined: the Virtuademy application, which has this package
     installed, switches tenant in Available Tenants and publishes no environment.
 - **`tenant-config` writes the connection store, not the project** (behaviour change). It imports the file's credentials as
-  the window's import does: one connection per environment of the file, or only `-vdEnv`'s, each recorded as one the project
-  uses. Nothing is written to the project. It needs the network, because a
+  the window's import does: one connection per environment of the file, or only `-vdEnv`'s, each one now in the store, which
+  every environment project of the computer uses. Nothing is written to the project. It needs the network, because a
   connection is named by the tenant key the platform gives (exit 19 when the platform cannot be read). The REPORT's
   `tenantConfig` lists `app`, `envs`, `connections`, `defaultConnection` and `failures` (it listed the file's `assetPath` and
   the settings asset). `-vdConfigFolder` and `-vdAllowTracked` are accepted and ignored, and exit 23 (file not ignored by
   git) is no longer returned and stays reserved. `login -vdApp <app> [-vdEnv <key>]` also finds a connection the project
   uses by its app and environment, now that the file is no longer in the project.
 - **The CLI works on a connection and takes its Application API address from it.** `worlds`, `preview` and `deploy` act on the
-  connection `-vdConnection` names, or, when it names none, on the project's only connection: nobody chooses a default
+  connection `-vdConnection` names, or, when it names none, on the computer's only usable connection: nobody chooses a default
   one, and with two or more a command must name its connection (exit 26). `status` and `session` act on the only one
-  (`session` reports its key), `build` on the one `-vdConnection` names or the only one. The address comes from the
+  (`session` reports its key), `build` on the one `-vdConnection` names or the only usable one. The address comes from the
   tenant that connection reported at login, not from the project's generated `PlatformEndpoints` asset, so `ExitApiHostMismatch`
   (25) is no longer returned (the number stays reserved) and the `target` of the REPORT lists the connection instead of two
   hosts. The messages that sent the user to the window for a login now say `-vdCommand login` or
   Virtuademy > Publish Environments.
 - **`worlds`, `preview` and `deploy` take `-vdConnection <connection>`** and act on that connection; a name that fits no connection, or several, is exit 26. The run takes its connection once, when it
   starts, and every request of it (the world list, the script verification, the uploads and imports) goes to that connection;
-  the `target` of the REPORT lists the connection, whether it is the project's only one (`default`) and the Configuration-API host.
+  the `target` of the REPORT lists the connection, whether it is the computer's only usable one (`default`) and the Configuration-API host.
   **A `-vdExpectTenant` that is not that connection's tenant label is exit 30** (*target mismatch*; it was 24 up to 2026.6),
   checked before the session, so a run aimed at the wrong tenant gets 30 even when its connection has no session, not a
   request to log in. 24 now means only a `deploy` without `-vdExpectTenant`. A command that names no connection in a
-  project that uses two or more is exit 26, not 11. The `connections` command marks the project's only connection with
+  computer with two or more connections is exit 26, not 11. The `connections` command marks the computer's only usable connection with
   `default` (and `session` and the `target` say `default` too). A `login` in batch mode on an OS with no
   encrypted store is exit 29.
 - **The Publish Environments window deploys to targets grouped per connection** (meta-repo ADR 0037). It shows one
-  collapsible group per connection the project uses (its tenant label, environment, platform version and login state, with
+  collapsible group per connection in the store, every environment project of the computer using all of them (its tenant label, environment, platform version and login state, with
   Log in and Log out), and in it the worlds the account can deploy to and, for a TenantManager, the tenant level, each with a
   tick. The ticks are kept per project and connection in `UserSettings/Virtuademy/connections.json`: the machine-wide
   `Virtuademy_AddressablesManagement_SelectedWorlds` value, which could tick a world of another tenant, is no longer read.
@@ -138,13 +161,14 @@ connections instead of a file, change for a script that drives them: that warran
   which stops with nothing built or sent when a target no longer matches. On the command line `preview` and `deploy` apply
   the same rule before the session and the build, with the new exit code 31 (*platform version mismatch*, nothing built or
   sent; the REPORT's `platformVersion` says what was compared).
-  A Production group starts closed,
-  and a deploy that includes it asks for a confirmation of its own; a deploy to more than one target lists them per tenant and
+  A Production group starts closed, and so does one with no target
+  ticked in this project, so a computer with many connections keeps the window short; the groups follow the order of tenant
+  label, environment and key. A deploy that includes a Production group asks for a confirmation of its own; a deploy to more than one target lists them per tenant and
   environment and asks first. **Build & Deploy** verifies the interpreted scripts on the platform of every target
   connection before anything is built, builds once, then deploys each target with its own connection's token; the errors in
   the panel carry the tenant. The **Deploy to Tenant** buttons are gone (the tenant level is a tick), a single deployable world
   is no longer ticked on its own, and the section has the import of a configuration file instead of a login of its own.
-  **Build** verifies the scripts on the connections of the ticked targets, or on the project's only connection when
+  **Build** verifies the scripts on the connections of the ticked targets, or on the computer's only usable connection when
   nothing is ticked (with two or more connections and interpreted scripts it asks for a tick); `EnvironmentsCli build`
   takes `-vdConnection` for the same reason. `EnvironmentsDeploy`,
   `PublishedEnvironmentsIndex`, `EnvironmentsBuild.VerifyInterpretedScriptsAsync` and the hot-update verifier take an optional

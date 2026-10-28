@@ -40,8 +40,9 @@ namespace Virtuademy.SDK.Environments.Editor
     /// <item><description><c>tenant-config -vdConfigFile &lt;path&gt; [-vdEnv &lt;key&gt;]</c>:
     /// imports the file downloaded from the Back Office (<b>Download SDK Environments Config</b>) into the per-user
     /// connection store, as the Publish Environments window's import does (<see cref="ConfigurationFileImport"/>): one
-    /// connection per environment of the file, or only <c>-vdEnv</c>'s, each recorded as one the project uses. Nothing is written to the project. It needs the network, because a
-    /// connection is named by the tenant key the platform gives; it does not log in, and never prints the file's content.
+    /// connection per environment of the file, or only <c>-vdEnv</c>'s, each one now in the store, which every environment project of the computer uses. Nothing is written to the project. It needs the network, because a
+    /// connection is named by the tenant key the platform gives; it does not log in, and never prints the file's content. A file whose
+    /// app is not a CreatorKit app is refused with <see cref="ExitPlatformMismatch"/>.
     /// <c>-vdConfigFolder</c> and <c>-vdAllowTracked</c>, which placed the file in the project up to 2026.6, are accepted
     /// and ignored.</description></item>
     /// <item><description><c>login [-vdConnection &lt;connection&gt; | -vdApp &lt;app&gt; [-vdEnv &lt;key&gt;]] [-vdNoBrowser] [-vdLoginTimeoutSeconds &lt;n&gt;]</c>:
@@ -52,13 +53,14 @@ namespace Virtuademy.SDK.Environments.Editor
     /// <c>-vdNoBrowser</c> says somebody else will (the URL is then the way in), and gives up
     /// <c>-vdLoginTimeoutSeconds</c> (180 by default) after the URL is issued, with <see cref="ExitLoginTimeout"/>.
     /// With <c>-vdResultFile</c> the URL is also written to the result file at once, as <c>state: awaiting-browser</c>.
+    /// A connection whose app is not a CreatorKit app does not log in: <see cref="ExitPlatformMismatch"/>.
     /// The editor must not have the project open: see "Batch or open editor" below.</description></item>
     /// <item><description><c>logout [-vdConnection &lt;connection&gt;]</c>: ends the connection's session. The Azure account
     /// stays in the token cache when another connection uses it.</description></item>
     /// <item><description><c>connections</c>: every connection of the store, with whether its session is valid and
-    /// which one the project uses. Needs no network. The same list, without any secret, is in the store's status file
+    /// the platform of its app and whether it is the computer's only usable one. Needs no network. The same list, without any secret, is in the store's status file
     /// (<c>%USERPROFILE%\.virtuademy\sdk\status.json</c>), which can be read without starting Unity.</description></item>
-    /// <item><description><c>whoami [-vdConnection &lt;connection&gt;]</c>: one connection (the project's only one when none is
+    /// <item><description><c>whoami [-vdConnection &lt;connection&gt;]</c>: one connection (the computer's only usable one when none is
     /// named): tenant, environment, user, role and when the token expires, never the token. Exits with
     /// <see cref="ExitLoginRequired"/> when there is no session. Also readable from the status file.</description></item>
     /// <item><description><c>worlds [-vdConnection &lt;connection&gt;]</c>: the worlds the login can deploy to, and for every scene
@@ -84,16 +86,19 @@ namespace Virtuademy.SDK.Environments.Editor
     /// </list>
     /// <para>
     /// <b>Where a command talks to.</b> The commands that call the platform (<c>worlds</c>, <c>preview</c>,
-    /// <c>deploy</c>) act on the connection <c>-vdConnection &lt;connection&gt;</c> names, and on the project's only connection
-    /// when it names none: a project that uses two or more connections must name one (<see cref="ExitConnectionUnknown"/>
-    /// otherwise). Nobody chooses a default connection. The connection is taken <b>once when the run starts</b>
-    /// (<c>targetKey</c>): every request of the run goes to it, whatever happens to the project's connections meanwhile. They take its Application API address from the tenant
+    /// <c>deploy</c>) act on the connection <c>-vdConnection &lt;connection&gt;</c> names, and on the computer's only usable connection
+    /// when it names none: on a computer with two or more connections every such command must name one
+    /// (<see cref="ExitConnectionUnknown"/> otherwise), also in a project that has always deployed to the same tenant. Nobody
+    /// chooses a default connection. A connection whose app is not a CreatorKit app (its platform is on <c>connections</c>
+    /// and <c>whoami</c>) is refused by <c>worlds</c>, <c>preview</c>, <c>deploy</c> and <c>build</c> with
+    /// <see cref="ExitPlatformMismatch"/>: an environment project needs a CreatorKit app. The connection is taken <b>once when the run starts</b>
+    /// (<c>targetKey</c>): every request of the run goes to it, whatever happens to the computer's connections meanwhile. They take its Application API address from the tenant
     /// that connection reported at login, never from the project's generated <c>PlatformEndpoints</c> asset: a token is sent
     /// to the host of the connection it belongs to. A <c>-vdExpectTenant</c> that is not that connection's tenant label exits
     /// with <see cref="ExitTargetMismatch"/>; <c>preview</c> and <c>deploy</c> to a tenant on another platform version than the
     /// project's exit with <see cref="ExitPlatformVersionMismatch"/>. <c>build</c> verifies the interpreted scripts on the connection
-    /// <c>-vdConnection</c> names, or on the project's only one. The REPORT of those three commands carries a <c>target</c>
-    /// object: the connection, whether it is the project's only one (<c>default</c>), the
+    /// <c>-vdConnection</c> names, or on the computer's only usable one. The REPORT of those three commands carries a <c>target</c>
+    /// object: the connection, whether it is the computer's only usable one (<c>default</c>), the
     /// tenant label, its environment and the API host.
     /// </para>
     /// <para>
@@ -229,6 +234,13 @@ namespace Virtuademy.SDK.Environments.Editor
         /// </summary>
         public const int ExitPlatformVersionMismatch = 31;
 
+        /// <summary>
+        /// The connection's app is not a CreatorKit app (<c>worlds</c>, <c>preview</c>, <c>deploy</c> and <c>build</c> on such a
+        /// connection; <c>login</c> or <c>tenant-config</c> with a key of another platform; ADR 0037, "The app key's platform").
+        /// Nothing was built or sent. The remedy is the CreatorKit configuration file, not another command.
+        /// </summary>
+        public const int ExitPlatformMismatch = 32;
+
         private const string log_prefix = "[EnvironmentsCli] ";
         private const int default_timeout_minutes = 60;
 
@@ -282,8 +294,8 @@ namespace Virtuademy.SDK.Environments.Editor
         private static volatile int pendingExit = int.MinValue;
         private static string resultFile;
 
-        // The connection this run works on: the one -vdConnection names, or the project's only one, taken once when the
-        // run starts. Every request of the run goes to it, whatever happens to the project's connections meanwhile (ADR 0037).
+        // The connection this run works on: the one -vdConnection names, or the computer's only usable one, taken once when the
+        // run starts. Every request of the run goes to it, whatever happens to the computer's connections meanwhile (ADR 0037).
         private static string targetKey;
 
         // True from the moment a deploy starts sending: the deadline then stops it between steps instead of ending the run.
@@ -779,6 +791,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 "login-timeout" => ExitLoginTimeout,
                 "bad-request" => ExitBadArguments,
                 "store-not-persistent" => ExitStoreNotPersistent,
+                "platform-mismatch" => ExitPlatformMismatch,
                 _ => ExitLoginFailed,
             };
         }
@@ -833,11 +846,13 @@ namespace Virtuademy.SDK.Environments.Editor
                     string message = "Not every environment of the file became a connection: " + string.Join("; ", result.Failures);
                     Debug.LogError(log_prefix + "tenant-config: " + message);
                     report["error"] = message;
-                    return ExitTenantConfigFailed;
+
+                    // A file of another platform is its own exit code, because the remedy is another file.
+                    return result.PlatformMismatches.Count == result.Failures.Count ? ExitPlatformMismatch : ExitTenantConfigFailed;
                 }
 
                 Debug.Log($"{log_prefix}tenant-config: {result.App} ({string.Join(", ", result.Envs)}) is in the connection store and used by " +
-                          "this project. Log in with -vdCommand login (or from Virtuademy > Publish Environments) to use it.");
+                          "every environment project of this computer. Log in with -vdCommand login (or from Virtuademy > Publish Environments) to use it.");
                 return ExitDone;
             }
             catch (InvalidOperationException ex)
@@ -853,6 +868,8 @@ namespace Virtuademy.SDK.Environments.Editor
             int code = UseNamedConnection(options.Connection);
             if (code == ExitDone)
                 code = RequireConnection();
+            if (code == ExitDone)
+                code = await RequireCreatorKitAppAsync();
             if (code != ExitDone)
                 return code;
 
@@ -908,6 +925,8 @@ namespace Virtuademy.SDK.Environments.Editor
             code = UseNamedConnection(options.Connection);
             if (code == ExitDone && EnvironmentsBuild.HasInterpretedScripts)
                 code = RequireConnection();
+            if (code == ExitDone)
+                code = await RequireCreatorKitAppAsync();
             if (code != ExitDone)
                 return code;
 
@@ -924,6 +943,8 @@ namespace Virtuademy.SDK.Environments.Editor
             code = UseNamedConnection(options.Connection);
             if (code == ExitDone)
                 code = RequireConnection();
+            if (code == ExitDone)
+                code = await RequireCreatorKitAppAsync();
             if (code != ExitDone)
                 return code;
 
@@ -988,6 +1009,8 @@ namespace Virtuademy.SDK.Environments.Editor
             code = UseNamedConnection(options.Connection);
             if (code == ExitDone)
                 code = RequireConnection();
+            if (code == ExitDone)
+                code = await RequireCreatorKitAppAsync();
             if (code != ExitDone)
                 return code;
 
@@ -1249,7 +1272,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         private const string LoginInstruction = "Log in with -vdCommand login (or with the Log in button of the connection's group in Virtuademy > Publish Environments), then run the command again.";
 
-        /// <summary>The login instruction for the connection the run acts on, naming it when it is not the project's only one.</summary>
+        /// <summary>The login instruction for the connection the run acts on, naming it when it is not the computer's only usable one.</summary>
         private static string LoginInstructionFor(string connectionKey) =>
             connectionKey == null || string.Equals(connectionKey, ProjectConnections.DefaultKey, StringComparison.OrdinalIgnoreCase)
                 ? LoginInstruction
@@ -1269,7 +1292,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// <c>worlds</c>, <c>preview</c> and <c>deploy</c> act on the connection <c>-vdConnection</c> names, and without it the
-        /// project's only one. The key carries the Configuration-API
+        /// computer's only usable one. The key carries the Configuration-API
         /// host, so naming it tells apart a tenant that two instances may both call "Acme". Run before the session: a
         /// connection that is not in the store, or a name that fits several, is <see cref="ExitConnectionUnknown"/>.
         /// </summary>
@@ -1291,21 +1314,57 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>
-        /// A command that names no connection acts on the project's only one. When the project uses none, or two or more, it
-        /// is <see cref="ExitConnectionUnknown"/>, not a request to log in.
+        /// A command that names no connection acts on the computer's only usable one (a connection whose app is a CreatorKit
+        /// app). When the computer has none, or two or more, it is <see cref="ExitConnectionUnknown"/>, not a request to log in.
         /// </summary>
         private static int RequireConnection()
         {
             if (targetKey != null)
                 return ExitDone;
 
-            int used = ProjectConnections.UsedInStoreCount;
-            string message = used == 0
-                ? "The project uses no connection: import a tenant's configuration file (tenant-config), or name a connection of the store with -vdConnection."
-                : $"The project uses {used} connections: name one with -vdConnection (the connections command lists them).";
+            int usable = ProjectConnections.UsableCount;
+            int all = ProjectConnections.All().Count;
+            string message = all == 0
+                ? "This computer has no connection: import a tenant's configuration file (tenant-config), or name a connection with -vdConnection."
+                : usable == 0
+                    ? $"None of the {all} connections on this computer is a CreatorKit app, which an environment project needs: import the CreatorKit configuration file of a tenant (tenant-config)."
+                    : $"This computer has {usable} connections: name one with -vdConnection (the connections command lists them).";
             Debug.LogError(log_prefix + message);
             report["error"] = message;
             return ExitConnectionUnknown;
+        }
+
+        /// <summary>
+        /// <see cref="CheckCreatorKitApp"/>, after reading the connection's platform again when the store says it is not a
+        /// CreatorKit app: the stored platform can be stale (the key was changed since, or an earlier import wrote it wrongly), and
+        /// a refusal on it would stand until someone opened the Publish Environments window. The refresh uses the record's own
+        /// credential; when the platform cannot be reached, the stored platform decides.
+        /// </summary>
+        private static async Task<int> RequireCreatorKitAppAsync()
+        {
+            if (ConnectionStore.Get(targetKey)?.PlatformMismatch == true)
+                await ConnectionLoginService.RefreshConnectionAsync(targetKey);
+
+            return CheckCreatorKitApp();
+        }
+
+        /// <summary>
+        /// An environment project deploys only through a CreatorKit app: a connection whose app has another platform (as the
+        /// store last had it from <c>config-public</c>) is refused with <see cref="ExitPlatformMismatch"/>, naming the platform
+        /// found. No connection, or one whose platform the platform never reported, passes: that is not this check's to refuse.
+        /// </summary>
+        private static int CheckCreatorKitApp()
+        {
+            ConnectionRecord record = ConnectionStore.Get(targetKey);
+            if (record?.PlatformMismatch != true)
+                return ExitDone;
+
+            string message = $"The connection '{targetKey}' is {AppPlatforms.Describe(record.Platform)} (platform '{record.Platform}'), and an environment " +
+                             "project needs a CreatorKit app. Import the CreatorKit configuration file of the tenant (tenant-config), " +
+                             "and name that connection, or remove this one from this computer in Virtuademy > Publish Environments. Nothing was built or sent.";
+            Debug.LogError(log_prefix + message);
+            report["error"] = message;
+            return ExitPlatformMismatch;
         }
 
         /// <summary>The session, renewed silently if it expired; <see cref="ExitLoginRequired"/> with the instruction when it cannot be.</summary>
@@ -1385,6 +1444,11 @@ namespace Virtuademy.SDK.Environments.Editor
         {
             await ConnectionLoginService.RefreshConnectionAsync(targetKey);
 
+            // The refresh reads the app's platform too: a key that was a CreatorKit one can have been changed since.
+            int platformCode = CheckCreatorKitApp();
+            if (platformCode != ExitDone)
+                return platformCode;
+
             string projectVersion = PlatformVersionRule.ProjectVersion;
             string tenantVersion = ConnectionStore.Get(targetKey)?.PlatformVersion;
             PlatformVersionRule.Verdict verdict = PlatformVersionRule.Check(projectVersion, tenantVersion);
@@ -1458,7 +1522,7 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>
-        /// The session of the connection the run acts on (the project's only one for <c>status</c> and <c>session</c>,
+        /// The session of the connection the run acts on (the computer's only usable one for <c>status</c> and <c>session</c>,
         /// and for <c>build</c> without <c>-vdConnection</c>), as a status label would show it. Never the token.
         /// </summary>
         private static Dictionary<string, object> DescribeSession()
@@ -1515,6 +1579,7 @@ namespace Virtuademy.SDK.Environments.Editor
             ExitLoginFailed => "login failed",
             ExitStoreNotPersistent => "connection store not persistent on this OS",
             ExitPlatformVersionMismatch => "platform version mismatch: the tenant runs another platform version than the project",
+            ExitPlatformMismatch => "platform mismatch: the connection's app is not a CreatorKit app",
             _ => "unknown",
         };
 
