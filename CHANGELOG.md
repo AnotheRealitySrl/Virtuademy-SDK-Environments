@@ -6,6 +6,10 @@ The review fixes below warrant a minor bump: fixes, two values appended to `Envi
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 #### Added
+- **The inventory's item slots round up to whole pages** (2026.7, minor) on desktop, web and mobile: past the first page,
+  a new page opens full of empty, usable slots, and `InventoryPlaceholder.inventorySlotsCount` follows (with
+  `SlotCountsChanged`), as it does when an item that does not fit adds a slot. The equipment's slots are declared, so
+  its pages show empty, inert cells instead.
 - **`IToolsApi.HeldToolModel`** (2026.7, minor): the held tool's 3D model in the avatar's hand, on desktop and mobile in
   third person, where an effect of the tool (a spray's jet) starts; null in first person, when the tool shows no model,
   and in VR.

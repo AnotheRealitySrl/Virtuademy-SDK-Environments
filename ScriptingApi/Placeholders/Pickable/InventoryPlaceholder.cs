@@ -140,7 +140,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public event Action<EInventoryMode, EInventoryMode> InventoryModeChanged;
 
         /// <summary>
-        /// Raised by <see cref="SetSlotCounts"/> when a slot count grows.
+        /// Raised by <see cref="SetSlotCounts"/> when a slot count grows, also when the inventory grows on its own (see
+        /// <see cref="SetSlotCounts"/>).
         /// </summary>
         public event Action SlotCountsChanged;
 
@@ -178,6 +179,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// <paramref name="wearSlots"/> is the wear inventory's number of generic cells, which counts only when no
         /// <see cref="equipmentSlots"/> are declared (as <see cref="wearSlotsCount"/>): with declared slots the
         /// equipment column shows one cell per declared slot, and a slot is added with <see cref="AddEquipmentSlot"/>.
+        /// The inventory also grows on its own, and <see cref="inventorySlotsCount"/> follows it: an item that does not
+        /// fit adds a slot, and on desktop, web and mobile the item slots round up to whole pages past the first (a
+        /// page is the grid the inventory shows: web 3 or 4 columns x 6 rows, mobile 2 or 3 x 2, the equipment taking
+        /// one column when it has slots), so a new page opens full of empty, usable slots.
         /// </summary>
         /// <remarks>Node: <c>Virtuademy Inventory: Set Slot Counts</c>.</remarks>
         public void SetSlotCounts(int wearSlots, int inventorySlots)
