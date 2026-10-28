@@ -6,6 +6,14 @@ The review fixes below warrant a minor bump: fixes, two values appended to `Envi
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 #### Added
+- **`IToolsApi.ToolUseStarted` / `ToolUseEnded`, `ToolUse`** (2026.7, minor): every player's tool uses, this player's
+  (`IsLocal`) and, in a multiplayer session, the others', with the tool's name, the player and an `Aim` transform
+  (where the use starts, its forward; for another player at their avatar's right hand). An effect every player sees
+  (a spray's jet) starts under `Aim` and stops on `ToolUseEnded`; what the use does to the world is done only for
+  `IsLocal` uses.
+- **`InventoryPlaceholder.returnItemsToOriginOnLeave`** (2026.7, minor): in a multiplayer session the items a player
+  took from the scene for themselves go back into the room when they leave, near where they left (default) or where
+  each was at the start (on).
 - **`TaskUIPlaceholder.vrPlacement`** (2026.7, minor): in VR the task panel stays where the placeholder is (`Fixed`, the
   default, as before) or goes with the player, low on their left, moving and turning with their body
   (`FollowPlayer`). Existing environments keep `Fixed`.

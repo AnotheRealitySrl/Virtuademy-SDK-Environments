@@ -44,5 +44,15 @@ namespace Virtuademy.Environments.ScriptingApi
         /// person: read it when the effect starts, and while it lasts.
         /// </summary>
         Transform HeldToolModel { get; }
+
+        /// <summary>
+        /// A tool's use started, this player's or, in a multiplayer session, another player's (2026.7): a press of the
+        /// use key, or the start of a held use. For an effect every player sees: start it under <see cref="ToolUse.Aim"/>,
+        /// and act on the world only when <see cref="ToolUse.IsLocal"/>.
+        /// </summary>
+        event System.Action<ToolUse> ToolUseStarted;
+
+        /// <summary>The use ended: a held use's release, at once after a single press.</summary>
+        event System.Action<ToolUse> ToolUseEnded;
 }
 }

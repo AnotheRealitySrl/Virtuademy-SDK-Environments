@@ -90,6 +90,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
                  + "A tool can override this with its Pickup Sharing.")]
         public bool pickedToolsShared = false;
 
+        [Tooltip("Multiplayer: the items a player took from the scene for themselves (not shared with everyone) go back into "
+                 + "the scene when they leave the room. Off (default): near where they left, spread so they do not overlap. "
+                 + "On: each where it was at the start.")]
+        public bool returnItemsToOriginOnLeave = false;
+
         [Tooltip("Whether or not you want to show the hand item in the inventory, used to remove items instead of clicking on the same item again")]
         [HideInInspector] public bool displayEmptyHand;
         [HideInInspector] public Sprite emptyHandSprite;
