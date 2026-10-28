@@ -1,10 +1,7 @@
 <engine:UXML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:engine="UnityEngine.UIElements" xmlns:editor="UnityEditor.UIElements" noNamespaceSchemaLocation="../../../../../UIElementsSchema/UIElements.xsd" editor-extension-mode="False">
     <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Editor/Scripts/AddressablesConfigurationWindow.uss?fileID=7433441132597879392&amp;guid=515b32a0c8a91b84482ae7efefc66dfe&amp;type=3#AddressablesConfigurationWindow" />
     <engine:ScrollView name="window-scroll">
-        <engine:VisualElement name="window-header" class="window-header">
-            <engine:VisualElement name="header-logo" class="header-logo" />
-            <engine:Label text="Publish Environments" name="header-subtitle" class="header-subtitle" />
-        </engine:VisualElement>
+        <engine:VisualElement name="window-header-slot" />
         <engine:VisualElement name="blocking-banner" class="banner banner-warning" style="display: none;">
             <engine:VisualElement name="blocking-icon" class="row-icon" />
             <engine:Label text="The build settings are not the ones the SDK needs: a build would fail at the end." name="blocking-text" class="banner-text" />

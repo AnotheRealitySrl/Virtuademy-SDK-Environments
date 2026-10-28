@@ -281,19 +281,12 @@ namespace Virtuademy.SDK.Environments.Editor
             ImportProjectCredentials();
         }
 
-        /// <summary>The Virtuademy logo at the top, as the setup window shows it: light lettering on the dark skin, dark on the light one.</summary>
+        /// <summary>The Virtuademy header of the SDK's windows (SDK-Core), with this window's name.</summary>
         private void ShowLogo()
         {
-            VisualElement logo = root.Q<VisualElement>("header-logo");
-            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(
-                $"{package_root}/Editor/Icons/virtuademy-logo-{(EditorGUIUtility.isProSkin ? "light" : "dark")}.png");
-            if (texture != null)
-                logo.style.backgroundImage = texture;
-            else
-                root.Q<VisualElement>("window-header").style.display = DisplayStyle.None;
+            root.Q<VisualElement>("window-header-slot").Add(VirtuademyWindowHeader.Create("Publish Environments"));
         }
 
-        private const string package_root = "Packages/com.anotherealitysrl.virtuademy-sdk-environments";
 
         private void InitializeWindow()
         {
