@@ -158,6 +158,11 @@ connections instead of a file, change for a script that drives them: that warran
   and spline components of an environment carry the fields the app reads. A project that lists one of them at
   another version in its own manifest keeps that version: a direct entry wins over a dependency. Animation
   Rigging brings Burst with it. Warrants a minor bump.
+- **The two "Fix build settings" dialogs list what the fix removes**: the Addressables groups by name with their entry
+  counts (a few names, then "and N more") and the entries of the default group, and say that no asset file is deleted,
+  only the groups and the Addressable marking, because a scene takes what it uses with it at build. `Apply` logs what it
+  removed (`[PublishEnvironments]`). The behaviour is unchanged; the package documentation now states the rule (one default
+  group, kept empty). No public member changes.
 
 #### Fixed
 - The advanced section's tooltip of the window named a button that no longer exists

@@ -88,6 +88,23 @@ a deploy lets the step in flight finish and reports what was and was not done. B
 commands renew the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list
 (`Assets/Virtuademy/Editor/Settings/AddressablesSceneList.asset`). Details: the class's XML documentation.
 
+## Addressables groups
+
+A project that publishes environments has one Addressables group, the default one, and keeps it
+empty. The build adds each scene to it alone, builds it once for every target platform, then takes
+it out again: everything the scene uses goes into its bundle as a dependency, so no asset has to be
+marked Addressable, and one that is would be packed into the download of every scene. Nothing in
+the SDK loads an environment's own Addressables entries, and the interpreted scripts may not use
+the Addressables assemblies.
+
+**Virtuademy > Publish Environments > Fix build settings** (and the `addressables` step of the
+setup command line) puts the project in that state: it removes every other group and every entry
+of the default group, and sets the default group's schema to the SDK's values. Only the groups and
+the marking are removed, never an asset file; the dialog lists them first and the Console logs them
+after. Addressables identifies entries by GUID, so assets with the same name in different folders
+do not clash. Scenes do: two scene names that become the same once lower-cased and reduced to
+`a-z` and `0-9` are refused by the build.
+
 ## Folders
 
 | Folder | Holds |

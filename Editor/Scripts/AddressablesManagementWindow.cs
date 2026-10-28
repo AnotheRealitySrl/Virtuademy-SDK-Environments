@@ -2029,14 +2029,29 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>
+        /// What the Fix dialogs say about the groups: what <see cref="AddressablesConfiguration.Apply"/> removes, by name, and what
+        /// it does not touch.
+        /// </summary>
+        private string GroupsRemovalMessage()
+        {
+            AddressablesConfiguration.GroupsRemoval removal = AddressablesConfiguration.DescribeGroupsRemoval(settings);
+            if (removal == null)
+                return "No group or entry has to be removed.";
+
+            return "It removes:\n" + removal.Describe() +
+                   "\n\nNo asset file is deleted, only these groups and the Addressable marking of assets. " +
+                   "The build adds each scene itself, with everything it uses, so no asset needs to be marked.";
+        }
+
+        /// <summary>
         /// Applies the build settings the SDK needs (<see cref="AddressablesConfiguration.Apply"/>), which resets the project's
-        /// asset groups to a single default group, after a confirmation.
+        /// asset groups to a single default group, after a confirmation that lists what it removes.
         /// </summary>
         private void FixBuildSettings()
         {
             if (!EditorUtility.DisplayDialog("Fix build settings",
-                    "Apply the build settings the SDK needs? It resets the project's asset groups to a single default group " +
-                    "(the scenes are added again at the next build).", "Fix", "Cancel"))
+                    "Apply the build settings the SDK needs? It resets the project's asset groups to a single default group, " +
+                    "kept empty.\n\n" + GroupsRemovalMessage(), "Fix", "Cancel"))
                 return;
 
             try
@@ -2225,7 +2240,8 @@ namespace Virtuademy.SDK.Environments.Editor
                            "Press Fix in the banner at the top of the window (\"Advanced settings\" lists what is wrong), then try again. Nothing was built.");
             if (EditorUtility.DisplayDialog($"{what} blocked",
                     "The project's build settings are not the ones the SDK needs, so a build would fail at the end. Nothing was built.\n\n" +
-                    "Fix them now? It resets the project's asset groups to a single default group. Then start again.",
+                    "Fix them now? It resets the project's asset groups to a single default group, kept empty.\n\n" +
+                    GroupsRemovalMessage() + "\n\nThen start again.",
                     "Fix build settings", "Cancel"))
             {
                 try
