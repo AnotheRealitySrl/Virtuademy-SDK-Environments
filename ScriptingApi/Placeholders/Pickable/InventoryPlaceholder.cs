@@ -180,9 +180,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// <see cref="equipmentSlots"/> are declared (as <see cref="wearSlotsCount"/>): with declared slots the
         /// equipment column shows one cell per declared slot, and a slot is added with <see cref="AddEquipmentSlot"/>.
         /// The inventory also grows on its own, and <see cref="inventorySlotsCount"/> follows it: an item that does not
-        /// fit adds a slot, and on desktop, web and mobile the item slots round up to whole pages past the first (a
-        /// page is the grid the inventory shows: web 3 or 4 columns x 6 rows, mobile 2 or 3 x 2, the equipment taking
-        /// one column when it has slots), so a new page opens full of empty, usable slots.
+        /// fit adds a slot, and the item slots round up so that the grid has no holes: on the first page to whole
+        /// columns once a second column starts (whole rows in VR, where the inventory develops horizontally), past it
+        /// to whole pages. A page is the grid the inventory shows: web 3 or 4 columns x 6 rows, mobile 2 or 3 x 2 (the
+        /// equipment taking one column when it has slots), VR 5 x 3. The new slots are empty and usable.
         /// </summary>
         /// <remarks>Node: <c>Virtuademy Inventory: Set Slot Counts</c>.</remarks>
         public void SetSlotCounts(int wearSlots, int inventorySlots)
