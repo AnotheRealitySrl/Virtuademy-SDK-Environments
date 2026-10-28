@@ -48,6 +48,11 @@ connections instead of a file, change for a script that drives them: that warran
   route answers 404 or 405 and the group shows no button, with no message. The group's **Log out** button is red.
 
 #### Changed
+- **Publish Environments takes its header from `Virtuademy-SDK-Core`** (`VirtuademyWindowHeader`): the same logo and
+  window name as the SDK's other windows and the setup window. The two logo images and `Editor/Icons/` moved there with
+  their GUIDs; nothing else referenced them.
+- **The scene list: a click on a scene's name selects it and shows it in the Project window, a double-click opens it**
+  (asking first to save modified scenes). Until now only a double-click selected it, and only the tooltip said so.
 - **The Addressables management window is "Publish Environments"** (meta-repo ADR 0037, "Windows per kind of project"):
   menu **Virtuademy > Publish Environments** (was Virtuademy > Addressables management), window title and header; the class
   keeps its name, `AddressablesManagementWindow`. **Build Addressables** is **Build**, beside Deploy and Build & Deploy, and

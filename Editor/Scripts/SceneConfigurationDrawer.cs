@@ -1,4 +1,5 @@
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEditor.UIElements;
 
 using UnityEngine;
@@ -56,16 +57,19 @@ namespace Virtuademy.SDK.Environments.Editor
 
             Label name = new(asset != null ? asset.name : "(missing scene)")
             {
-                tooltip = asset != null ? assetPath + "\nDouble-click to select it in the Project window." : string.Empty,
+                tooltip = asset != null ? assetPath + "\nClick to show it in the Project window, double-click to open it." : string.Empty,
                 style = { flexGrow = 1, flexShrink = 1, overflow = Overflow.Hidden, textOverflow = TextOverflow.Ellipsis },
             };
             if (asset != null)
             {
+                name.AddToClassList("scene-name");
                 name.RegisterCallback<MouseDownEvent>(evt =>
                 {
-                    if (evt.clickCount != 2) return;
-                    EditorGUIUtility.PingObject(asset);
+                    if (evt.button != 0) return;
                     Selection.activeObject = asset;
+                    EditorGUIUtility.PingObject(asset);
+                    if (evt.clickCount == 2 && EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+                        EditorSceneManager.OpenScene(assetPath);
                 });
             }
             row.Add(name);
