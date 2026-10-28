@@ -35,5 +35,14 @@ namespace Virtuademy.Environments.ScriptingApi
         /// <c>Virtuademy inventory: AddPickableToInventoryNode</c>.
         /// </remarks>
         bool AddPickableToInventory(GameObject pickable);
+
+        /// <summary>
+        /// The held tool's 3D model in the avatar's hand, on desktop and mobile in third person: where an effect of the
+        /// tool (a spray's jet) starts, aimed where the player points. Null in first person (start the effect from the
+        /// camera), when the tool shows no model in hand, and in VR (the tool is in the player's hand: use
+        /// <c>IPlayerApi.RightHand</c> or <c>LeftHand</c>). It changes when the view changes between first and third
+        /// person: read it when the effect starts, and while it lasts.
+        /// </summary>
+        Transform HeldToolModel { get; }
 }
 }

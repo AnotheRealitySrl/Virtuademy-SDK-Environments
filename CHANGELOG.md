@@ -6,6 +6,9 @@ The review fixes below warrant a minor bump: fixes, two values appended to `Envi
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 #### Added
+- **`IToolsApi.HeldToolModel`** (2026.7, minor): the held tool's 3D model in the avatar's hand, on desktop and mobile in
+  third person, where an effect of the tool (a spray's jet) starts; null in first person, when the tool shows no model,
+  and in VR.
 - **The build refuses an environment whose scripts compile into `Assembly-CSharp-firstpass`.** A component binds in
   the app only if the app has a class with the same assembly, namespace and name, and the app has no
   `Assembly-CSharp-firstpass` (nor `Assembly-UnityScript-firstpass` or `Assembly-CSharp-Editor-firstpass`): scripts
