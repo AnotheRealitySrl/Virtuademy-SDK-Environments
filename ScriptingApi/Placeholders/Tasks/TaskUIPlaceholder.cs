@@ -44,6 +44,19 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             onDisplayIntro?.Invoke(value);
         }
 
+        [HideInInspector] public UnityEvent onShowAsPersonalPanel = new UnityEvent();
+
+        /// <summary>
+        /// Makes this placeholder's panel the one shown with the player. Only one panel with the player (With Player: on
+        /// the screen on desktop and mobile, beside the player in VR) is shown at a time: the first one created, until
+        /// the environment calls this on another placeholder. The panel shown until then is hidden, not destroyed: it
+        /// keeps its tasks and its state. Panels in the world are not affected. Callable from Visual Scripting.
+        /// </summary>
+        public void ShowAsPersonalPanel()
+        {
+            onShowAsPersonalPanel?.Invoke();
+        }
+
         /// <summary>Whether any platform shows this panel in the world.</summary>
         public bool AnyInWorld => desktopPlacement == ETaskPanelPlacement.InWorld || mobilePlacement == ETaskPanelPlacement.InWorld
             || vrPlacement == ETaskPanelPlacement.InWorld;

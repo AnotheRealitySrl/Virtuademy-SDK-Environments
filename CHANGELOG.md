@@ -31,6 +31,9 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   left, moving and turning with their body). Defaults keep today's behaviour: desktop and mobile with the player, VR in
   the world. In the world, `worldPanelSize` (metres, 0.61 x 0.69 by default) times the placeholder's scale sets the
   panel's size; selecting the placeholder draws its outline in the Scene view.
+- **One task panel with the player at a time** (2026.7, minor): `TaskUIPlaceholder.ShowAsPersonalPanel()` (also from
+  Visual Scripting) makes that placeholder's panel the one shown with the player; the first created is shown until
+  then, the others wait hidden with their state. Panels in the world are unaffected.
 - **The inventory's item slots round up so the grid has no holes** (2026.7, minor): on the first page to whole columns
   once a second column starts (whole rows in VR), past it to whole pages, with empty, usable slots;
   `InventoryPlaceholder.inventorySlotsCount` follows (with `SlotCountsChanged`), as it does when an item that does not
