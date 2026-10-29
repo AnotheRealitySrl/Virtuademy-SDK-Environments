@@ -87,6 +87,8 @@ namespace Virtuademy.SDK.Environments.UIKit
         private static int lastPopupId;
         private readonly HashSet<int> pendingPopups = new();
         private readonly HashSet<int> cancelledPopups = new();
+        // The handlers of the popups queued before the host was bound: answered with -1 if the host goes away first
+        private readonly Dictionary<int, PopupClosedHandler> pendingHandlers = new();
         private readonly Queue<System.Action> pending = new();
 
         /// <summary>
@@ -130,9 +132,17 @@ namespace Virtuademy.SDK.Environments.UIKit
         protected override void OnDisable()
         {
             hosts.Remove(this);
+            // A popup queued but never drawn still closes once (IUIApi: "called once when the popup closes"), with -1;
+            // review S1: a graph waiting on it would otherwise never continue
+            var unanswered = new List<PopupClosedHandler>(pendingHandlers.Values);
             pending.Clear();
             pendingPopups.Clear();
             cancelledPopups.Clear();
+            pendingHandlers.Clear();
+            foreach (PopupClosedHandler handler in unanswered)
+            {
+                handler?.Invoke(-1);
+            }
             base.OnDisable();
         }
 
@@ -252,6 +262,7 @@ namespace Virtuademy.SDK.Environments.UIKit
             {
                 pending.Enqueue(() => Open(id, title, text, buttons, onClosed, closeOnOutsideClick, autoCloseSeconds));
                 pendingPopups.Add(id);
+                pendingHandlers[id] = onClosed;
                 return id;
             }
             Open(id, title, text, buttons, onClosed, closeOnOutsideClick, autoCloseSeconds);
@@ -261,6 +272,7 @@ namespace Virtuademy.SDK.Environments.UIKit
         private void Open(int id, string title, string text, string[] buttons, PopupClosedHandler onClosed,
                           bool closeOnOutsideClick, float autoCloseSeconds)
         {
+            pendingHandlers.Remove(id);
             // A popup closed by id before the host could draw it is answered and never drawn.
             if (pendingPopups.Remove(id) && cancelledPopups.Remove(id))
             {
@@ -268,7 +280,8 @@ namespace Virtuademy.SDK.Environments.UIKit
                 return;
             }
 
-            ClosePopup();
+            // The open one gives way (not the queued ones: they open after this, each replacing the previous)
+            Close(openPopupId, -1);
 
             VisualElement popup = Instantiate(popupTemplate, "scrim");
             if (popup == null)
@@ -331,7 +344,15 @@ namespace Virtuademy.SDK.Environments.UIKit
         }
 
         /// <summary>Closes the open popup, whichever it is, reporting -1.</summary>
-        public void ClosePopup() => Close(openPopupId, -1);
+        public void ClosePopup()
+        {
+            // The ones still queued too (review S1): each is answered with -1 when the host would draw it
+            foreach (int queued in pendingPopups)
+            {
+                cancelledPopups.Add(queued);
+            }
+            Close(openPopupId, -1);
+        }
 
         /// <summary>
         /// Closes the popup <paramref name="popupId"/> (from <c>ShowPopup</c>), reporting -1. Does
