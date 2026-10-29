@@ -34,8 +34,9 @@ namespace Virtuademy.SDK.Environments
                  + "platform's default.")]
         public bool customThirdPersonHold = false;
 
-        [Tooltip("The holding hand's place from the avatar's chest, in metres (x to the side of the holding arm, y up, z "
-                 + "forward). Used only with Custom Third Person Hold.")]
+        [Tooltip("The holding hand's place from the avatar's chest, in metres for an avatar of its model's own height (about "
+                 + "1.75 m), scaled with the avatar's height (x to the side of the holding arm, y up, z forward). Used only "
+                 + "with Custom Third Person Hold.")]
         public Vector3 thirdPersonHoldOffset = new Vector3(0.2f, 0.15f, 0.4f);
 
         [HideInInspector] public GameObject LeftHandReference;

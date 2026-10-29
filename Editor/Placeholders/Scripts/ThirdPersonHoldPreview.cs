@@ -28,6 +28,15 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
         // The fingers level, a little in towards the body (HeldToolPose.FingerDirection, mirrored for the right hand)
         private static readonly Vector3 FingerDirection = new Vector3(-0.15f, 0f, 1f);
 
+        /// <summary>The mannequin's height, in metres, at which the hold offset is drawn as written.</summary>
+        public const float ReferenceHeight = 1.75f;
+
+        /// <summary>
+        /// The height of the avatar to preview, for this editor session only: the application scales the avatar, and with
+        /// it the hold offset (its targets are under the avatar), to the user's height; the item keeps its own size.
+        /// </summary>
+        public static float PreviewHeight { get; set; } = ReferenceHeight;
+
         // A 1.75 m mannequin, feet at its origin, facing +z
         private static readonly Vector3 Chest = new Vector3(0f, 1.35f, 0f);
         private static readonly Vector3 RightShoulder = new Vector3(0.18f, 1.42f, 0f);
@@ -130,8 +139,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
 
             // The palm on the item's grip: its right-hand pivot, else the centre of its meshes
             GripPose(out Vector3 gripPosition, out Quaternion gripRotation);
+            // The avatar scaled to the previewed height, the item at its own size, as in the application
+            float scale = PreviewHeight / ReferenceHeight;
+            root.transform.localScale = Vector3.one * scale;
             Quaternion rotation = gripRotation * Quaternion.Inverse(handRotation);
-            root.transform.SetPositionAndRotation(gripPosition - rotation * palm, rotation);
+            root.transform.SetPositionAndRotation(gripPosition - rotation * (palm * scale), rotation);
         }
 
         private void GripPose(out Vector3 position, out Quaternion rotation)

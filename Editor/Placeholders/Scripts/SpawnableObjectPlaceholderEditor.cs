@@ -37,6 +37,19 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Third-person hold (desktop, web, mobile)", EditorStyles.boldLabel);
             bool shown = preview != null && preview.IsShown;
+            if (shown)
+            {
+                // The preview only: the application scales the avatar, and the hold with it, to each user's height
+                float height = EditorGUILayout.Slider(new GUIContent("Preview avatar height (m)",
+                    "Previews a shorter or taller avatar; the hold offset is written for a "
+                    + ThirdPersonHoldPreview.ReferenceHeight + " m one and scales with the avatar. Not saved."),
+                    ThirdPersonHoldPreview.PreviewHeight, 1.3f, 2.1f);
+                if (!Mathf.Approximately(height, ThirdPersonHoldPreview.PreviewHeight))
+                {
+                    ThirdPersonHoldPreview.PreviewHeight = height;
+                    changed = true;
+                }
+            }
             if (GUILayout.Button(shown ? "Hide preview" : "Preview third-person hold"))
             {
                 if (shown)
