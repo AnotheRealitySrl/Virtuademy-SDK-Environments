@@ -14,44 +14,15 @@ namespace Virtuademy.SDK.Environments.UIKit
     /// </summary>
     public static class PanelEnvironment
     {
+        // The application's scripting surface when it is installed (2026-10-29, review B3: availability checks, not
+        // catch-all blocks; an exception from the application's implementation is a bug and surfaces)
+        private static IVirtuademyGameplay Gameplay => IVirtuademyGameplay.IsAvailable ? IVirtuademyGameplay.Current : null;
+
         /// <summary>Running in a headset. Without the application, whether an XR device is active.</summary>
-        public static bool IsVR
-        {
-            get
-            {
-                try
-                {
-                    if (IVirtuademyGameplay.IsAvailable)
-                    {
-                        return IVirtuademyGameplay.Current.Platform.IsVR;
-                    }
-                }
-                catch (Exception)
-                {
-                    // The platform system is not up yet: fall through to the device check.
-                }
-                return XRSettings.isDeviceActive;
-            }
-        }
+        public static bool IsVR => Gameplay?.Platform != null ? Gameplay.Platform.IsVR : XRSettings.isDeviceActive;
 
         /// <summary>Running on a phone or tablet. Without the application, Unity's own answer.</summary>
-        public static bool IsMobile
-        {
-            get
-            {
-                try
-                {
-                    if (IVirtuademyGameplay.IsAvailable)
-                    {
-                        return IVirtuademyGameplay.Current.Platform.IsMobile;
-                    }
-                }
-                catch (Exception)
-                {
-                }
-                return Application.isMobilePlatform;
-            }
-        }
+        public static bool IsMobile => Gameplay?.Platform != null ? Gameplay.Platform.IsMobile : Application.isMobilePlatform;
 
         /// <summary>
         /// Whether the application's help panel (its tutorial) is open, opening or closing. False
@@ -61,16 +32,36 @@ namespace Virtuademy.SDK.Environments.UIKit
         {
             get
             {
-                try
-                {
-                    return IVirtuademyGameplay.IsAvailable && IVirtuademyGameplay.Current.Help.IsAvailable
-                           && IVirtuademyGameplay.Current.Help.IsOpen;
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
+                IHelpApi help = Gameplay?.Help;
+                return help != null && help.IsAvailable && help.IsOpen;
             }
+        }
+
+        /// <summary>
+        /// Subscribes to the help panel opening and closing when the application has one, and returns whether it did.
+        /// Pair it with <see cref="UnsubscribeHelp"/>.
+        /// </summary>
+        public static bool SubscribeHelp(Action opened, Action closed)
+        {
+            IHelpApi help = Gameplay?.Help;
+            if (help == null || !help.IsAvailable)
+            {
+                return false;
+            }
+            help.Opened += opened;
+            help.Closed += closed;
+            return true;
+        }
+
+        public static void UnsubscribeHelp(Action opened, Action closed)
+        {
+            IHelpApi help = Gameplay?.Help;
+            if (help == null)
+            {
+                return;
+            }
+            help.Opened -= opened;
+            help.Closed -= closed;
         }
 
         /// <summary>
@@ -84,17 +75,12 @@ namespace Virtuademy.SDK.Environments.UIKit
             {
                 return fallback ?? string.Empty;
             }
-            try
+            ILocalizationApi localization = Gameplay?.Localization;
+            if (localization != null && localization.IsAvailable)
             {
-                if (IVirtuademyGameplay.IsAvailable && IVirtuademyGameplay.Current.Localization.IsAvailable)
-                {
-                    return IVirtuademyGameplay.Current.Localization.TranslateOr(key, fallback ?? key);
-                }
+                return localization.TranslateOr(key, fallback ?? key);
             }
-            catch (Exception)
-            {
-                // No localization system: show what the author wrote.
-            }
+            // No localization system: show what the author wrote.
             return string.IsNullOrEmpty(fallback) ? key : fallback;
         }
 
@@ -104,31 +90,21 @@ namespace Virtuademy.SDK.Environments.UIKit
         /// </summary>
         public static bool SubscribeLanguage(Action<string> handler)
         {
-            try
+            ILocalizationApi localization = Gameplay?.Localization;
+            if (localization == null)
             {
-                if (IVirtuademyGameplay.IsAvailable)
-                {
-                    IVirtuademyGameplay.Current.Localization.LanguageChanged += handler;
-                    return true;
-                }
+                return false;
             }
-            catch (Exception)
-            {
-            }
-            return false;
+            localization.LanguageChanged += handler;
+            return true;
         }
 
         public static void UnsubscribeLanguage(Action<string> handler)
         {
-            try
+            ILocalizationApi localization = Gameplay?.Localization;
+            if (localization != null)
             {
-                if (IVirtuademyGameplay.IsAvailable)
-                {
-                    IVirtuademyGameplay.Current.Localization.LanguageChanged -= handler;
-                }
-            }
-            catch (Exception)
-            {
+                localization.LanguageChanged -= handler;
             }
         }
 
