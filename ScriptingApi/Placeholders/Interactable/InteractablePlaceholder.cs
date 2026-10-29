@@ -118,8 +118,9 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         void IInteractableEventSink.RaiseSelectExit(InteractionEventArgs args) => Raise(OnSelectExit, args);
         void IInteractableEventSink.RaiseInteract(InteractionEventArgs args) => Raise(OnInteract, args);
 
-        // A failing handler is its script's problem: it must neither break the interaction flow
-        // that raised the event nor keep the other handlers from running.
+        // Every handler runs, then a failure surfaces (review S9, platform errors fail loudly): a failing handler does
+        // not keep the others from running, and its exception is thrown to the application, which raises these events
+        // once its own state is settled and rethrows after it.
         private void Raise(Action<InteractionEventArgs> handlers, InteractionEventArgs args)
         {
             if (handlers == null)
@@ -127,6 +128,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
                 return;
             }
             args ??= InteractionEventArgs.None;
+            List<Exception> failures = null;
             foreach (Delegate handler in handlers.GetInvocationList())
             {
                 try
@@ -135,9 +137,19 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
                 }
                 catch (Exception e)
                 {
-                    Debug.LogException(e, this);
+                    (failures ??= new List<Exception>()).Add(e);
                 }
             }
+            if (failures == null)
+            {
+                return;
+            }
+            if (failures.Count == 1)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failures[0]).Throw();
+            }
+            throw new AggregateException("[InteractablePlaceholder] " + name + ": " + failures.Count
+                + " interaction event handlers failed", failures);
         }
 
         #endregion
