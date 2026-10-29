@@ -23,7 +23,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
     {
         // The application's default hold (ToolSystemWebGL.holdHandOffset in the app), from the chest, x to the side of the
         // holding arm, y up, z forward; and the elbow's hint (HeldToolPose)
-        public static readonly Vector3 DefaultHoldOffset = new Vector3(0.2f, 0.15f, 0.4f);
+        public static readonly Vector3 DefaultHoldOffset = new Vector3(0.2f, 0.3f, 0.43f);
         private static readonly Vector3 ElbowHintOffset = new Vector3(0.35f, -0.25f, -0.2f);
         // The fingers level, a little in towards the body (HeldToolPose.FingerDirection, mirrored for the right hand)
         private static readonly Vector3 FingerDirection = new Vector3(-0.15f, 0f, 1f);
