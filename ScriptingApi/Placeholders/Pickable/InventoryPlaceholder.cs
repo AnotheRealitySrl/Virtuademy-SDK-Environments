@@ -142,7 +142,15 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// <summary>
         /// Raised when <see cref="InventoryMode"/> changes, with the previous and the new mode.
         /// </summary>
-        public event Action<EInventoryMode, EInventoryMode> InventoryModeChanged;
+        /// <remarks>
+        /// A named delegate, not <c>Action&lt;EInventoryMode, EInventoryMode&gt;</c>: a generic delegate over a value type
+        /// is a generic instance an interpreted (HybridCLR) script may not be able to use (review S2, as
+        /// <c>PopupClosedHandler</c>).
+        /// </remarks>
+        public event InventoryModeChangedHandler InventoryModeChanged;
+
+        /// <summary>The handler of <see cref="InventoryModeChanged"/>: the previous and the new mode.</summary>
+        public delegate void InventoryModeChangedHandler(EInventoryMode previousMode, EInventoryMode newMode);
 
         /// <summary>
         /// Raised by <see cref="SetSlotCounts"/> when a slot count grows, also when the inventory grows on its own (see
