@@ -128,5 +128,3 @@ MonoBehaviour:
   vrHeightOffset: -0.1
   vrSideOffset: 0
   vrFollowHead: 1
-  followAngle: 30
-  followSpeed: 3

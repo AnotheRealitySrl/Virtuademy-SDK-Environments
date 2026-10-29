@@ -1,29 +1,34 @@
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.UIElements;
+using Virtuademy.SDK.Environments.Utilities;
 
 namespace Virtuademy.SDK.Environments.UIKit
 {
     /// <summary>
     /// Puts an overlay panel (HUD, toasts, popups) where each platform can see it: drawn over the
-    /// screen on desktop, WebGL and mobile, and in VR a world-space panel that floats in front of the
-    /// user and follows the head lazily, the way the application's own VR panels do.
+    /// screen on desktop, WebGL and mobile, and in VR a world-space panel in front of the user that
+    /// goes with them, the way the application's own VR task panel does.
     /// </summary>
     /// <remarks>
     /// <para>
     /// The document is authored with the screen PanelSettings; in VR this component swaps in the
     /// world PanelSettings, a fixed size and the UI layer when it is enabled. The tree survives the
-    /// swap: the SDK binders re-bind by themselves when it is rebuilt.
+    /// swap: the SDK binders re-bind by themselves when it is rebuilt, and so does this component
+    /// (<see cref="IVisualTreeRebindable"/>).
     /// </para>
     /// <para>
-    /// The follow keeps the panel where it is while the head turns less than
-    /// <see cref="followAngle"/> away from it, then glides it back in front, so reading it never
-    /// needs a steady head and a glance aside does not drag it along.
+    /// In VR the panel is placed in front of the head when it is enabled and on <see cref="RecentreNow"/>,
+    /// then a <see cref="ParentConstraint"/> on the player's rig carries it with their body (locomotion,
+    /// teleport, snap turn), not with their head, so reading it never needs a steady head. Nothing of ours
+    /// runs per frame (2026-10-29, review B2): the root's size, the colliders and the help state are applied
+    /// on the events that change them.
     /// </para>
     /// </remarks>
     [RequireComponent(typeof(UIDocument))]
     [DisallowMultipleComponent]
     [AddComponentMenu("Virtuademy/UI/Overlay Panel Placement")]
-    public class OverlayPanelPlacement : MonoBehaviour
+    public class OverlayPanelPlacement : MonoBehaviour, IVisualTreeRebindable
     {
         private const int UILayer = 5;
 
@@ -48,18 +53,15 @@ namespace Virtuademy.SDK.Environments.UIKit
             "Keeps a HUD beside the popups instead of behind them.")]
         private float vrSideOffset;
 
-        [SerializeField, Tooltip("In VR, follow the head. Off: placed once in front of the user when enabled.")]
+        [SerializeField, Tooltip("In VR, go with the player's body (locomotion, teleport, turns) after being placed " +
+            "in front of them. Off: placed once in front of the user when enabled.")]
         private bool vrFollowHead = true;
 
-        [SerializeField, Range(5f, 90f), Tooltip("How far, in degrees, the head may turn before the panel follows.")]
-        private float followAngle = 30f;
-
-        [SerializeField, Tooltip("How fast the panel glides back in front, per second.")]
-        private float followSpeed = 3f;
-
         private UIDocument document;
+        private VisualElement root;
         private bool vr;
-        private bool recentring;
+        private bool blocksRay = true;
+        private bool helpSubscribed;
 
         /// <summary>Whether the panel is in its VR (world-space) form.</summary>
         public bool IsWorldSpace => vr;
@@ -71,7 +73,19 @@ namespace Virtuademy.SDK.Environments.UIKit
         /// for the application's own panels behind it (the tutorial, the tablet), whose buttons the
         /// ray reaches through colliders too. On by default for panels whose owner does not say.
         /// </summary>
-        public bool BlocksRay { get; set; } = true;
+        public bool BlocksRay
+        {
+            get => blocksRay;
+            set
+            {
+                if (blocksRay == value)
+                {
+                    return;
+                }
+                blocksRay = value;
+                ApplyColliders();
+            }
+        }
 
         [SerializeField, Tooltip("In VR, hide the panel (and let the ray through) while the application's " +
             "help panel is open: that panel is where the user must point, and it keeps them from moving " +
@@ -96,8 +110,13 @@ namespace Virtuademy.SDK.Environments.UIKit
                 document.worldSpaceSize = vrSize;
                 document.pivot = Pivot.Center;
                 transform.localScale = Vector3.one;
-                ApplyRootSize();
-                Recentre(true);
+                Rebind();
+                if (vrHideWhileHelpOpen)
+                {
+                    helpSubscribed = PanelEnvironment.SubscribeHelp(OnHelpChanged, OnHelpChanged);
+                }
+                OnHelpChanged();
+                Recentre();
             }
             else if (screenPanelSettings != null && document.panelSettings != screenPanelSettings)
             {
@@ -105,21 +124,48 @@ namespace Virtuademy.SDK.Environments.UIKit
             }
         }
 
-        private void LateUpdate()
+        private void OnDisable()
         {
-            if (!vr)
+            if (helpSubscribed)
+            {
+                PanelEnvironment.UnsubscribeHelp(OnHelpChanged, OnHelpChanged);
+                helpSubscribed = false;
+            }
+            root?.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
+            root = null;
+        }
+
+        /// <summary>The tree was rebuilt (panel swap, WorldSpaceUIDocumentRebuilder): its root sized again.</summary>
+        public void Rebind()
+        {
+            if (!vr || !isActiveAndEnabled)
             {
                 return;
             }
-            // The tree may be rebuilt (panel swap, WorldSpaceUIDocumentRebuilder): keep its root sized.
+            root?.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
+            root = document != null ? document.rootVisualElement : null;
+            if (root == null)
+            {
+                return;
+            }
+            // Laid out (or re-laid out): UI Toolkit creates and resizes the document's collider then
+            root.RegisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             ApplyRootSize();
+            ApplyHelpVisibility();
+            ApplyColliders();
+        }
+
+        private void OnRootGeometryChanged(GeometryChangedEvent e)
+        {
+            ApplyRootSize();
+            ApplyColliders();
+        }
+
+        private void OnHelpChanged()
+        {
             hiddenForHelp = vrHideWhileHelpOpen && PanelEnvironment.IsHelpOpen;
             ApplyHelpVisibility();
             ApplyColliders();
-            if (vrFollowHead)
-            {
-                Recentre(false);
-            }
         }
 
         /// <summary>Brings the panel in front of the user now, in VR. Does nothing on a screen.</summary>
@@ -127,7 +173,7 @@ namespace Virtuademy.SDK.Environments.UIKit
         {
             if (vr)
             {
-                Recentre(true);
+                Recentre();
             }
         }
 
@@ -140,7 +186,6 @@ namespace Virtuademy.SDK.Environments.UIKit
         /// </summary>
         private void ApplyRootSize()
         {
-            VisualElement root = document != null ? document.rootVisualElement : null;
             if (root == null)
             {
                 return;
@@ -154,11 +199,15 @@ namespace Virtuademy.SDK.Environments.UIKit
 
         /// <remarks>
         /// The document's trigger collider is created and resized by UI Toolkit (the SDK world
-        /// PanelSettings use MatchBoundingBox), so it is switched every frame rather than once: a
-        /// collider created later is caught too.
+        /// PanelSettings use MatchBoundingBox) when the tree is laid out: switched then, when the
+        /// owner changes <see cref="BlocksRay"/> and when the help opens or closes.
         /// </remarks>
         private void ApplyColliders()
         {
+            if (!vr)
+            {
+                return;
+            }
             bool on = BlocksRay && !hiddenForHelp;
             GetComponents(colliders);
             foreach (Collider c in colliders)
@@ -177,7 +226,6 @@ namespace Virtuademy.SDK.Environments.UIKit
         /// </summary>
         private void ApplyHelpVisibility()
         {
-            VisualElement root = document != null ? document.rootVisualElement : null;
             if (root == null)
             {
                 return;
@@ -191,11 +239,14 @@ namespace Virtuademy.SDK.Environments.UIKit
 
         private readonly System.Collections.Generic.List<Collider> colliders = new();
 
-        private void Recentre(bool snap)
+        // In front of the head, then (vrFollowHead) carried by the player's rig with a ParentConstraint: the engine
+        // moves it with the body, no code of ours runs per frame
+        private void Recentre()
         {
             Camera cam = Camera.main;
             if (cam == null)
             {
+                Debug.LogWarning($"[{nameof(OverlayPanelPlacement)}] '{name}': no main camera to place the VR panel in front of", this);
                 return;
             }
             Transform head = cam.transform;
@@ -211,31 +262,30 @@ namespace Virtuademy.SDK.Environments.UIKit
                                      + right * vrSideOffset;
             Quaternion targetRotation = Quaternion.LookRotation(forward, Vector3.up);
 
-            if (snap)
+            ParentConstraint follow = GetComponent<ParentConstraint>();
+            if (follow != null)
             {
-                transform.SetPositionAndRotation(targetPosition, targetRotation);
-                recentring = false;
-                return;
+                follow.constraintActive = false;
             }
-
-            Vector3 toPanel = Vector3.ProjectOnPlane(transform.position - head.position, Vector3.up);
-            float angle = toPanel.sqrMagnitude < 0.0001f ? 180f : Vector3.Angle(forward, toPanel);
-            if (angle > followAngle)
-            {
-                recentring = true;
-            }
-            if (!recentring)
+            transform.SetPositionAndRotation(targetPosition, targetRotation);
+            Transform body = head.root;
+            if (!vrFollowHead || body == head || body == transform.root)
             {
                 return;
             }
-
-            float t = 1f - Mathf.Exp(-followSpeed * Time.deltaTime);
-            transform.SetPositionAndRotation(Vector3.Lerp(transform.position, targetPosition, t),
-                Quaternion.Slerp(transform.rotation, targetRotation, t));
-            if ((transform.position - targetPosition).sqrMagnitude < 0.0004f)
+            follow = follow != null ? follow : gameObject.AddComponent<ParentConstraint>();
+            while (follow.sourceCount > 0)
             {
-                recentring = false;
+                follow.RemoveSource(0);
             }
+            follow.AddSource(new ConstraintSource { sourceTransform = body, weight = 1f });
+            Quaternion inverse = Quaternion.Inverse(body.rotation);
+            follow.SetTranslationOffset(0, inverse * (targetPosition - body.position));
+            follow.SetRotationOffset(0, (inverse * targetRotation).eulerAngles);
+            follow.translationAtRest = transform.localPosition;
+            follow.rotationAtRest = transform.localEulerAngles;
+            follow.locked = true;
+            follow.constraintActive = true;
         }
     }
 }
