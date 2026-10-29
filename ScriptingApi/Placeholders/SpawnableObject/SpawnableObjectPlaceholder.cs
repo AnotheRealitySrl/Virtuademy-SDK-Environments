@@ -358,30 +358,4 @@ namespace Virtuademy.SDK.Environments
 #endif
     }
 
-#if UNITY_EDITOR
-    [CustomEditor(typeof(SpawnableObjectPlaceholder))]
-    public class SpawnableObjectEditor : Editor
-    {
-        public override void OnInspectorGUI()
-        {
-            DrawDefaultInspector();
-
-            SpawnableObjectPlaceholder myScript = (SpawnableObjectPlaceholder)target;
-            string leftButtonLabel = myScript.LeftHandReference == null ? "Show Left Reference" : "Hide Left Reference";
-            string rigthButtonLabel = myScript.RightHandReference == null ? "Show Right Reference" : "Hide Right Reference";
-
-            myScript.SetPositionLeftHand();
-            //myScript.SetPositionRightHand();
-
-            if (GUILayout.Button(leftButtonLabel))
-            {
-                myScript.ShowHandReference(myScript.LeftHandReference, 0);
-            }
-            if (GUILayout.Button(rigthButtonLabel))
-            {
-                myScript.ShowHandReference(myScript.RightHandReference, 1);
-            }
-        }
-    }
-#endif
 }

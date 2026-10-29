@@ -6,6 +6,10 @@ The review fixes below warrant a minor bump: fixes, two values appended to `Envi
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 #### Added
+- **Third-person hold preview** (2026.7, minor): the SpawnableObject inspector's "Preview third-person hold" button
+  shows a mannequin (Unity primitives, not saved) holding the item as desktop, web and mobile hold it in third person,
+  from its hold offset and right-hand pivot; "Hide preview" removes it. The inspector moved to the editor assembly
+  (`SpawnableObjectPlaceholderEditor`), with its hand-reference buttons as before.
 - **`SpawnableObjectPlaceholder.customThirdPersonHold` / `thirdPersonHoldOffset`** (2026.7, minor): on desktop, web
   and mobile, in third person, an item held with the hand at its own offset from the avatar's chest instead of the
   platform's default. Off by default.
