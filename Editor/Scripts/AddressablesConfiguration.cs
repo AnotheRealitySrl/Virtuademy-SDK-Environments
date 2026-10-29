@@ -18,7 +18,7 @@ namespace Virtuademy.SDK.Environments.Editor
     /// A project that has never been through the window keeps Unity's defaults: the stock profile
     /// and the stock groups. A build then runs to the end and fails only afterwards, because the
     /// bundles land in <c>Library/com.unity.addressables</c> instead of <c>ServerData</c>. The
-    /// window's "Fix Addressables configurations" button and the setup command line's
+    /// window's "Fix build settings" button and the setup command line's
     /// <c>addressables</c> step both call <see cref="Apply"/>; <see cref="IsConfigured"/> is the
     /// check the build buttons and the setup report read.
     /// </para>
@@ -105,8 +105,8 @@ namespace Virtuademy.SDK.Environments.Editor
 
             if (!IsConfiguredFor(settings))
                 throw new InvalidOperationException(
-                    "The Addressables configuration was applied but the project still does not match it. " +
-                    "Open Virtuademy > Addressables management and look at the red items under " +
+                    "The build settings were applied but the project still does not match them. " +
+                    "Open Virtuademy > Publish Environments and look at the red items under " +
                     "'Show advanced addressables configurations'.");
         }
 

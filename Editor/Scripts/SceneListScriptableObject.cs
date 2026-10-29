@@ -83,10 +83,16 @@ namespace Virtuademy.SDK.Environments.Editor
 
         [SerializeField] private List<SceneConfiguration> sceneConfigurations;
 
-        [Tooltip("Folders whose scenes are not the project's own and never appear in the list: imported package samples, third-party assets, plugins. Paths relative to the project, one folder per entry.")]
-        [SerializeField] private List<string> excludedFolders = new(DefaultExcludedFolders);
+        [Tooltip("Folders the creator excluded: their scenes, and their subfolders', are not listed. Paths relative to the project, one folder per entry.")]
+        [SerializeField] private List<string> excludedFolders = new();
 
-        /// <summary>Where package samples and third-party assets usually land; the starting value of <see cref="excludedFolders"/>.</summary>
+        // 0 until the folders the list used to exclude by default have been taken out of excludedFolders (2026.7.0).
+        [SerializeField, HideInInspector] private int exclusionsVersion;
+
+        /// <summary>
+        /// The folders the list excluded on its own up to 2026.6, which every list created then still carries. Since 2026.7.0
+        /// nothing is excluded unless the creator excludes it: <see cref="SyncWithProject"/> takes these out of a list once.
+        /// </summary>
         public static readonly string[] DefaultExcludedFolders =
         {
             "Assets/Samples", "Assets/Plugins", "Assets/_ThirdParty", "Assets/ThirdParty", "Assets/Third Party",
@@ -94,6 +100,31 @@ namespace Virtuademy.SDK.Environments.Editor
         };
 
         public List<SceneConfiguration> SceneConfigurations => sceneConfigurations;
+
+        /// <summary>The folders whose scenes are left out of the list, as stored (paths relative to the project).</summary>
+        public IReadOnlyList<string> ExcludedFolders => excludedFolders ??= new List<string>();
+
+        /// <summary>Leaves <paramref name="folder"/>, and its subfolders, out of the list. False when it already was.</summary>
+        public bool ExcludeFolder(string folder)
+        {
+            string normalized = NormalizeFolder(folder);
+            excludedFolders ??= new List<string>();
+            if (string.IsNullOrEmpty(normalized) || excludedFolders.Any(f => string.Equals(NormalizeFolder(f), normalized, StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            excludedFolders.Add(normalized);
+            excludedFolders.Sort(StringComparer.OrdinalIgnoreCase);
+            return true;
+        }
+
+        /// <summary>Lists <paramref name="folder"/>'s scenes again. False when it was not excluded.</summary>
+        public bool IncludeFolder(string folder)
+        {
+            string normalized = NormalizeFolder(folder);
+            return excludedFolders != null && excludedFolders.RemoveAll(f => string.Equals(NormalizeFolder(f), normalized, StringComparison.OrdinalIgnoreCase)) > 0;
+        }
+
+        private static string NormalizeFolder(string folder) => folder?.Trim().Replace('\\', '/').TrimEnd('/');
 
         /// <summary>The folder the list's asset is created in when the project has none.</summary>
         public const string DefaultFolder = "Assets/Virtuademy/Editor/Settings";
@@ -103,7 +134,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// The project's scene list, or null when it has none yet. Creates and changes nothing: the
-        /// list is only created by <see cref="LoadOrCreate"/>, which the Addressables management
+        /// list is only created by <see cref="LoadOrCreate"/>, which the Publish Environments
         /// window calls when it opens.
         /// </summary>
         public static SceneListScriptableObject Find()
@@ -138,20 +169,30 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>
-        /// Makes the list mirror the scenes of the project — every <c>.unity</c> under <c>Assets/</c>, packages
-        /// excluded — so nothing gets published because it was added by hand, and nothing is forgotten because
-        /// it was not. Scenes that appeared are added <b>not included in the build</b>; entries whose scene is
-        /// gone are dropped; duplicates collapse to the first; the order is by scene name. The settings of
-        /// the scenes already listed (include in build, platforms) are kept: an entry holds the
-        /// <see cref="SceneAsset"/> reference, which follows renames and moves. Returns true when the asset
+        /// Makes the list mirror the scenes of the project — every <c>.unity</c> under <c>Assets/</c> and in the packages,
+        /// except Unity's own packages and the folders the creator excluded — so nothing gets published because it was
+        /// added by hand, and nothing is forgotten because it was not. Scenes that appeared are added <b>not included in
+        /// the build</b>; entries whose scene is gone are dropped; duplicates collapse to the first; the order is by folder,
+        /// then by scene name. The settings of the scenes already listed (include in build, platforms) are kept: an entry
+        /// holds the <see cref="SceneAsset"/> reference, which follows renames and moves. Returns true when the asset
         /// changed and should be saved.
         /// </summary>
         public bool SyncWithProject()
         {
             sceneConfigurations ??= new List<SceneConfiguration>();
+            excludedFolders ??= new List<string>();
+
+            // Up to 2026.6 the list excluded some folders on its own; since 2026.7.0 only the creator excludes.
+            bool migrated = false;
+            if (exclusionsVersion < 1)
+            {
+                excludedFolders.RemoveAll(f => DefaultExcludedFolders.Contains(NormalizeFolder(f), StringComparer.OrdinalIgnoreCase));
+                exclusionsVersion = 1;
+                migrated = true;
+            }
 
             HashSet<SceneAsset> present = new();
-            foreach (string guid in AssetDatabase.FindAssets("t:SceneAsset", new[] { "Assets" }))
+            foreach (string guid in AssetDatabase.FindAssets("t:SceneAsset", new[] { "Assets", "Packages" }))
             {
                 string path = AssetDatabase.GUIDToAssetPath(guid);
                 if (IsExcluded(path)) continue;
@@ -167,36 +208,31 @@ namespace Virtuademy.SDK.Environments.Editor
                 sceneConfigurations.Add(new SceneConfiguration(scene));
             }
 
-            List<SceneConfiguration> ordered = sceneConfigurations.OrderBy(c => c.Scene.name, StringComparer.OrdinalIgnoreCase).ToList();
-            bool changed = before != sceneConfigurations.Count || !ordered.SequenceEqual(sceneConfigurations);
+            List<SceneConfiguration> ordered = sceneConfigurations
+                .OrderBy(c => System.IO.Path.GetDirectoryName(AssetDatabase.GetAssetPath(c.Scene))?.Replace('\\', '/'), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(c => c.Scene.name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            bool changed = migrated || before != sceneConfigurations.Count || !ordered.SequenceEqual(sceneConfigurations);
             sceneConfigurations.Clear();
             sceneConfigurations.AddRange(ordered);
             return changed;
         }
 
         /// <summary>
-        /// A scene that is not the project's own: under one of <see cref="excludedFolders"/> (package
-        /// samples, third-party assets, plugins), inside a package Unity resolves (an embedded or local
-        /// package), or in a folder that carries a <c>package.json</c> — a package dropped under
-        /// <c>Assets/</c> by hand. These are demos, not environments to publish.
+        /// A scene the list leaves out: under one of <see cref="excludedFolders"/>, which only the creator adds to, or in one
+        /// of Unity's own packages (<c>com.unity.*</c>), whose scenes are scene templates and test scenes, never content.
+        /// Scenes of every other package are listed, unticked: some are meant as examples to build.
         /// </summary>
         private bool IsExcluded(string assetPath)
         {
             if (string.IsNullOrEmpty(assetPath)) return true;
             string normalized = assetPath.Replace('\\', '/');
+            if (normalized.StartsWith("Packages/com.unity.", StringComparison.OrdinalIgnoreCase)) return true;
             foreach (string excluded in excludedFolders ?? new List<string>())
             {
                 if (string.IsNullOrWhiteSpace(excluded)) continue;
-                string prefix = excluded.Trim().Replace('\\', '/').TrimEnd('/') + "/";
+                string prefix = NormalizeFolder(excluded) + "/";
                 if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return true;
-            }
-            if (UnityEditor.PackageManager.PackageInfo.FindForAssetPath(normalized) != null) return true;
-
-            string folder = System.IO.Path.GetDirectoryName(normalized)?.Replace('\\', '/');
-            while (!string.IsNullOrEmpty(folder) && folder.Length > "Assets".Length)
-            {
-                if (System.IO.File.Exists(System.IO.Path.Combine(folder, "package.json"))) return true;
-                folder = System.IO.Path.GetDirectoryName(folder)?.Replace('\\', '/');
             }
             return false;
         }

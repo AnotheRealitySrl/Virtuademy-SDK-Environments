@@ -23,7 +23,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
 {
     public static class BreakingChangesSolver2025_4
     {
-        [MenuItem("Virtuademy/Update routines/v2025.3 -> v2025.4")]
+        [MenuItem("Virtuademy/Update routines/v2025.3 -> v2025.4", false, 22)]
         public static void SolveBreakingChanges()
         {
 #if VIRTUADEMY_ENVIRONMENTS_PLACEHOLDERS

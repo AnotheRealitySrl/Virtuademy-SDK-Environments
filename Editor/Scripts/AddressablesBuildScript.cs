@@ -55,15 +55,37 @@ namespace Virtuademy.SDK.Environments.Editor
                                  $"active. Using last run builder instead.");
         }
 
+        /// <summary>
+        /// Addressables asks, in a modal dialog, whether to turn on "Debug Build Layout" for its Build Report, once per
+        /// project, the first time content is built from the editor (never in batch mode). The publish pipeline does not use
+        /// the report, and a dialog left behind the editor stops the build until someone finds it. Recording that the user
+        /// was informed skips it; "Debug Build Layout" itself stays as it is (Edit &gt; Preferences &gt; Addressables).
+        /// The flag is internal to Addressables 2.x, hence the reflection: when it is not found, the dialog may appear.
+        /// </summary>
+        static void SkipBuildReportPrompt()
+        {
+            System.Reflection.PropertyInfo informed = typeof(ProjectConfigData).GetProperty(
+                "UserHasBeenInformedAboutBuildReportSettingPreBuild",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+
+            if (informed == null || !informed.CanWrite)
+                return;
+
+            if (informed.GetValue(null) is bool done && !done)
+                informed.SetValue(null, true);
+        }
+
         static bool BuildAddressableContent()
         {
+            SkipBuildReportPrompt();
+
             AddressableAssetSettings
                 .BuildPlayerContent(out AddressablesPlayerBuildResult result);
             bool success = string.IsNullOrEmpty(result.Error);
 
             if (!success)
             {
-                Debug.LogError("Addressables build error encountered: " + result.Error);
+                Debug.LogError("[PublishEnvironments] The build failed: " + result.Error);
             }
             return success;
         }
@@ -116,13 +138,13 @@ namespace Virtuademy.SDK.Environments.Editor
                 {
                     if (!EditorUserBuildSettings.SwitchActiveBuildTarget(group, target))
                     {
-                        Debug.LogError($"[AddressablesManagement] Could not switch the active build target to {target}: the remaining platforms were not built.");
+                        Debug.LogError($"[PublishEnvironments] Could not switch the active build target to {target}: the remaining platforms were not built.");
                         return;
                     }
 
                     if (!BuildAddressables())
                     {
-                        Debug.LogError($"[AddressablesManagement] The Addressables build failed for {target} (see the errors above): the remaining platforms were not built.");
+                        Debug.LogError($"[PublishEnvironments] The build failed for {target} (see the errors above): the remaining platforms were not built.");
                         return;
                     }
                 }
@@ -132,7 +154,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (EditorUserBuildSettings.activeBuildTarget != originalTarget
                     && !EditorUserBuildSettings.SwitchActiveBuildTarget(originalGroup, originalTarget))
                 {
-                    Debug.LogWarning($"[AddressablesManagement] Could not switch the active build target back to {originalTarget}.");
+                    Debug.LogWarning($"[PublishEnvironments] Could not switch the active build target back to {originalTarget}.");
                 }
             }
         }

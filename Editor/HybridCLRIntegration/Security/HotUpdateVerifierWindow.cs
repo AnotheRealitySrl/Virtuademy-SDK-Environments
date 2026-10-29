@@ -1,3 +1,5 @@
+using Virtuademy.SDK.TenantConfiguration.Editor;
+
 using System;
 using System.IO;
 
@@ -17,8 +19,6 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
     /// </summary>
     public sealed class HotUpdateVerifierWindow : EditorWindow
     {
-        private const string EditorTokenPrefKey = "Virtuademy_EditorLogin_Token";
-
         private enum Source { Auto, StandaloneWindows64, Android, WebGL, Browse }
 
         private Source _source = Source.Auto;
@@ -181,13 +181,13 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Server verification (authoritative)", EditorStyles.boldLabel);
 
-            string token = EditorPrefs.GetString(EditorTokenPrefKey, string.Empty);
-            bool hasToken = !string.IsNullOrEmpty(token);
+            // The login is a connection in the per-user store now: the old EditorPrefs token is deleted.
+            bool hasToken = EditorLoginState.HasSession;
 
             EditorGUILayout.HelpBox(
                 hasToken
                     ? "Editor login token found. Server verification is not wired yet (stub)."
-                    : "No editor login token found — log in via 'Virtuademy / Available Tenants' first.",
+                    : "No editor login token found — log in via 'Virtuademy / Publish Environments' first.",
                 hasToken ? MessageType.Info : MessageType.Warning);
 
             using (new EditorGUI.DisabledScope(true))

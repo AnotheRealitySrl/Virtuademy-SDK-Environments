@@ -1,169 +1,300 @@
-using Virtuademy.Environments.ScriptingApi.Placeholders;
-
 using System.Collections.Generic;
 using System.Linq;
 
 using UnityEditor;
+using UnityEditor.SceneManagement;
 
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UIElements;
+
+using Virtuademy.SDK.TenantConfiguration.Editor;
 
 namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
 {
+    /// <summary>
+    /// The Placeholder IDs window (menu Virtuademy > Advanced > Placeholder IDs; the class kept its old name, Scene objects
+    /// management): every <see cref="SceneObjectId"/> of the active scene, which every placeholder carries, with its ID. The ID tells
+    /// a placeholder apart from the others of the scene, in the app and across the network, so one that is 0 or used twice is
+    /// marked, and the window gives new IDs to those (Fix IDs), or to all of them.
+    /// </summary>
     public class SceneObjectsManagementWindow : EditorWindow
     {
-        private List<SceneObjectId> sceneObjects = new();
+        private const string window_title = "Placeholder IDs";
+        private const string styles_path = "Packages/com.anotherealitysrl.virtuademy-sdk-environments/Editor/Scripts/AddressablesConfigurationWindow.uss";
 
-        private Vector2 scrollPosition = Vector2.zero;
+        private static readonly Color problem_color = new(0.95f, 0.45f, 0.45f);
 
-        [MenuItem("Virtuademy/Development/Scene objects management")]
+        private readonly List<SceneObjectId> sceneObjects = new();
+
+        private Label sceneLabel;
+        private Label summaryLabel;
+        private Label unsavedLabel;
+        private VisualElement list;
+        private Button fixButton;
+        private Button resetAllButton;
+        private string signature;
+
+        [MenuItem("Virtuademy/Advanced/Placeholder IDs", false, 42)]
         public static void ShowWindow()
         {
-            //Show existing window instance. If one doesn't exist, make one.
-            GetWindow(typeof(SceneObjectsManagementWindow));
+            SceneObjectsManagementWindow window = GetWindow<SceneObjectsManagementWindow>();
+            window.titleContent = new GUIContent(window_title);
+            window.minSize = new Vector2(380, 260);
         }
 
-        private void OnGUI()
+        public void CreateGUI()
         {
-            FindPlaceholders();
-            DisplayPlaceholders();
+            // A window restored from a layout saved before the rename keeps the title it was saved with.
+            titleContent = new GUIContent(window_title);
 
-            GUIStyle btnStyle = new(GUI.skin.button)
+            VisualElement root = rootVisualElement;
+            StyleSheet styles = AssetDatabase.LoadAssetAtPath<StyleSheet>(styles_path);
+            if (styles != null)
+                root.styleSheets.Add(styles);
+
+            ScrollView scroll = new();
+            scroll.style.flexGrow = 1;
+            root.Add(scroll);
+            scroll.Add(VirtuademyWindowHeader.Create(window_title));
+
+            Label intro = new("Every placeholder has an ID that tells it apart from the others of the scene, in the app and across the " +
+                              "network. An ID that is 0 or used twice is marked: Fix IDs gives those a new one.")
             {
-                richText = true
+                style = { whiteSpace = WhiteSpace.Normal, marginLeft = 8, marginRight = 8, marginBottom = 4 },
             };
+            intro.AddToClassList("muted");
+            scroll.Add(intro);
 
-            if (GUILayout.Button("Initialize invalid network placeholders IDs", btnStyle))
+            VisualElement section = new();
+            section.AddToClassList("section");
+
+            VisualElement header = new();
+            header.AddToClassList("section-header");
+            sceneLabel = new Label();
+            sceneLabel.AddToClassList("section-title");
+            header.Add(sceneLabel);
+            summaryLabel = new Label();
+            summaryLabel.AddToClassList("section-note");
+            header.Add(summaryLabel);
+            section.Add(header);
+
+            // SceneObjectId gives an ID only to a placeholder of a scene that has a name: in an unsaved scene it takes it for a prefab.
+            unsavedLabel = new Label("Save the scene first: a placeholder gets its ID only in a saved scene.");
+            unsavedLabel.AddToClassList("section-notice");
+            section.Add(unsavedLabel);
+
+            list = new VisualElement();
+            list.AddToClassList("section-body");
+            section.Add(list);
+
+            VisualElement bar = new();
+            bar.AddToClassList("section-bar");
+            bar.Add(new VisualElement { style = { flexGrow = 1 } });
+            resetAllButton = new Button(ResetAllIds)
             {
-                SetPlaceholdersNewIDs();
-            }
-            if (GUILayout.Button("Initialize <b>ALL</b> network placeholders IDs", btnStyle))
+                text = "New IDs for all...",
+                tooltip = "Gives every placeholder of the scene a new ID. Asks first.",
+            };
+            bar.Add(resetAllButton);
+            fixButton = new Button(FixIds)
             {
-                SetPlaceholdersNewIDs(true);
-            }
+                text = "Fix IDs",
+                tooltip = "Gives a new ID to each placeholder whose ID is 0 or used by another one. The first of two that share an ID keeps it.",
+            };
+            bar.Add(fixButton);
+            section.Add(bar);
+            scroll.Add(section);
+
+            Refresh();
+
+            // A placeholder added, removed or renamed, another scene opened, an undo: the list is read again when it changed.
+            EditorApplication.hierarchyChanged += Refresh;
+            EditorSceneManager.activeSceneChangedInEditMode += OnActiveSceneChanged;
+            Undo.undoRedoPerformed += Refresh;
+            root.schedule.Execute(Refresh).Every(1000);
         }
+
+        private void OnDestroy()
+        {
+            EditorApplication.hierarchyChanged -= Refresh;
+            EditorSceneManager.activeSceneChangedInEditMode -= OnActiveSceneChanged;
+            Undo.undoRedoPerformed -= Refresh;
+        }
+
+        private void OnActiveSceneChanged(Scene previous, Scene current) => Refresh();
 
         private void FindPlaceholders()
         {
-            Scene s = SceneManager.GetActiveScene();
-            GameObject[] gameObjects = s.GetRootGameObjects();
-
             sceneObjects.Clear();
 
-            foreach (GameObject obj in gameObjects)
-            {
+            Scene scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid() || !scene.isLoaded)
+                return;
+
+            foreach (GameObject obj in scene.GetRootGameObjects())
                 sceneObjects.AddRange(obj.GetComponentsInChildren<SceneObjectId>(true));
-            }
         }
 
-        private void SetPlaceholdersNewIDs(bool overrideAll = false)
+        /// <summary>
+        /// The list, rebuilt only when what it shows changed: each placeholder with its name (a click selects it), its ID and, for an
+        /// ID that is 0 or already used above it, why it has to change.
+        /// </summary>
+        private void Refresh()
         {
-            System.Random rnd = new();
+            if (list == null)
+                return;
 
-            if (overrideAll)
+            FindPlaceholders();
+            Scene scene = SceneManager.GetActiveScene();
+
+            // Read through UniqueID, as the app does: a placeholder in a scene with an ID of 0 gets one on the first read.
+            List<(SceneObjectId Object, int Id)> rows = sceneObjects.Where(item => item != null).Select(item => (item, item.UniqueID)).ToList();
+            string current = scene.path + "|" + string.Join("|", rows.Select(row => $"{row.Object.GetInstanceID()}:{row.Id}:{row.Object.gameObject.name}"));
+            if (current == signature)
+                return;
+
+            signature = current;
+            list.Clear();
+
+            bool saved = !string.IsNullOrEmpty(scene.name);
+            sceneLabel.text = saved ? scene.name : "Untitled scene";
+            unsavedLabel.style.display = saved || rows.Count == 0 ? DisplayStyle.None : DisplayStyle.Flex;
+
+            Dictionary<int, string> used = new();
+            int problems = 0;
+            foreach ((SceneObjectId item, int id) in rows)
             {
-                sceneObjects.ForEach(sceneObject =>
-                {
-                    sceneObject.UniqueID = 0;
-                });
-                sceneObjects.ForEach(sceneObject =>
-                {
-                    sceneObject.GenerateObjectUniqueID();
-                    EditorUtility.SetDirty(sceneObject);
-                });
+                string problem = null;
+                if (id == 0)
+                    problem = "No ID yet.";
+                else if (used.TryGetValue(id, out string first))
+                    problem = $"Same ID as {first}.";
+                else
+                    used.Add(id, item.gameObject.name);
+
+                if (problem != null)
+                    problems++;
+
+                list.Add(Row(item, id, problem));
             }
-            else
+
+            if (rows.Count == 0)
             {
-                // Here are stored the recalculated (or preserved if correct) previous IDs during the update session.
-                List<int> updatedIds = new List<int>();
-
-                // First of all, get distinct of all used IDs greater than 0.
-                List<int> oldIds = sceneObjects.Select(p => (p.UniqueID)).Distinct().Where(id => id > 0).ToList();
-
-                // Then, for each value, keep it if it is the first time it appears.
-                // Else, if it is duplicated or 0, then recalculate it with a brand new value.
-                sceneObjects.ForEach(p =>
-                {
-                    int currentId = (p.UniqueID);
-
-                    bool needsOverride = currentId == 0 || !oldIds.Contains(currentId);
-
-                    if (needsOverride)
-                    {
-                        p.UniqueID = 0;
-                        p.GenerateObjectUniqueID();
-                        EditorUtility.SetDirty(p);
-                    }
-                    else
-                    {
-                        oldIds.Remove(currentId);
-                    }
-
-                    updatedIds.Add((p.UniqueID));
-                });
+                Label empty = new("No placeholder in this scene.");
+                empty.AddToClassList("muted");
+                list.Add(empty);
             }
+
+            summaryLabel.text = rows.Count == 0 ? string.Empty
+                : $"{rows.Count} placeholder{(rows.Count == 1 ? string.Empty : "s")}" + (problems > 0 ? $", {problems} to fix" : ", all IDs unique");
+            summaryLabel.style.color = problems > 0 ? new StyleColor(problem_color) : new StyleColor(StyleKeyword.Null);
+            fixButton.SetEnabled(saved && problems > 0);
+            resetAllButton.SetEnabled(saved && rows.Count > 0);
         }
 
-        private void DisplayPlaceholders()
+        private static VisualElement Row(SceneObjectId item, int id, string problem)
         {
-            GUIStyle style = new(EditorStyles.label)
+            VisualElement row = new() { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, minHeight = 18 } };
+
+            Label name = new(item.gameObject.name)
             {
-                richText = true
+                tooltip = "Click to select it in the Hierarchy.",
+                style = { flexGrow = 1, flexShrink = 1, unityFontStyleAndWeight = FontStyle.Bold, overflow = Overflow.Hidden, textOverflow = TextOverflow.Ellipsis },
             };
-
-            scrollPosition = GUILayout.BeginScrollView(scrollPosition, false, false);
+            name.AddToClassList("scene-name");
+            name.RegisterCallback<ClickEvent>(_ =>
             {
-                Dictionary<int, string> usedCodes = new Dictionary<int, string>();
+                Selection.activeGameObject = item.gameObject;
+                EditorGUIUtility.PingObject(item.gameObject);
+            });
+            row.Add(name);
 
-                foreach (var objectId in sceneObjects)
+            if (problem != null)
+            {
+                Label why = new(problem) { style = { color = problem_color, marginRight = 6, flexShrink = 1 } };
+                row.Add(why);
+            }
+
+            Label idLabel = new(id.ToString())
+            {
+                style = { minWidth = 80, unityTextAlign = TextAnchor.MiddleRight, color = problem != null ? new StyleColor(problem_color) : new StyleColor(StyleKeyword.Null) },
+            };
+            row.Add(idLabel);
+            return row;
+        }
+
+        /// <summary>Gives a new ID to each placeholder whose ID is 0 or already used: the first that holds an ID keeps it.</summary>
+        private void FixIds()
+        {
+            FindPlaceholders();
+            int undoGroup = StartUndo("Fix placeholder IDs");
+
+            // The IDs in use that are not 0. Each is kept by the first placeholder that holds it; a second one gets a new ID.
+            List<int> unclaimed = sceneObjects.Select(item => item.UniqueID).Distinct().Where(id => id > 0).ToList();
+            foreach (SceneObjectId item in sceneObjects)
+            {
+                int id = item.UniqueID;
+                if (id == 0 || !unclaimed.Contains(id))
                 {
-                    int tmpCode = objectId.UniqueID;
-
-                    string tmpCodeStr = tmpCode.ToString();
-                    string tmpFeedback = string.Empty;
-
-                    if (tmpCode != 0)
-                    {
-                        if (usedCodes.TryGetValue(tmpCode, out string alreadyUsedGOName))
-                        {
-                            // Code already used.
-                            tmpCodeStr = "<color=red>" + tmpCodeStr + "</color>";
-                            tmpFeedback = "Used by: <b>" + alreadyUsedGOName + "</b>";
-                        }
-                        else
-                        {
-                            usedCodes.Add(tmpCode, objectId.gameObject.name);
-                        }
-                    }
-                    else
-                    {
-                        // Not inizialized.
-                        tmpCodeStr = "<color=red>" + tmpCodeStr + "</color>";
-                        tmpFeedback = "This GameObject is <b>not initialized</b>.";
-                    }
-
-                    EditorGUILayout.BeginHorizontal();
-                    {
-                        float codeWidth = 50f;
-                        float btnWidth = 20f;
-                        float margin = 35f;
-                        float remainingWidth = EditorGUIUtility.currentViewWidth - codeWidth - btnWidth - margin;
-
-                        if (GUILayout.Button(">", GUILayout.Width(btnWidth)))
-                        {
-                            EditorGUIUtility.PingObject(objectId.gameObject);
-                        }
-
-                        EditorGUILayout.LabelField($"<b>{objectId.gameObject.name}</b>", style, GUILayout.Width(remainingWidth * 0.4f));
-
-                        EditorGUILayout.LabelField($"{tmpCodeStr}", style, GUILayout.Width(codeWidth));
-
-                        EditorGUILayout.LabelField($"{tmpFeedback}", style, GUILayout.Width(remainingWidth * 0.6f));
-                    }
-                    EditorGUILayout.EndHorizontal();
+                    item.UniqueID = 0;
+                    item.GenerateObjectUniqueID();
+                    EditorUtility.SetDirty(item);
+                }
+                else
+                {
+                    unclaimed.Remove(id);
                 }
             }
-            GUILayout.EndScrollView();
+
+            Undo.CollapseUndoOperations(undoGroup);
+            MarkSceneDirty();
+            Refresh();
+        }
+
+        /// <summary>Gives every placeholder of the scene a new ID, after a confirmation.</summary>
+        private void ResetAllIds()
+        {
+            FindPlaceholders();
+            if (!EditorUtility.DisplayDialog("New IDs for all placeholders",
+                    $"Give all {sceneObjects.Count} placeholders of this scene a new ID? Use it only when their IDs came from another " +
+                    "scene: Fix IDs already repairs an ID that is missing or used twice. Edit > Undo puts the previous IDs back.",
+                    "New IDs for all", "Cancel"))
+                return;
+
+            int undoGroup = StartUndo("New placeholder IDs");
+            foreach (SceneObjectId item in sceneObjects)
+                item.UniqueID = 0;
+            foreach (SceneObjectId item in sceneObjects)
+            {
+                item.GenerateObjectUniqueID();
+                EditorUtility.SetDirty(item);
+            }
+
+            Undo.CollapseUndoOperations(undoGroup);
+            MarkSceneDirty();
+            Refresh();
+        }
+
+        /// <summary>
+        /// One undo step for the whole change: <see cref="SceneObjectId.GenerateObjectUniqueID"/> records its own through a
+        /// SerializedObject. An ID put back by an undo that another placeholder holds too is given a new one again by
+        /// <c>SceneObjectId.OnValidate</c>, so undoing Fix IDs does not bring a shared ID back.
+        /// </summary>
+        private int StartUndo(string name)
+        {
+            Undo.IncrementCurrentGroup();
+            Undo.SetCurrentGroupName(name);
+            int group = Undo.GetCurrentGroup();
+            Undo.RecordObjects(sceneObjects.Cast<Object>().ToArray(), name);
+            return group;
+        }
+
+        private static void MarkSceneDirty()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            if (scene.IsValid() && !Application.isPlaying)
+                EditorSceneManager.MarkSceneDirty(scene);
         }
     }
 }

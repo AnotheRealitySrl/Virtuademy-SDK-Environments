@@ -33,7 +33,8 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
             }
         }
 
-        [MenuItem("Virtuademy/Update VS Library")]
+        // Under Advanced: the setup does it (its Visual Scripting nodes step), and runs it again when the library lacks the SDK's types.
+        [MenuItem("Virtuademy/Advanced/Update Visual Scripting library", false, 41)]
         public static void Setup()
         {
             if (!VSUsageUtility.isVisualScriptingUsed)

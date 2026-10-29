@@ -42,17 +42,19 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
             public string Error;
         }
 
-        public static async Task<Result> VerifyAsync(byte[] dll, string fileName)
+        /// <param name="connectionKey">The connection to verify on; null is the project's default one, read once here.</param>
+        public static async Task<Result> VerifyAsync(byte[] dll, string fileName, string connectionKey = null)
         {
-            string baseUrl = EditorApiEndpoint.ApplicationApiUrl;
+            connectionKey ??= ProjectConnections.DefaultKey;
+            string baseUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
 
-            if (string.IsNullOrEmpty(baseUrl) || !EditorLoginState.HasSession)
+            if (string.IsNullOrEmpty(baseUrl) || ConnectionStore.Get(connectionKey)?.HasSession != true)
             {
                 return new Result
                 {
                     Reachable = false,
                     Error = "Not logged in (no Application API URL / token). " +
-                            "Log in via 'Virtuademy / Available Tenants'."
+                            "Log in via 'Virtuademy / Publish Environments'."
                 };
             }
 
@@ -78,7 +80,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                     return new HttpRequestMessage(HttpMethod.Post, url) { Content = form };
                 }
 
-                using HttpResponseMessage resp = await EditorSessionManager.SendAuthorizedAsync(BuildRequest, client);
+                using HttpResponseMessage resp = await EditorSessionManager.SendAuthorizedAsync(connectionKey, BuildRequest, client);
 
                 if (resp == null)
                 {
@@ -86,7 +88,7 @@ namespace Virtuademy.SDK.Environments.HybridCLR.Editor
                     {
                         Reachable = false,
                         Error = "The editor session expired and could not be renewed. " +
-                                "Log in again via 'Virtuademy / Available Tenants'."
+                                "Log in again via 'Virtuademy / Publish Environments'."
                     };
                 }
 

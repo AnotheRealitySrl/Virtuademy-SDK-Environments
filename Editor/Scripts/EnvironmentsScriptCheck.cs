@@ -72,7 +72,7 @@ namespace Virtuademy.SDK.Environments.Editor
             "Assembly-CSharp-Editor-firstpass",
         };
 
-        private const string log_prefix = "[AddressablesManagement] ";
+        private const string log_prefix = "[PublishEnvironments] ";
 
         /// <summary>How many components <see cref="Describe"/> lists by default; the dialog of the window shows the text as it is.</summary>
         public const int DefaultListed = 15;
