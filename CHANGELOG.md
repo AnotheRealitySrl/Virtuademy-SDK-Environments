@@ -189,6 +189,12 @@ one usable connection, which changes what a script that relied on the project's 
   and the deploy previews do not change. No public member changes.
 
 #### Fixed
+- **Reload Scene plays the current experience again, in the session's mode.** It started the experience again
+  single-player whatever the session was, so in a multiplayer session the player left the others, and it looked the
+  experience up by the environment's name, which could open another experience of the same environment. It now calls
+  `ISessionApi.ReloadSession` (`Virtuademy-SDK-Core`): in a multiplayer session the player goes back into the same
+  session, with the same people; a single-player run starts over from the experience's initial state, as before. Graphs
+  that use the node need no change.
 - The advanced section's tooltip of the window named a button that no longer exists
   ("Configure Addressables settings"; it is "Fix build settings"), and the binary-catalog message read "Plese".
 - **A build from the editor no longer stops on Addressables' "Addressables Build Report" dialog.** Addressables asks once
