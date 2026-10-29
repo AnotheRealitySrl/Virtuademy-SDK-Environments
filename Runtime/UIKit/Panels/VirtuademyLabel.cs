@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Animations;
 using UnityEngine.UIElements;
 
 using Virtuademy.SDK.Environments.Utilities;
@@ -17,7 +18,7 @@ namespace Virtuademy.SDK.Environments.UIKit
     {
         [SerializeField] private VirtuademyPanel.LocalizedText text = new("Label");
         [SerializeField, Tooltip("Visible when the scene starts. Off: call Show().")] private bool visibleOnStart;
-        [SerializeField, Tooltip("Turn every frame to face the camera (upright).")] private bool faceCamera = true;
+        [SerializeField, Tooltip("Turn to face the camera (upright), by an AimConstraint on it.")] private bool faceCamera = true;
 
         private Label label;
         private bool visible;
@@ -57,6 +58,7 @@ namespace Virtuademy.SDK.Environments.UIKit
         {
             visible = true;
             Refresh();
+            Face();
         }
 
         public void Hide()
@@ -80,22 +82,43 @@ namespace Virtuademy.SDK.Environments.UIKit
             }
         }
 
-        private void LateUpdate()
+        protected override void OnEnable()
         {
-            if (!faceCamera || !visible)
-            {
-                return;
-            }
+            base.OnEnable();
+            Face();
+        }
+
+        // Facing the camera, upright (its back to the camera, as a world-space document is read): an AimConstraint
+        // turning it about the world's up axis only, set on the current main camera when it is enabled or shown. The
+        // engine turns it; no code of ours runs per frame (2026-10-29, review B2).
+        private void Face()
+        {
+            AimConstraint aim = GetComponent<AimConstraint>();
             Camera cam = Camera.main;
-            if (cam == null)
+            if (!faceCamera || cam == null)
             {
+                if (aim != null)
+                {
+                    aim.constraintActive = false;
+                }
                 return;
             }
-            Vector3 away = Vector3.ProjectOnPlane(transform.position - cam.transform.position, Vector3.up);
-            if (away.sqrMagnitude > 0.0001f)
+            if (aim == null)
             {
-                transform.rotation = Quaternion.LookRotation(away, Vector3.up);
+                aim = gameObject.AddComponent<AimConstraint>();
             }
+            while (aim.sourceCount > 0)
+            {
+                aim.RemoveSource(0);
+            }
+            aim.AddSource(new ConstraintSource { sourceTransform = cam.transform, weight = 1f });
+            aim.aimVector = Vector3.back;
+            aim.upVector = Vector3.up;
+            aim.worldUpType = AimConstraint.WorldUpType.SceneUp;
+            aim.rotationAxis = Axis.Y;
+            aim.rotationAtRest = transform.localEulerAngles;
+            aim.locked = true;
+            aim.constraintActive = true;
         }
 
         private void OnLanguageChanged(string _) => Refresh();
