@@ -157,8 +157,48 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
   Pro Essential Resources once when a project lacks them (not in batch mode), so the SDK's texts no longer render
   magenta in a new creator project. `Virtuademy/Advanced/Developer/Generate theme tokens` is the same kind of
   developer-only menu.
+- **`ToolItemPlaceholder.useMode`** (`EToolUseMode`: `None`, the default and the behaviour before 2026.7, `Click`,
+  `Hold`), **`onUseEnded`**, **`showModelInHand`** and **`pickupSharing`** (`EToolPickupSharing`: `AsInventory`, the
+  default, `PickerOnly`, `Everyone`) (2026.7, minor): how a tool is used (one press, or held with `onUseEnded` on
+  release), whether its 3D model shows in the hand on desktop, web and mobile, and who gets a tool picked up in a
+  multiplayer session.
+- **`WearablePlaceholder.wearSlot`, `onWorn` and `onRemoved`** (2026.7, minor): the equipment slot a wearable goes in
+  (empty: the wear inventory's own), and events when the player wears it and takes it off.
+- **`InventorySlotPlaceholder.startingItems`** and **`ToolInventoryPlaceholder.pickedToolsShared`** (2026.7, minor):
+  new fields on the existing placeholders, as on `InventoryPlaceholder`: items in the slot inventory at start, and
+  picked tools shared with every player.
+- **Interaction events for scripts** (2026.7, minor): `InteractablePlaceholder.OnHoverEnter`, `OnHoverExit`,
+  `OnSelectEnter`, `OnSelectExit` and `OnInteract`, C# events carrying `InteractionEventArgs` (the controller,
+  `EInteractionControllerType`: Mouse, Ray, Hand, Touch; and the hand, `EInteractionHand`), raised by the application
+  only. Every handler runs; a handler's exception is then thrown, not swallowed.
+- **`InteractablePlaceholder.VRControllers`** (`EVRInteractionControllers` flags: `Ray`, `Hands`; both by default)
+  (2026.7, minor): which VR controllers can hover, select and interact with the object.
+- **Scene panels from scripts** (2026.7, minor): `IUIApi.ShowPanel`, `HidePanel`, `SetPanelText`, `SetPanelVariant`,
+  `SetHudCount`, `SetHudHint`, `SetListItemDone`, `ShowCheckResult` and the event `PanelButtonPressed`, for the UI
+  Toolkit panels an environment places in its scene.
+- **`TaskUIPlaceholder.PersonalPanelRequest`** and **`PersonalPanelRequested`** (2026.7, minor): `ShowAsPersonalPanel()`
+  is kept until the panel exists, so a call made before it (On Start) is applied when it is created.
+- **`InventoryPlaceholder.InventoryModeChangedHandler`** (2026.7, minor): `InventoryModeChanged` is a named delegate
+  (previous mode, new mode), usable from interpreted scripts.
 
 #### Changed
+- **`VisualScriptingInteractablePlaceholder.VrVisualScriptingInteraction` is `[Obsolete]`** and its field hidden: the
+  VR controllers are set on the Interactable (`InteractablePlaceholder.VRControllers`). Opening a scene or prefab in the
+  editor moves an explicit Ray-only or Hands-only value over to the new field (and marks both components dirty); that
+  value used to restrict nothing and now restricts the VR controllers once the scene is saved and rebuilt. Published
+  environments are not affected (the migration runs in the editor only; the application reads the new field, which
+  defaults to both).
+- **Removed: `Virtuademy.SDK.Environments.SpawnableObjectEditor`**, the SpawnableObject inspector, replaced by
+  `SpawnableObjectPlaceholderEditor` in the editor assembly with the same hand-reference buttons and the hold preview.
+  An editor script that subclassed or named it no longer compiles: a major note.
+- **Show Popup's `Closed` runs from the popup's close callback** in a new flow of the graph, not from a coroutine that
+  waited frame by frame. A popup queued before its host was bound is answered with -1 when the host goes away.
+- **The Visual Scripting inventory nodes throw** (Set Inventory Mode, Set Inventory Slot Counts, Add Equipment Slot)
+  when they have no `InventoryPlaceholder`, instead of continuing without doing anything.
+- **SDK panels run nothing per frame**: `SafeFrame` applies its insets on screen and zone changes, `OverlayPanelPlacement`
+  in VR goes with the player's body by a constraint after being placed in front of them (its `followAngle` and
+  `followSpeed` are gone) and reads the help state from its events, `VirtuademyLabel` faces the camera with an
+  `AimConstraint`.
 - `InventoryPlaceholder.SetSlotCounts` documents what its wear count is: the wear inventory's generic cells, counted only
   when no equipment slots are declared; with declared slots, `AddEquipmentSlot` adds a slot.
 - **The package depends on AI Navigation 2.0.14, Animation Rigging 1.4.1 and Splines 2.9.0**, the versions the
