@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 
 using Unity.VisualScripting;
@@ -11,7 +10,8 @@ namespace Virtuademy.SDK.Environments.VisualScripting
     /// Shows a popup (<see cref="IUIApi.ShowPopup"/>) and continues twice: at once through
     /// <c>Shown</c>, and when the popup closes through <c>Closed</c>, with the index of the button
     /// pressed (0 for the first, -1 when it closed without one, or by a click outside it when
-    /// <c>CloseOnOutsideClick</c> is on).
+    /// <c>CloseOnOutsideClick</c> is on). <c>Closed</c> runs from the popup's close callback, in a new flow of the
+    /// same graph: nothing waits frame by frame (2026-10-29, review B2).
     /// </summary>
     [UnitTitle("Virtuademy UI: Show Popup")]
     [UnitSurtitle("UI")]
@@ -61,7 +61,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting
             CloseOnOutsideClick = ValueInput(nameof(CloseOnOutsideClick), false);
             AutoCloseSeconds = ValueInput(nameof(AutoCloseSeconds), 0f);
 
-            InputTrigger = ControlInputCoroutine(nameof(InputTrigger), Run);
+            InputTrigger = ControlInput(nameof(InputTrigger), Run);
             Shown = ControlOutput(nameof(Shown));
             Closed = ControlOutput(nameof(Closed));
             ButtonIndex = ValueOutput<int>(nameof(ButtonIndex));
@@ -75,7 +75,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting
             Assignment(InputTrigger, PopupId);
         }
 
-        private IEnumerator Run(Flow flow)
+        private ControlOutput Run(Flow flow)
         {
             var labels = new List<string>(3);
             foreach (ValueInput input in new[] { Button1, Button2, Button3 })
@@ -87,28 +87,30 @@ namespace Virtuademy.SDK.Environments.VisualScripting
                 }
             }
 
-            // Locals of this run: the handler below is this popup's, so Closed and ButtonIndex always
-            // answer for the popup this run opened, never for a later one (which closes this one
-            // first, with -1).
-            bool closed = false;
-            int index = -1;
-            int id = IVirtuademyGameplay.Current.UI.ShowPopup(flow.GetValue<string>(Title), flow.GetValue<string>(Text),
-                labels.ToArray(), i =>
-                {
-                    index = i;
-                    closed = true;
-                }, flow.GetValue<bool>(CloseOnOutsideClick), flow.GetValue<float>(AutoCloseSeconds));
+            // The handler is this popup's, so Closed and ButtonIndex always answer for the popup this run opened,
+            // never for a later one (which closes this one first, with -1). It runs Closed in a new flow of this
+            // graph, when the popup closes
+            GraphReference reference = flow.stack.ToReference();
+            int id = -1;
+            id = IVirtuademyGameplay.Current.UI.ShowPopup(flow.GetValue<string>(Title), flow.GetValue<string>(Text),
+                labels.ToArray(), index => OnClosed(reference, id, index),
+                flow.GetValue<bool>(CloseOnOutsideClick), flow.GetValue<float>(AutoCloseSeconds));
 
             flow.SetValue(PopupId, id);
-            yield return Shown;
+            return Shown;
+        }
 
-            while (!closed)
+        private void OnClosed(GraphReference reference, int id, int index)
+        {
+            // The graph's object is gone (scene unloaded): nothing left to continue
+            if (reference == null || !reference.isValid)
             {
-                yield return null;
+                return;
             }
-
-            flow.SetValue(ButtonIndex, index);
-            yield return Closed;
+            Flow closedFlow = Flow.New(reference);
+            closedFlow.SetValue(PopupId, id);
+            closedFlow.SetValue(ButtonIndex, index);
+            closedFlow.Run(Closed);
         }
     }
 }
