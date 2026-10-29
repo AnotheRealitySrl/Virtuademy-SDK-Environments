@@ -51,11 +51,14 @@ namespace Virtuademy.SDK.Environments.VisualScripting
         private ControlOutput Enter(Flow flow)
         {
             InventoryPlaceholder inventory = flow.GetValue<InventoryPlaceholder>(Inventory);
-            if (inventory != null)
+            // No inventory is the graph's error, not something to skip (review S8)
+            if (inventory == null)
             {
-                inventory.AddEquipmentSlot(flow.GetValue<InventoryPlaceholder.EEquipmentSlotType>(Type),
-                    flow.GetValue<string>(SlotName), flow.GetValue<Sprite>(Icon));
+                throw new System.ArgumentNullException(nameof(Inventory),
+                    "[AddEquipmentSlotNode] no InventoryPlaceholder: connect one, or put the graph on the object that has it");
             }
+            inventory.AddEquipmentSlot(flow.GetValue<InventoryPlaceholder.EEquipmentSlotType>(Type),
+                flow.GetValue<string>(SlotName), flow.GetValue<Sprite>(Icon));
             return OutputTrigger;
         }
     }
