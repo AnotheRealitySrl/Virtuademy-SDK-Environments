@@ -32,8 +32,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
         public const float ReferenceHeight = 1.75f;
 
         /// <summary>
-        /// The height of the avatar to preview, for this editor session only: the application scales the avatar, and with
-        /// it the hold offset (its targets are under the avatar), to the user's height; the item keeps its own size.
+        /// The height of the avatar to preview, for this editor session only: the application proportions the hold offset
+        /// to each avatar's height (offset x height / ReferenceHeight, HeldToolPose); the item keeps its own size.
         /// </summary>
         public static float PreviewHeight { get; set; } = ReferenceHeight;
 
