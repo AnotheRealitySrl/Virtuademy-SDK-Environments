@@ -108,6 +108,23 @@ namespace Virtuademy.SDK.Environments.Editor
         // Logins started from a group, by connection key: they outlive a rebuild of the groups.
         private readonly Dictionary<string, PendingLogin> pendingLogins = new(StringComparer.OrdinalIgnoreCase);
 
+        // An expired session is renewed by the window itself, silently (no browser), so the tokens stay fresh while it is open: up
+        // to session_renewal_attempts tries per expiry, session_renewal_retry_ms apart. Only when they all fail does the group stay
+        // yellow, for the next operation to renew (which may then ask for the browser).
+        private const int session_renewal_attempts = 2;
+        private const long session_renewal_retry_ms = 30000;
+
+        private sealed class SessionRenewal
+        {
+            // Which expiry the tries are for: a renewal, a rejection by the server or a new login stores the record again.
+            internal string Expiry;
+            internal int Attempts;
+            internal bool Running;
+            internal DateTime NextUtc;
+        }
+
+        private readonly Dictionary<string, SessionRenewal> sessionRenewals = new(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>True while a deploy runs from a Publish Environments window: it holds on to the connections' tokens.</summary>
         internal static bool DeployRunning => deployRunning;
 
@@ -1174,13 +1191,14 @@ namespace Virtuademy.SDK.Environments.Editor
                     continue;
 
                 pendingLogins.TryGetValue(group.Key, out PendingLogin login);
+                bool renewing = login == null && RenewExpiredSession(record);
 
-                group.Dot.style.backgroundColor = login != null ? new Color(0.35f, 0.6f, 0.95f)
+                group.Dot.style.backgroundColor = login != null || renewing ? new Color(0.35f, 0.6f, 0.95f)
                     : !record.HasSession ? new Color(0.5f, 0.5f, 0.5f)
                     : record.IsTokenValid ? new Color(0.3f, 0.78f, 0.35f)
                     : new Color(0.92f, 0.68f, 0.2f);
-                group.Dot.tooltip = login != null ? "Logging in" : !record.HasSession ? "Not logged in"
-                    : record.IsTokenValid ? "Logged in" : "Session expired: it is renewed on the next operation";
+                group.Dot.tooltip = login != null ? "Logging in" : renewing ? "Session expired: renewing it" : !record.HasSession ? "Not logged in"
+                    : record.IsTokenValid ? "Logged in" : "Session expired: it could not be renewed now, the next operation renews it";
 
                 int groupTargets = ticked.Where(t => t.Group == group).Sum(t => t.Count);
                 group.Summary.text = login != null ? "logging in"
@@ -1204,8 +1222,10 @@ namespace Virtuademy.SDK.Environments.Editor
                     string role = record.IsTenantManager ? " · Tenant manager" : string.Empty;
                     group.Status.text = record.IsTokenValid
                         ? $"{user}{role} · until {ShortTime(record.UsableUntilUtc)}"
-                        : $"{user}{role} · session expired, renewed on the next operation";
-                    group.Status.style.color = record.IsTokenValid ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.92f, 0.68f, 0.2f);
+                        : renewing
+                            ? $"{user}{role} · session expired, renewing it…"
+                            : $"{user}{role} · session expired, renewed on the next operation";
+                    group.Status.style.color = record.IsTokenValid || renewing ? new Color(0.6f, 0.6f, 0.6f) : new Color(0.92f, 0.68f, 0.2f);
                     group.Status.tooltip = $"Account: {record.Username}{EditorSessionManager.DescribeSession(record, out _)}\nConnection: {record.Key}";
                 }
                 else
@@ -1238,8 +1258,65 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         /// <summary>
+        /// For a connection whose session expired: starts a silent renewal when one is due (see <see cref="session_renewal_attempts"/>),
+        /// and says whether one is running or still to come, so the group shows it as renewing rather than expired. False when the
+        /// tries for this expiry are used up, the record cannot be renewed, or the session is valid or gone.
+        /// </summary>
+        private bool RenewExpiredSession(ConnectionRecord record)
+        {
+            if (!record.HasSession || record.IsTokenValid || !record.CanRenew)
+            {
+                sessionRenewals.Remove(record.Key);
+                return false;
+            }
+
+            string expiry = $"{record.Revision}|{record.ExpiryUtc:o}|{record.TokenRejected}";
+            if (!sessionRenewals.TryGetValue(record.Key, out SessionRenewal renewal) || renewal.Expiry != expiry)
+                sessionRenewals[record.Key] = renewal = new SessionRenewal { Expiry = expiry };
+
+            if (renewal.Running)
+                return true;
+            if (renewal.Attempts >= session_renewal_attempts)
+                return false;
+            if (DateTime.UtcNow < renewal.NextUtc)
+                return true;
+
+            renewal.Running = true;
+            renewal.Attempts++;
+            _ = RenewSessionAsync(record.Key, renewal);
+            return true;
+        }
+
+        private async Task RenewSessionAsync(string key, SessionRenewal renewal)
+        {
+            bool renewed = false;
+            try
+            {
+                // Shared with any other caller renewing the same connection, in this process and the others (the store's lock).
+                renewed = await EditorSessionManager.EnsureValidTokenAsync(key, allowInteractive: false);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PublishEnvironments] The session of {key} could not be renewed: {ex.Message}");
+            }
+
+            renewal.Running = false;
+            if (!renewed)
+                renewal.NextUtc = DateTime.UtcNow.AddMilliseconds(session_renewal_retry_ms);
+
+            if (this == null || loginStatusLabel == null)
+                return;
+
+            // A renewal raises OnTokenChanged, which refreshes the labels; a failure tries again once the wait is over.
+            RefreshLabels();
+            if (!renewed && renewal.Attempts < session_renewal_attempts)
+                loginStatusLabel.schedule.Execute(RefreshLabels).StartingIn(session_renewal_retry_ms + 500);
+        }
+
+        /// <summary>
         /// The labels go stale on their own when a token expires while the window sits idle: re-render them once, right
-        /// after the first such moment among the store's connections. Re-armed on every render.
+        /// after the first such moment among the store's connections, which also starts the renewal of that session.
+        /// Re-armed on every render.
         /// </summary>
         private void ScheduleSessionExpiryRefresh()
         {

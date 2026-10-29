@@ -13,6 +13,11 @@
   Environments keeps the banner that says when the settings are not the SDK's: its **Details** opens the new window, and so does
   **Addressables settings...** at the foot of the window. Not compiled in the application (`VIRTUADEMY_APPLICATION`), like Publish
   Environments.
+- **Publish Environments renews an expired session by itself** (minor). When a connection's token has expired, the window renews
+  it silently (`EditorSessionManager.EnsureValidTokenAsync` without the browser), up to two tries per expiry, 30 s apart; the dot is
+  blue and the line says "session expired, renewing it…" meanwhile. It runs when the window is drawn, when it gets the focus, and
+  at the moment a token expires while it is open, so the tokens stay fresh while the window is open. The group stays yellow
+  ("renewed on the next operation") only when both tries failed, or when the stored session cannot be renewed silently.
 - **Advanced ▸ Placeholder IDs** (was *Scene objects management*; the class keeps its name, `SceneObjectsManagementWindow`) is drawn
   like the SDK's other windows: the Virtuademy header, the active scene's placeholders with their IDs, the ones that are 0 or shared
   marked in red with why, a click on a name to select it, **Fix IDs** (was *Initialize invalid network placeholders IDs*) and **New IDs
