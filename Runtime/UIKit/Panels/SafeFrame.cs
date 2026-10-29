@@ -16,7 +16,9 @@ namespace Virtuademy.SDK.Environments.UIKit
     /// It insets one element, by default the first with the class <c>vd-safe-frame</c>, with inline
     /// <c>left/right/top/bottom</c>: lay the panel's content out inside that element and it never
     /// sits under the top bar, the bottom bar, the joystick or the task HUD. The insets are the
-    /// larger of the application's zones and the device's safe area, recomputed when either changes.
+    /// larger of the application's zones and the device's safe area, recomputed when either changes:
+    /// on <see cref="ReservedScreenZones.Changed"/> and on the document root's geometry change, which a
+    /// resize or an orientation change (and with it the safe area) raises. Nothing runs per frame.
     /// </para>
     /// <para>
     /// World-space documents (and every document in VR) are left alone: they have no screen edge.
@@ -60,9 +62,7 @@ namespace Virtuademy.SDK.Environments.UIKit
         private float margin = 16f;
 
         private VisualElement target;
-        private Rect lastSafeArea;
-        private Vector2Int lastScreen;
-        private bool dirty = true;
+        private VisualElement root;
 
         /// <summary>The insets in use, in panel pixels.</summary>
         public ReservedScreenZones.Insets Current { get; private set; }
@@ -78,42 +78,38 @@ namespace Virtuademy.SDK.Environments.UIKit
                     $"or the class {ThemeTokens.SafeFrameClass}).", this);
                 return false;
             }
-            ReservedScreenZones.Changed += MarkDirty;
+            ReservedScreenZones.Changed += Apply;
+            // The screen's size (and with it the safe area): the root's geometry. The insets change the target's, not
+            // the root's, so this does not come back here.
+            this.root = root;
+            root.RegisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
             WatchForRebuild(target);
-            dirty = true;
+            Apply();
             return true;
         }
 
         protected override void UnbindFromTree()
         {
-            ReservedScreenZones.Changed -= MarkDirty;
+            ReservedScreenZones.Changed -= Apply;
+            root?.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
+            root = null;
             target = null;
         }
 
-        private void MarkDirty() => dirty = true;
+        private void OnRootGeometryChanged(GeometryChangedEvent e)
+        {
+            if (e.oldRect.size != e.newRect.size)
+            {
+                Apply();
+            }
+        }
 
-        private void Update()
+        private void Apply()
         {
             if (target == null || Document == null || Document.panelSettings == null)
             {
                 return;
             }
-            if (Screen.safeArea != lastSafeArea || Screen.width != lastScreen.x || Screen.height != lastScreen.y)
-            {
-                dirty = true;
-            }
-            if (!dirty)
-            {
-                return;
-            }
-            dirty = false;
-            lastSafeArea = Screen.safeArea;
-            lastScreen = new Vector2Int(Screen.width, Screen.height);
-            Apply();
-        }
-
-        private void Apply()
-        {
             bool screenSpace = Document.panelSettings.renderMode == PanelRenderMode.ScreenSpaceOverlay;
             if (!screenSpace || PanelEnvironment.IsVR || target.panel == null)
             {
