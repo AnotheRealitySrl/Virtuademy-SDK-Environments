@@ -182,6 +182,11 @@ one usable connection, which changes what a script that relied on the project's 
   and spline components of an environment carry the fields the app reads. A project that lists one of them at
   another version in its own manifest keeps that version: a direct entry wins over a dependency. Animation
   Rigging brings Burst with it. Warrants a minor bump.
+- **Where the scenes are published is read in parallel.** `PublishedEnvironmentsIndex` read a connection's worlds one
+  after the other (`GET /worlds/{id}/environments`) and then the tenant list (`GET /tenants/environments`); it now reads
+  up to four worlds at a time with the tenant list alongside, so a tenant with many worlds waits for the slowest batch
+  instead of the sum. The index is built in the same order from the same answers: the "Published in" lines, the tooltip
+  and the deploy previews do not change. No public member changes.
 
 #### Fixed
 - The advanced section's tooltip of the window named a button that no longer exists
