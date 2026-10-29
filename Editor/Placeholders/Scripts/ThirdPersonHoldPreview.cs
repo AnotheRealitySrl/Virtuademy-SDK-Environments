@@ -15,7 +15,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
     /// <remarks>
     /// The mannequin is built from Unity primitives, ours to ship: no model, no licence, no IK package. Its objects are
     /// <see cref="HideFlags.DontSave"/>, so neither the scene nor the prefab keeps them, and it goes when the inspector
-    /// closes, before a domain reload, when the scene or the prefab is saved, and when the item is gone. It is placed again
+    /// closes, before a domain reload and when the item is gone (saving needs no hook: DontSave keeps it out of the
+    /// file, and Prefab Mode's auto save would hide it after every edit). It is placed again
     /// when the inspector changes a field and when the item or its pivot moves (ObjectChangeEvents): no frame loop. An
     /// approximation: the application uses the avatar's own proportions and fits a tool longer than 0.5 m to the hand.
     /// </remarks>
@@ -62,8 +63,6 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
                 return;
             }
             AssemblyReloadEvents.beforeAssemblyReload += Hide;
-            EditorSceneManager.sceneSaving += OnSceneSaving;
-            PrefabStage.prefabSaving += OnPrefabSaving;
             ObjectChangeEvents.changesPublished += OnChangesPublished;
             Refresh();
         }
@@ -71,19 +70,21 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
         public void Hide()
         {
             AssemblyReloadEvents.beforeAssemblyReload -= Hide;
-            EditorSceneManager.sceneSaving -= OnSceneSaving;
-            PrefabStage.prefabSaving -= OnPrefabSaving;
             ObjectChangeEvents.changesPublished -= OnChangesPublished;
             if (root != null)
             {
                 Object.DestroyImmediate(root);
             }
             root = null;
+            // One material per preview, not per placement (review S6: a DontSave material is never unloaded)
+            if (BodyMaterial != null)
+            {
+                Object.DestroyImmediate(BodyMaterial);
+            }
+            BodyMaterial = null;
         }
 
-        private void OnSceneSaving(UnityEngine.SceneManagement.Scene scene, string path) => Hide();
-
-        private void OnPrefabSaving(GameObject prefab) => Hide();
+        private Material BodyMaterial;
 
         // The item or its pivot moved, or a field changed through Undo: placed again; the item gone: hidden
         private void OnChangesPublished(ref ObjectChangeEventStream stream)
@@ -187,9 +188,9 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
             return shoulder + direction * along + pole * height;
         }
 
-        private static void BuildBody(Transform parent, Vector3 elbow, Vector3 hand, Quaternion handRotation)
+        private void BuildBody(Transform parent, Vector3 elbow, Vector3 hand, Quaternion handRotation)
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"))
+            Material material = BodyMaterial ??= new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"))
             {
                 color = new Color(0.62f, 0.66f, 0.72f),
                 hideFlags = HideFlags.DontSave,
