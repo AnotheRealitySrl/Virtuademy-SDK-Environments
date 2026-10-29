@@ -18,11 +18,13 @@ namespace Virtuademy.SDK.Environments.Editor.UIKit
     /// <para>
     /// The static <c>Poppins-Regular SDF</c> and <c>Poppins-Bold SDF</c> hold 211 Latin glyphs each,
     /// with no fallback: an accented letter outside them (Polish, Czech, Romanian, Turkish…) renders
-    /// as a box. <c>Virtuademy/UI/Create Poppins font fallbacks</c> creates
+    /// as a box. <c>Virtuademy/Advanced/Developer/Create Poppins font fallbacks</c> (enabled only where the package
+    /// is embedded) creates
     /// <c>Poppins-Regular Dynamic SDF</c>, <c>Poppins-SemiBold SDF</c> and
     /// <c>Poppins-Bold Dynamic SDF</c> beside them (dynamic atlases cleared on build, so the package
     /// stays small) and sets the dynamic ones as the static ones' fallback. Run it once in a checkout
-    /// where the package is embedded, then commit the new assets. UI Toolkit panels do not need it:
+    /// where the package is embedded, then commit the new assets (not done yet: until then the static assets have no
+    /// fallback). UI Toolkit panels do not need it:
     /// they use the font files directly, with every glyph.
     /// </para>
     /// <para>
@@ -39,6 +41,12 @@ namespace Virtuademy.SDK.Environments.Editor.UIKit
 
         static VirtuademyFontSetup()
         {
+            // Not in batch mode (review S5): an EnvironmentsCli build or deploy would import a package, and maybe reload
+            // the domain, in the middle of its run. The setup's configure step imports them there.
+            if (Application.isBatchMode)
+            {
+                return;
+            }
             // Without the Essential Resources (TMP Settings and the TextMesh Pro shaders) every SDK
             // text renders magenta in a creator project. Import them once, quietly, the way the setup
             // would: TextMesh Pro's own prompt only appears when a TMP component is created.
@@ -66,7 +74,22 @@ namespace Virtuademy.SDK.Environments.Editor.UIKit
             AssetDatabase.ImportPackage(EssentialsPackage, false);
         }
 
-        [MenuItem("Virtuademy/UI/Create Poppins font fallbacks")]
+
+        /// <summary>
+        /// Whether this package is embedded (the SDK's own checkout), the only place the developer menus can write: in a
+        /// creator project it comes from the registry and is read-only (review S4).
+        /// </summary>
+        internal static bool PackageIsEmbedded()
+        {
+            UnityEditor.PackageManager.PackageInfo package =
+                UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(VirtuademyFontSetup).Assembly);
+            return package != null && package.source == UnityEditor.PackageManager.PackageSource.Embedded;
+        }
+
+        [MenuItem("Virtuademy/Advanced/Developer/Create Poppins font fallbacks", true)]
+        private static bool CanCreateFallbacks() => PackageIsEmbedded();
+
+        [MenuItem("Virtuademy/Advanced/Developer/Create Poppins font fallbacks", false, 100)]
         private static void CreateFallbacks()
         {
             TMP_FontAsset regular = Dynamic("Poppins-Regular.ttf", "Poppins-Regular Dynamic SDF.asset");

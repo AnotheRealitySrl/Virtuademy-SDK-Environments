@@ -32,7 +32,11 @@ namespace Virtuademy.SDK.Environments.Editor.UIKit
         private const string SdkTheme = PackageRoot + "Common/Theme/VirtuademyTheme.asset";
         private const string SdkTokens = PackageRoot + "Common/Theme/VirtuademyTokens.uss";
 
-        [MenuItem("Virtuademy/UI/Generate theme tokens")]
+        // Writes into the package: the SDK's own checkout only (review S4)
+        [MenuItem("Virtuademy/Advanced/Developer/Generate theme tokens", true)]
+        private static bool CanGenerateSdkTokens() => VirtuademyFontSetup.PackageIsEmbedded();
+
+        [MenuItem("Virtuademy/Advanced/Developer/Generate theme tokens", false, 101)]
         private static void GenerateSdkTokens()
         {
             var theme = AssetDatabase.LoadAssetAtPath<VirtuademyTheme>(SdkTheme);

@@ -147,12 +147,16 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
 - **`SafeFrame`** keeps a screen panel clear of the application's reserved zones (`ReservedScreenZones`: top bar,
   bottom bar and task HUD on desktop and WebGL, top bar and joystick on mobile, measured from the application's
   code) and of the device's safe area.
-- **`Virtuademy/Localization/Check missing translations`** lists the keys the open scenes use that the
+- **`Virtuademy/Advanced/Check missing translations`** lists the keys the open scenes use that the
   Localization File does not translate, per language.
-- **Poppins SemiBold** (`Common/Fonts/Poppins-SemiBold.ttf`), and `Virtuademy/UI/Create Poppins font fallbacks`,
-  which creates dynamic TextMesh Pro assets for the three weights and sets them as fallback of the two static
-  211-glyph ones. The editor imports the TextMesh Pro Essential Resources once when a project lacks them, so the
-  SDK's texts no longer render magenta in a new creator project.
+- **Poppins SemiBold** (`Common/Fonts/Poppins-SemiBold.ttf`), and the developer menu
+  `Virtuademy/Advanced/Developer/Create Poppins font fallbacks` (enabled only where the package is embedded), which
+  creates dynamic TextMesh Pro assets for the three weights and sets them as fallback of the two static 211-glyph ones.
+  The fallback assets are not generated in this release yet: TextMesh Pro texts still show a box for an accented letter
+  outside those 211 glyphs (UI Toolkit panels use the font files and are not affected). The editor imports the TextMesh
+  Pro Essential Resources once when a project lacks them (not in batch mode), so the SDK's texts no longer render
+  magenta in a new creator project. `Virtuademy/Advanced/Developer/Generate theme tokens` is the same kind of
+  developer-only menu.
 
 #### Changed
 - `InventoryPlaceholder.SetSlotCounts` documents what its wear count is: the wear inventory's generic cells, counted only

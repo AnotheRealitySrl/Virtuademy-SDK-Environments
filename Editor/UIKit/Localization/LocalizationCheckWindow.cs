@@ -55,7 +55,8 @@ namespace Virtuademy.SDK.Environments.Editor.UIKit
         private string summary;
         private Vector2 scroll;
 
-        [MenuItem("Virtuademy/Localization/Check missing translations")]
+        // Under Advanced, after develop's ordered menu (review S7)
+        [MenuItem("Virtuademy/Advanced/Check missing translations", false, 44)]
         private static void Open()
         {
             GetWindow<LocalizationCheckWindow>("Localization check").Show();
