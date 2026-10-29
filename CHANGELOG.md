@@ -25,9 +25,12 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
 - **`InventoryPlaceholder.returnItemsToOriginOnLeave`** (2026.7, minor): in a multiplayer session the items a player
   took from the scene for themselves go back into the room when they leave, near where they left (default) or where
   each was at the start (on).
-- **`TaskUIPlaceholder.vrPlacement`** (2026.7, minor): in VR the task panel stays where the placeholder is (`Fixed`, the
-  default, as before) or goes with the player, low on their left, moving and turning with their body
-  (`FollowPlayer`). Existing environments keep `Fixed`.
+- **Task panel placement per platform** (2026.7, minor): `TaskUIPlaceholder.desktopPlacement`, `mobilePlacement` and
+  `vrPlacement` (`ETaskPanelPlacement`: `InWorld`, `WithPlayer`) choose for each platform whether the panel stands in the
+  world, where the placeholder is, or goes with the player (on the screen on desktop and mobile; in VR low on their
+  left, moving and turning with their body). Defaults keep today's behaviour: desktop and mobile with the player, VR in
+  the world. In the world, `worldPanelSize` (metres, 0.61 x 0.69 by default) times the placeholder's scale sets the
+  panel's size; selecting the placeholder draws its outline in the Scene view.
 - **The inventory's item slots round up so the grid has no holes** (2026.7, minor): on the first page to whole columns
   once a second column starts (whole rows in VR), past it to whole pages, with empty, usable slots;
   `InventoryPlaceholder.inventorySlotsCount` follows (with `SlotCountsChanged`), as it does when an item that does not
