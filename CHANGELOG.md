@@ -5,8 +5,21 @@
 - **The Virtuademy menu is grouped and ordered** (minor): **Setup project**, **Publish Environments** and **Readme** first, then
   **Update routines** (newest first), then **Advanced**, with a separator before each submenu (menu priorities). **Update VS Library** is
   now **Advanced ▸ Update Visual Scripting library**: the setup updates the library itself, and does it again when the library lacks
-  the SDK's types. **Development ▸ Scene objects management** is now **Advanced ▸ Scene objects management**, and the Development
+  the SDK's types. **Development ▸ Scene objects management** is now **Advanced ▸ Placeholder IDs** (below), and the Development
   submenu is gone. The update routines keep their menu paths, which the setup and the command line run them by.
+- **Advanced ▸ Addressables settings: the advanced settings have a window of their own** (minor). The *Advanced settings* section at the
+  foot of Publish Environments (the Addressables top-level, profile and groups settings the build relies on, each with its check and
+  what the SDK expects, and Fix build settings) moved to the window `AddressablesSettingsWindow`, with the Virtuademy header. Publish
+  Environments keeps the banner that says when the settings are not the SDK's: its **Details** opens the new window, and so does
+  **Addressables settings...** at the foot of the window. Not compiled in the application (`VIRTUADEMY_APPLICATION`), like Publish
+  Environments.
+- **Advanced ▸ Placeholder IDs** (was *Scene objects management*; the class keeps its name, `SceneObjectsManagementWindow`) is drawn
+  like the SDK's other windows: the Virtuademy header, the active scene's placeholders with their IDs, the ones that are 0 or shared
+  marked in red with why, a click on a name to select it, **Fix IDs** (was *Initialize invalid network placeholders IDs*) and **New IDs
+  for all...** (was *Initialize ALL network placeholders IDs*, now after a confirmation). Both are one undo step. In a scene that was
+  never saved the buttons are off and the window says to save it first: `SceneObjectId` gives an ID only to a placeholder of a scene
+  that has a name, so the buttons did nothing there. The list is read again when the hierarchy, the active scene or an undo changes it,
+  not on every repaint.
 
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
 classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four

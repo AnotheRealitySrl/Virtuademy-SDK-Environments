@@ -66,20 +66,6 @@ namespace Virtuademy.SDK.Environments.Editor
 
         [SerializeField] private EBuildError buildResult = EBuildError.None;
 
-        [CreateProperty] private string ActiveProfileName => settings.profileSettings.GetProfileName(settings.activeProfileId);
-
-        [CreateProperty] private string CurrentRemoteBuildPathVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.RemoteBuildPathVariableName);
-        [CreateProperty] private bool IsRemoteBuildPathConfigured => CurrentRemoteBuildPathVariableValue == AddressablesConfiguration.RemoteBuildPath;
-
-        [CreateProperty] private string CurrentRemoteLoadPathVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.RemoteLoadPathVariableName);
-        [CreateProperty] private bool IsRemoteLoadPathConfigured => CurrentRemoteLoadPathVariableValue == AddressablesConfiguration.RemoteLoadPath;
-
-        [CreateProperty] private string CurrentBuildTargetVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.BuildTargetVariableName);
-        [CreateProperty] private bool IsBuildTargetConfigured => CurrentBuildTargetVariableValue == AddressablesConfiguration.BuildTargetVariableValue;
-
-        [CreateProperty] private string CurrentPlayerVersionOverrideVariableValue => AddressablesConfiguration.GetProfileValue(settings, AddressablesConfiguration.PlayerVersionOverrideVariableName);
-        [CreateProperty] private bool IsPlayerVersionOverrideConfigured => CurrentPlayerVersionOverrideVariableValue == AddressablesConfiguration.PlayerVersionOverrideVariableValue;
-
         [CreateProperty] private bool AreAddressablesConfigured => AddressablesConfiguration.IsConfiguredFor(settings);
 
 
@@ -132,8 +118,6 @@ namespace Virtuademy.SDK.Environments.Editor
         private Label buildStatusLabel;
         private Label scenesInBuildLabel;
         private VisualElement blockingBanner;
-        private VisualElement advancedFixRow;
-        private Foldout advancedFoldout;
         private IVisualElementScheduledItem sessionExpiryRefresh;
         private VisualElement deploySection;
         private VisualElement targetsContainer;
@@ -663,8 +647,8 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         private static readonly string[] menu_icons = { "_Menu", "d__Menu", "pane options" };
-        private static readonly string[] check_icons = { "TestPassed", "d_GreenCheckmark", "GreenCheckmark" };
-        private static readonly string[] warning_icons = { "console.warnicon.sml", "console.warnicon", "d_console.warnicon.sml" };
+        internal static readonly string[] check_icons = { "TestPassed", "d_GreenCheckmark", "GreenCheckmark" };
+        internal static readonly string[] warning_icons = { "console.warnicon.sml", "console.warnicon", "d_console.warnicon.sml" };
         private static readonly string[] error_icons = { "console.erroricon.sml", "console.erroricon" };
 
         /// <summary>The first of Unity's built-in icons that exists, or null.</summary>
@@ -680,7 +664,7 @@ namespace Virtuademy.SDK.Environments.Editor
             return null;
         }
 
-        private static void SetIcon(VisualElement element, string[] names)
+        internal static void SetIcon(VisualElement element, string[] names)
         {
             Texture2D texture = BuiltinIcon(names);
             element.style.backgroundImage = texture != null ? new StyleBackground(texture) : new StyleBackground(StyleKeyword.None);
@@ -1968,8 +1952,6 @@ namespace Virtuademy.SDK.Environments.Editor
             RefreshPlatformWarnings();
 
             blockingBanner = root.Q<VisualElement>("blocking-banner");
-            advancedFixRow = root.Q<VisualElement>("advanced-fix-row");
-            advancedFoldout = root.Q<Foldout>("addressables-settings-foldout");
             buildStatusLabel = root.Q<Label>("build-status-label");
             scenesInBuildLabel = root.Q<Label>("scenes-in-build-label");
 
@@ -1978,29 +1960,12 @@ namespace Virtuademy.SDK.Environments.Editor
             SetIcon(root.Q<VisualElement>("binary-catalog-icon"), error_icons);
 
             root.Q<Button>("blocking-fix-button").clicked += FixBuildSettings;
-            root.Q<Button>("advanced-fix-button").clicked += FixBuildSettings;
-            root.Q<Button>("blocking-details-button").clicked += () =>
-            {
-                advancedFoldout.value = true;
-                VisualElement target = root.Q<VisualElement>("addressables-settings");
-                root.schedule.Execute(() => root.Q<ScrollView>("window-scroll")?.ScrollTo(target));
-            };
+            root.Q<Button>("blocking-details-button").clicked += AddressablesSettingsWindow.Open;
+            root.Q<Button>("addressables-settings-button").clicked += AddressablesSettingsWindow.Open;
 
-            // The checks are read again every two seconds: someone can change the Addressables settings in their own windows.
+            // The check is read again every two seconds: someone can change the Addressables settings in their own windows.
             RefreshSettingsChecks();
             root.schedule.Execute(RefreshSettingsChecks).Every(2000);
-
-            Button topLevelSettingsButton = root.Q<Button>("top-level-settings-button");
-            topLevelSettingsButton.clicked += () => EditorApplication.ExecuteMenuItem("Window/Asset Management/Addressables/Settings");
-
-            Button profileSettingsButton = root.Q<Button>("profile-settings-button");
-            profileSettingsButton.clicked += () => EditorApplication.ExecuteMenuItem("Window/Asset Management/Addressables/Profiles");
-
-            Button groupsSettingsButton = root.Q<Button>("addressables-groups-button");
-            groupsSettingsButton.clicked += () => EditorApplication.ExecuteMenuItem("Window/Asset Management/Addressables/Groups");
-
-            Button defaultLocalGroupButton = root.Q<Button>("default-local-group-button");
-            defaultLocalGroupButton.clicked += () => Selection.activeObject = settings.DefaultGroup;
 
             // Build only builds: when the settings are not the SDK's, it says so and offers the fix.
             buildAddressablesButton = root.Q<Button>("build-addressables-button");
@@ -2038,14 +2003,11 @@ namespace Virtuademy.SDK.Environments.Editor
 
         #endregion
 
-        #region Top-Level settings configuration
-
-        [CreateProperty]
-        public bool IsAddressablesSettingsConfigured => AddressablesConfiguration.IsSettingsConfigured(settings);
+        #region Build settings banner
 
         /// <summary>
-        /// The advanced section's items, each with a check or a warning icon and, in its tooltip, what the SDK expects; the
-        /// count of items to fix in the section's title; and the banner at the top while anything differs.
+        /// The banner at the top while the Addressables settings are not the SDK's: the same check the build makes, so the two never
+        /// disagree. What differs is listed in the Addressables settings window (Details).
         /// </summary>
         private void RefreshSettingsChecks()
         {
@@ -2055,73 +2017,13 @@ namespace Virtuademy.SDK.Environments.Editor
             if (settings == null)
                 settings = AddressablesConfiguration.GetOrCreateSettings();
 
-            (string Icon, string Value, Func<string> Current, bool Ok, string Expected)[] items =
-            {
-                ("addressables-profile-check", "addressables-profile-value", () => ActiveProfileName, IsAddressablesSettingsConfigured,
-                    "The top-level settings the SDK sets: the remote catalog on Remote.BuildPath and Remote.LoadPath, a JSON catalog " +
-                    $"(with the {AddressablesConfiguration.JsonCatalogDefine} define), custom bundle naming, contiguous and non-recursive bundles."),
-                ("remote-buildpath-check", "remote-buildpath-value", () => CurrentRemoteBuildPathVariableValue, IsRemoteBuildPathConfigured,
-                    "Expected: " + AddressablesConfiguration.RemoteBuildPath),
-                ("remote-loadpath-check", "remote-loadpath-value", () => CurrentRemoteLoadPathVariableValue, IsRemoteLoadPathConfigured,
-                    "Expected: " + AddressablesConfiguration.RemoteLoadPath),
-                ("build-target-check", "build-target-value", () => CurrentBuildTargetVariableValue, IsBuildTargetConfigured,
-                    "Expected: " + AddressablesConfiguration.BuildTargetVariableValue),
-                ("player-version-override-check", "player-version-override-value", () => CurrentPlayerVersionOverrideVariableValue, IsPlayerVersionOverrideConfigured,
-                    "Expected: " + AddressablesConfiguration.PlayerVersionOverrideVariableValue),
-                ("default-local-group-check", null, null, AddressablesConfiguration.AreGroupsConfigured(settings),
-                    "Expected: one default group, built and loaded from the remote paths. Fix build settings resets the groups to it."),
-            };
-
-            int toFix = 0;
-            foreach ((string icon, string value, Func<string> current, bool ok, string expected) in items)
-            {
-                VisualElement element = root.Q<VisualElement>(icon);
-                SetIcon(element, ok ? check_icons : warning_icons);
-                element.tooltip = (ok ? "As the SDK expects. " : "Not what the SDK expects. ") + expected;
-
-                if (value != null)
-                {
-                    Label label = root.Q<Label>(value);
-                    label.text = current() ?? "(missing)";
-                    label.tooltip = element.tooltip;
-                }
-
-                if (!ok)
-                    toFix++;
-            }
-
-            // The banner follows the same check the build makes, so the two never disagree.
-            bool configured = AddressablesConfiguration.IsConfiguredFor(settings);
-            if (!configured && toFix == 0)
-                toFix = 1;
-
-            DisplayStyle show = configured ? DisplayStyle.None : DisplayStyle.Flex;
-            blockingBanner.style.display = show;
-            advancedFixRow.style.display = show;
-            advancedFoldout.text = configured ? "Advanced settings" : $"Advanced settings ({toFix} to fix)";
+            blockingBanner.style.display = AddressablesConfiguration.IsConfiguredFor(settings) ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
-        /// <summary>
-        /// Applies the build settings the SDK needs (<see cref="AddressablesConfiguration.Apply"/>), which resets the project's
-        /// asset groups to a single default group, after a confirmation.
-        /// </summary>
+        /// <summary>Fix in the banner: <see cref="AddressablesSettingsWindow.FixBuildSettings"/>, which asks first.</summary>
         private void FixBuildSettings()
         {
-            if (!EditorUtility.DisplayDialog("Fix build settings",
-                    "Apply the build settings the SDK needs? It resets the project's asset groups to a single default group " +
-                    "(the scenes are added again at the next build).", "Fix", "Cancel"))
-                return;
-
-            try
-            {
-                AddressablesConfiguration.Apply();
-            }
-            catch (InvalidOperationException ex)
-            {
-                Debug.LogError("[PublishEnvironments] " + ex.Message);
-                EditorUtility.DisplayDialog("Fix build settings", ex.Message, "OK");
-            }
-
+            AddressablesSettingsWindow.FixBuildSettings();
             settings = AddressablesConfiguration.GetOrCreateSettings();
             RefreshSettingsChecks();
         }
@@ -2295,7 +2197,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 return true;
 
             LogDeployError($"{what} aborted: the project's build settings are not the ones the SDK needs. " +
-                           "Press Fix in the banner at the top of the window (\"Advanced settings\" lists what is wrong), then try again. Nothing was built.");
+                           "Press Fix in the banner at the top of the window (its Details opens Addressables settings, which lists what is wrong), then try again. Nothing was built.");
             if (EditorUtility.DisplayDialog($"{what} blocked",
                     "The project's build settings are not the ones the SDK needs, so a build would fail at the end. Nothing was built.\n\n" +
                     "Fix them now? It resets the project's asset groups to a single default group. Then start again.",
