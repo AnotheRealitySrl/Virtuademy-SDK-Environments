@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Events;
 
 namespace Virtuademy.Environments.ScriptingApi.Placeholders
@@ -44,17 +45,30 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             onDisplayIntro?.Invoke(value);
         }
 
-        [HideInInspector] public UnityEvent onShowAsPersonalPanel = new UnityEvent();
+        // The order of the requests, across placeholders: the latest wins
+        private static int lastPersonalPanelRequest;
+
+        /// <summary>
+        /// When <see cref="ShowAsPersonalPanel"/> was last called on this placeholder, as an order among every
+        /// placeholder's calls (0: never). The application reads it when it creates the panel, so a call made before
+        /// (on Start, say) is not lost.
+        /// </summary>
+        public int PersonalPanelRequest { get; private set; }
+
+        /// <summary>Raised by <see cref="ShowAsPersonalPanel"/>; the application switches the panel on it.</summary>
+        public event Action PersonalPanelRequested;
 
         /// <summary>
         /// Makes this placeholder's panel the one shown with the player. Only one panel with the player (With Player: on
-        /// the screen on desktop and mobile, beside the player in VR) is shown at a time: the first one created, until
-        /// the environment calls this on another placeholder. The panel shown until then is hidden, not destroyed: it
-        /// keeps its tasks and its state. Panels in the world are not affected. Callable from Visual Scripting.
+        /// the screen on desktop and mobile, beside the player in VR) is shown at a time: the one the environment asked
+        /// for last, else the first one created. The panel shown until then is hidden, not destroyed: it keeps its tasks
+        /// and its state. Panels in the world are not affected. Callable from Visual Scripting, also before the panel
+        /// exists: the request is kept and applied when it is created.
         /// </summary>
         public void ShowAsPersonalPanel()
         {
-            onShowAsPersonalPanel?.Invoke();
+            PersonalPanelRequest = ++lastPersonalPanelRequest;
+            PersonalPanelRequested?.Invoke();
         }
 
         /// <summary>Whether any platform shows this panel in the world.</summary>
