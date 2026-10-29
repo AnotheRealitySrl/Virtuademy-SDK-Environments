@@ -13,10 +13,10 @@ classes kept as `[Obsolete]` shells. No public member removed or renamed.
 - **`SpawnableObjectPlaceholder.customThirdPersonHold` / `thirdPersonHoldOffset`** (2026.7, minor): on desktop, web
   and mobile, in third person, an item held with the hand at its own offset from the avatar's chest instead of the
   platform's default. Off by default.
-- **`PickablePlaceholder.dragMode`** (2026.7, minor): `Model` (default) drags the 3D object as a manipulable; `Icon`
-  drags the item as its icon on desktop, web and mobile, back where it was on release unless used on a target or
-  dropped on the inventory. Until now every pickable was dragged as its icon on desktop: an environment that wants that
-  sets `Icon` on its pickables.
+- **`PickablePlaceholder.dragMode`** (2026.7, minor): `Icon` (default) drags the item as its icon on desktop, web and
+  mobile, back where it was on release unless used on a target or dropped on the inventory, as every pickable was
+  dragged on desktop until now; `Model` drags the 3D object as a manipulable. A pickable serialized before the field
+  existed (every published environment) loads as `Icon`: no environment changes behaviour.
 - **`IToolsApi.ToolUseStarted` / `ToolUseEnded`, `ToolUse`** (2026.7, minor): every player's tool uses, this player's
   (`IsLocal`) and, in a multiplayer session, the others', with the tool's name, the player and an `Aim` transform
   (where the use starts, its forward; for another player at their avatar's right hand). An effect every player sees
