@@ -663,7 +663,7 @@ namespace Virtuademy.BreakingChangeSolvers
             if (result.NodeLibrary == VirtuademyRenameRoutine.NodeLibraryState.NotBuilt)
             {
                 applied["nodeLibraryNote"] = "The project never built its Visual Scripting node library, so there was none to rebuild. " +
-                                             "Build it after the last launch: SetupCli -vdSetupSteps vslibrary, or Virtuademy > Update VS Library.";
+                                             "Build it after the last launch: SetupCli -vdSetupSteps vslibrary, or Virtuademy > Advanced > Update Visual Scripting library.";
             }
             if (result.UnmappedReferences.Count > 0)
             {

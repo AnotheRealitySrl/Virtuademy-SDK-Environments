@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The Virtuademy menu is grouped and ordered** (minor): **Setup project**, **Publish Environments** and **Readme** first, then
+  **Update routines** (newest first), then **Advanced**, with a separator before each submenu (menu priorities). **Update VS Library** is
+  now **Advanced ▸ Update Visual Scripting library**: the setup updates the library itself, and does it again when the library lacks
+  the SDK's types. **Development ▸ Scene objects management** is now **Advanced ▸ Scene objects management**, and the Development
+  submenu is gone. The update routines keep their menu paths, which the setup and the command line run them by.
+
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
 classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four
 `EnvironmentsCli` commands, one option on every command and the exit codes 26 to 32 (minor; `ExitApiHostMismatch` stays defined and is no

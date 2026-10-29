@@ -96,7 +96,7 @@ namespace Virtuademy.SDK.Environments.VisualScripting.Editor
     private bool hasScanned;
     private bool scenesSkipped;
 
-    [MenuItem("Virtuademy/Update routines/v2026.4.x -> v2026.5.0")]
+    [MenuItem("Virtuademy/Update routines/v2026.4.x -> v2026.5.0", false, 21)]
     public static void Open()
     {
       CheckPlatformUnitMobilePortUpdater window = GetWindow<CheckPlatformUnitMobilePortUpdater>(false, WindowTitle, true);

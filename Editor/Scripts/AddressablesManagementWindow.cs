@@ -230,7 +230,8 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
 #if !VIRTUADEMY_APPLICATION
-        [MenuItem("Virtuademy/Publish Environments")]
+        // Second in the Virtuademy menu, under Setup project (the setup package's, priority 0).
+        [MenuItem("Virtuademy/Publish Environments", false, 1)]
 #endif
         public static void ShowExample()
         {

@@ -620,7 +620,8 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         private bool resolveGuidCollisions = true;
         private bool wasResavePending;
 
-        [MenuItem(MenuPath)]
+        // The update routines sit in their own group of the Virtuademy menu, newest first.
+        [MenuItem(MenuPath, false, 20)]
         public static void Open()
         {
             VirtuademyRenameMigrator window = GetWindow<VirtuademyRenameMigrator>(false, WindowTitle, true);
@@ -1404,7 +1405,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
                     && boltFlow.GetProperty("Paths", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null) == null)
                 {
                     Debug.Log($"[{WindowTitle}] The Visual Scripting node library was not rebuilt: it has not been built in this project, so there is " +
-                              "nothing to rebuild. Build it once the project has recompiled: Virtuademy > Update VS Library, or " +
+                              "nothing to rebuild. Build it once the project has recompiled: Virtuademy > Advanced > Update Visual Scripting library, or " +
                               "SetupCli -vdSetupSteps vslibrary on the command line.");
                     return VirtuademyRenameRoutine.NodeLibraryState.NotBuilt;
                 }
@@ -1482,7 +1483,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
         {
             /// <summary>Rebuilt in place.</summary>
             Rebuilt,
-            /// <summary>There was none to rebuild: the project never built one. <b>Update VS Library</b> does.</summary>
+            /// <summary>There was none to rebuild: the project never built one. <b>Advanced ▸ Update Visual Scripting library</b> does.</summary>
             NotBuilt,
             /// <summary>The rebuild threw: see the Console.</summary>
             Failed,
@@ -1529,7 +1530,7 @@ namespace Virtuademy.SDK.Environments.Installer.Editor
             /// <summary>The rewrite changed scripts or assembly definitions: Unity recompiles, and the re-save waits for it.</summary>
             public bool CodeChanged;
             /// <summary>What became of the Visual Scripting node library. <see cref="NodeLibraryState.NotBuilt"/> in a project that never
-            /// built one (a batch-mode project nobody opened): <b>Update VS Library</b> builds it.</summary>
+            /// built one (a batch-mode project nobody opened): <b>Advanced ▸ Update Visual Scripting library</b> builds it.</summary>
             public NodeLibraryState NodeLibrary;
             /// <summary>The node library was rebuilt in place.</summary>
             public bool NodeLibraryRebuilt => NodeLibrary == NodeLibraryState.Rebuilt;
