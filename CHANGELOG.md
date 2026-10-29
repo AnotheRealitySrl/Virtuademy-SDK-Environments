@@ -6,6 +6,9 @@ The review fixes below warrant a minor bump: fixes, two values appended to `Envi
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 #### Added
+- **`SpawnableObjectPlaceholder.customThirdPersonHold` / `thirdPersonHoldOffset`** (2026.7, minor): on desktop, web
+  and mobile, in third person, an item held with the hand at its own offset from the avatar's chest instead of the
+  platform's default. Off by default.
 - **`PickablePlaceholder.dragMode`** (2026.7, minor): `Model` (default) drags the 3D object as a manipulable; `Icon`
   drags the item as its icon on desktop, web and mobile, back where it was on release unless used on a target or
   dropped on the inventory. Until now every pickable was dragged as its icon on desktop: an environment that wants that

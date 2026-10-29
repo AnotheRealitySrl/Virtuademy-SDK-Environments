@@ -30,6 +30,14 @@ namespace Virtuademy.SDK.Environments
         [HideInInspector] public Transform rightHandPivot;
         //------------------
 
+        [Tooltip("Desktop, web and mobile, third person: hold this item with the hand at the offset below instead of the "
+                 + "platform's default.")]
+        public bool customThirdPersonHold = false;
+
+        [Tooltip("The holding hand's place from the avatar's chest, in metres (x to the side of the holding arm, y up, z "
+                 + "forward). Used only with Custom Third Person Hold.")]
+        public Vector3 thirdPersonHoldOffset = new Vector3(0.2f, 0.15f, 0.4f);
+
         [HideInInspector] public GameObject LeftHandReference;
         [HideInInspector] public GameObject RightHandReference;
 
