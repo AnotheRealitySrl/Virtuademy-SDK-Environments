@@ -6,6 +6,9 @@ The review fixes below warrant a minor bump: fixes, two values appended to `Envi
 classes kept as `[Obsolete]` shells. No public member removed or renamed.
 
 #### Added
+- **`PickablePlaceholder.dragMode`** (2026.7, minor): `Icon` (default, as before) drags the item as its icon on
+  desktop, web and now mobile too, back where it was on release unless used on a target or dropped on the inventory;
+  `Model` drags the 3D object as a manipulable.
 - **`IToolsApi.ToolUseStarted` / `ToolUseEnded`, `ToolUse`** (2026.7, minor): every player's tool uses, this player's
   (`IsLocal`) and, in a multiplayer session, the others', with the tool's name, the player and an `Aim` transform
   (where the use starts, its forward; for another player at their avatar's right hand). An effect every player sees
