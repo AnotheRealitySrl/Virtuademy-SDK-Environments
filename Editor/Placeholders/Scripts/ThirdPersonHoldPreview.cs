@@ -22,10 +22,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
     public sealed class ThirdPersonHoldPreview
     {
         // The application's default hold (ToolSystemWebGL.holdHandOffset in the app), from the chest, x to the side of the
-        // holding arm, y up, z forward; and the elbow's hint (HeldToolPose)
+        // holding arm, y up, z forward; and the elbow's hint (FavoriteHandPose)
         public static readonly Vector3 DefaultHoldOffset = new Vector3(0.2f, 0.3f, 0.43f);
         private static readonly Vector3 ElbowHintOffset = new Vector3(0.35f, -0.25f, -0.2f);
-        // The fingers level, a little in towards the body (HeldToolPose.FingerDirection, mirrored for the right hand)
+        // The fingers level, a little in towards the body (FavoriteHandPose.FingerDirection, mirrored for the right hand)
         private static readonly Vector3 FingerDirection = new Vector3(-0.15f, 0f, 1f);
 
         /// <summary>The mannequin's height, in metres, at which the hold offset is drawn as written.</summary>
@@ -33,7 +33,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
 
         /// <summary>
         /// The height of the avatar to preview, for this editor session only: the application proportions the hold offset
-        /// to each avatar's height (offset x height / ReferenceHeight, HeldToolPose); the item keeps its own size.
+        /// to each avatar's height (offset x height / ReferenceHeight, FavoriteHandPose); the item keeps its own size.
         /// </summary>
         public static float PreviewHeight { get; set; } = ReferenceHeight;
 
