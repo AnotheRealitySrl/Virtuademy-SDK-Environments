@@ -28,9 +28,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [Tooltip("VR: the panel in the world, where this placeholder is, or with the player, low on their left.")]
         public ETaskPanelPlacement vrPlacement = ETaskPanelPlacement.InWorld;
 
-        [Tooltip("In the world: the panel's width and height, in metres, before this placeholder's scale. The panel is "
-            + "centred on the placeholder and read from the side its forward axis (blue) points away from. Select the "
-            + "placeholder to see it in the Scene view.")]
+        [Tooltip("In the world: the panel's width and height, in metres, multiplied by this placeholder's scale on each "
+            + "axis. The scale sizes the panel, it does not stretch its content: text and controls keep their size and "
+            + "lay out in the area. The panel is centred on the placeholder and read from the side its forward axis "
+            + "(blue) points away from. Select the placeholder to see it in the Scene view.")]
         public Vector2 worldPanelSize = new Vector2(0.61f, 0.69f);
 
         [SerializeField] public GameObject taskSystem; //Reference to task system for callbacks (Forse non serve, ma ci collego gli eventi di callback)
@@ -61,8 +62,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             Gizmos.DrawCube(Vector3.zero, size);
             Gizmos.color = new Color(0.23f, 0.5f, 1f, 1f);
             Gizmos.DrawWireCube(Vector3.zero, size);
-            // The header strip: 60 of the panel's 692 units
-            float header = size.y * 60f / 692f;
+            // The header strip: 6 cm in the world, whatever the scale (the content is not stretched)
+            float header = Mathf.Min(size.y, 0.06f / Mathf.Max(1e-5f, Mathf.Abs(transform.lossyScale.y)));
             Gizmos.color = new Color(1f, 1f, 1f, 0.8f);
             Gizmos.DrawCube(new Vector3(0f, size.y * 0.5f - header * 0.5f, 0f), new Vector3(size.x, header, 0f));
             // Read from the -forward side: an arrow from the reader towards the panel
