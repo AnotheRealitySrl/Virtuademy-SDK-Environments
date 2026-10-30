@@ -112,11 +112,52 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// <remarks>Node: <c>Virtuademy Visual Scripting Interactable: On Interact</c>.</remarks>
         public event Action<InteractionEventArgs> OnInteract;
 
+        /// <summary>
+        /// Whether the application blocks interaction with the object: while it is selected by another
+        /// user, being manipulated or edited, locked, or blocked by a script or node. A blocked object
+        /// cannot be hovered, selected or interacted with. False until the application sets the object
+        /// up.
+        /// </summary>
+        public bool IsBlocked { get; private set; }
+
+        /// <summary>
+        /// <see cref="IsBlocked"/> changed. Raised on this client when the object becomes blocked for any
+        /// reason after being free, and when the last reason goes away; not when one reason replaces another.
+        /// </summary>
+        public event InteractableBlockedChangedHandler OnBlockedChanged;
+
         void IInteractableEventSink.RaiseHoverEnter(InteractionEventArgs args) => Raise(OnHoverEnter, args);
         void IInteractableEventSink.RaiseHoverExit(InteractionEventArgs args) => Raise(OnHoverExit, args);
         void IInteractableEventSink.RaiseSelectEnter(InteractionEventArgs args) => Raise(OnSelectEnter, args);
         void IInteractableEventSink.RaiseSelectExit(InteractionEventArgs args) => Raise(OnSelectExit, args);
         void IInteractableEventSink.RaiseInteract(InteractionEventArgs args) => Raise(OnInteract, args);
+
+        void IInteractableEventSink.RaiseBlockedChanged(bool blocked)
+        {
+            if (IsBlocked == blocked)
+            {
+                return;
+            }
+            IsBlocked = blocked;
+            InteractableBlockedChangedHandler handlers = OnBlockedChanged;
+            if (handlers == null)
+            {
+                return;
+            }
+            List<Exception> failures = null;
+            foreach (Delegate handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    ((InteractableBlockedChangedHandler)handler)(blocked);
+                }
+                catch (Exception e)
+                {
+                    (failures ??= new List<Exception>()).Add(e);
+                }
+            }
+            Rethrow(failures);
+        }
 
         // Every handler runs, then a failure surfaces (review S9, platform errors fail loudly): a failing handler does
         // not keep the others from running, and its exception is thrown to the application, which raises these events
@@ -140,6 +181,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
                     (failures ??= new List<Exception>()).Add(e);
                 }
             }
+            Rethrow(failures);
+        }
+
+        private void Rethrow(List<Exception> failures)
+        {
             if (failures == null)
             {
                 return;

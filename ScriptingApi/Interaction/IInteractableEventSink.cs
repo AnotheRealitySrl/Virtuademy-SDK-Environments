@@ -16,5 +16,6 @@ namespace Virtuademy.Environments.ScriptingApi.Interaction
         void RaiseSelectEnter(InteractionEventArgs args);
         void RaiseSelectExit(InteractionEventArgs args);
         void RaiseInteract(InteractionEventArgs args);
+        void RaiseBlockedChanged(bool blocked);
     }
 }

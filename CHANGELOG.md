@@ -245,6 +245,9 @@ one usable connection, which changes what a script that relied on the project's 
   only. Every handler runs; a handler's exception is then thrown, not swallowed.
 - **`InteractablePlaceholder.VRControllers`** (`EVRInteractionControllers` flags: `Ray`, `Hands`; both by default)
   (2026.7, minor): which VR controllers can hover, select and interact with the object.
+- **`InteractablePlaceholder.IsBlocked`** and **`OnBlockedChanged`** (`InteractableBlockedChangedHandler(bool blocked)`)
+  (2026.7, minor): whether the application blocks interaction with the object (selected or manipulated by another
+  user, edited, locked, blocked by a node), and an event when that changes from free to blocked or back.
 - **Scene panels from scripts** (2026.7, minor): `IUIApi.ShowPanel`, `HidePanel`, `SetPanelText`, `SetPanelVariant`,
   `SetHudCount`, `SetHudHint`, `SetListItemDone`, `ShowCheckResult` and the event `PanelButtonPressed`, for the UI
   Toolkit panels an environment places in its scene.
