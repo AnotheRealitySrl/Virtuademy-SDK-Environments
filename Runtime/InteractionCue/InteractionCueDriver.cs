@@ -150,6 +150,21 @@ namespace Virtuademy.SDK.Environments.InteractionCue
             cue.SetInteractableBlocked(held.CurrentBlockedState != 0);
         }
 
+        /// <summary>
+        /// Called by the application in multiplayer for a networked cue: from now on a right or wrong action shown by a
+        /// script or node on this client is also sent to the others through <paramref name="bridge"/>.
+        /// </summary>
+        public void AttachNetwork(IInteractionCueNetworkBridge bridge)
+        {
+            cue.ResultBroadcast = bridge == null ? null : bridge.SendResult;
+        }
+
+        /// <summary>A right or wrong action received from another user: shown here, never sent on.</summary>
+        public void ShowReceivedResult(bool right)
+        {
+            cue.ShowResultLocally(right);
+        }
+
         private void OnDestroy()
         {
             if (cue != null)

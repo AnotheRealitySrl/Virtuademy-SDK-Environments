@@ -235,10 +235,15 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// <summary>Shows a wrong action for <see cref="FeedbackSeconds"/>.</summary>
         public void ShowWrong() => ShowResult(false);
 
-        /// <summary>Shows a right or wrong action for <see cref="FeedbackSeconds"/>; a new one replaces the one shown.</summary>
+        /// <summary>
+        /// Shows a right or wrong action for <see cref="FeedbackSeconds"/>; a new one replaces the one shown. In
+        /// multiplayer a cue with <see cref="SceneComponentPlaceholderNetwork.IsNetworked"/> shows it to every user of the
+        /// room (sent once); otherwise on this client only.
+        /// </summary>
         public void ShowResult(bool right)
         {
             ShowResultLocally(right);
+            ResultBroadcast?.Invoke(right);
         }
 
         #endregion
@@ -250,6 +255,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 
         /// <summary>Raised when what the cue draws may have changed: its state, or a setting of its look.</summary>
         internal event Action VisualChanged;
+
+        /// <summary>Set by the SDK runtime when the application networks this cue: sends an action shown by a script to the
+        /// others. Not called for actions received from them.</summary>
+        internal Action<bool> ResultBroadcast;
 
         /// <summary>Raised for every right (true) or wrong (false) action shown, after <see cref="VisualChanged"/>.</summary>
         internal event Action<bool> ResultShown;

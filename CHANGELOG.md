@@ -260,7 +260,8 @@ one usable connection, which changes what a script that relied on the project's 
   right or wrong action uses as `feedback` says (`ECueFeedback`: Rim, Mark, Flash, Sound); `showArrow` shows a "go
   here" arrow above the next target (or at `arrowAnchor`), created the first time it shows. The inspector also says
   what the cue cannot show (no settings, no renderer, Batching Static, a label without feedback objects) and the cost
-  of skinned cues. The rim is drawn on copies of the object's
+  of skinned cues. In multiplayer a cue with Is Networked (the default) shows `ShowRight`/`ShowWrong` to every user
+  of the room (one message per action, never sent on). The rim is drawn on copies of the object's
   renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
   never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
   `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
