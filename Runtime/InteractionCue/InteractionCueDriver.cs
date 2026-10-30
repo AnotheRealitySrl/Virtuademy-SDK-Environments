@@ -38,6 +38,12 @@ namespace Virtuademy.SDK.Environments.InteractionCue
 
         private InteractablePlaceholder interactable;
         private int hoveringControllers;
+        private InteractionCueTaskBinding taskBinding;
+
+        // The Interactable block this cue holds while completed (Block Interaction When Completed). Only a flag this
+        // cue set is cleared by it.
+        private const IInteractable.EBlockedState CompletedBlock = IInteractable.EBlockedState.BlockedByGenericLogic;
+        private IInteractable blockedInteractable;
 
         private VirtuademyLabel label;
         private bool labelSearched;
@@ -49,6 +55,7 @@ namespace Virtuademy.SDK.Environments.InteractionCue
             cue = placeholder;
             cue.VisualChanged += Draw;
             BindInteractable();
+            taskBinding = InteractionCueTaskBinding.Create(cue);
             Draw();
         }
 
@@ -99,7 +106,44 @@ namespace Virtuademy.SDK.Environments.InteractionCue
 
         private void OnSelectExit(InteractionEventArgs args) => cue.SetInteractableSelected(false);
 
-        private void OnBlockedChanged(bool blocked) => cue.SetInteractableBlocked(blocked);
+        // The block this cue holds while completed does not lock it (the cue shows Completed): only other reasons do.
+        private void OnBlockedChanged(bool blocked)
+        {
+            if (blocked && blockedInteractable != null && (blockedInteractable.CurrentBlockedState & ~CompletedBlock) == 0)
+            {
+                return;
+            }
+            cue.SetInteractableBlocked(blocked);
+        }
+
+        private void HoldCompletedBlock(bool hold)
+        {
+            if (hold == (blockedInteractable != null))
+            {
+                return;
+            }
+            if (hold)
+            {
+                IInteractable target = interactable != null ? interactable.GetComponent<IInteractable>() : null;
+                if (target == null || (target.CurrentBlockedState & CompletedBlock) != 0)
+                {
+                    // No Interactable yet (a creator's play mode), or already blocked this way by someone else.
+                    return;
+                }
+                blockedInteractable = target;
+                target.CurrentBlockedState |= CompletedBlock;
+                return;
+            }
+            IInteractable held = blockedInteractable;
+            blockedInteractable = null;
+            if (held as Object == null)
+            {
+                return;
+            }
+            held.CurrentBlockedState &= ~CompletedBlock;
+            // While this cue held its block, other reasons came and went without an event: read what is left.
+            cue.SetInteractableBlocked(held.CurrentBlockedState != 0);
+        }
 
         private void OnDestroy()
         {
@@ -107,6 +151,9 @@ namespace Virtuademy.SDK.Environments.InteractionCue
             {
                 cue.VisualChanged -= Draw;
             }
+            taskBinding?.Dispose();
+            taskBinding = null;
+            HoldCompletedBlock(false);
             if (interactable != null)
             {
                 interactable.OnHoverEnter -= OnHoverEnter;
@@ -128,6 +175,7 @@ namespace Virtuademy.SDK.Environments.InteractionCue
 
         private void Draw()
         {
+            HoldCompletedBlock(cue.BlockInteractionWhenCompleted && cue.BaseState == EInteractionCueState.Completed);
             DrawLabel();
             Material material = MaterialFor(cue.RimState);
             if (material == shownMaterial)

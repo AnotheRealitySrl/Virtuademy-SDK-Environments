@@ -35,6 +35,16 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
     {
         #region Settings
 
+        [Header("Tasks")]
+        [SerializeField, Tooltip("The tasks (objects with a Task) this object is a target of; several when the same object " +
+            "is used in several steps. The cue is the next target while any of them is to do, and completed when all are " +
+            "done. Empty: the task of the task elements on this object, if any.")]
+        private List<GameObject> tasks = new();
+
+        [SerializeField, Tooltip("Block the object's Interactable while the cue is completed (no hover, no clicks), and " +
+            "unblock it when it is not any more.")]
+        private bool blockInteractionWhenCompleted = false;
+
         [Header("Look")]
         [SerializeField, Tooltip("Materials, colour and arrow of the cue. The SDK's asset reproduces the Showcase highlight.")]
         private InteractionCueSettings settings;
@@ -77,6 +87,15 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [SerializeField] private UnityEvent onWrong = new();
         [SerializeField] private UnityEvent onCompleted = new();
         [SerializeField] private UnityEvent onLocked = new();
+
+        /// <summary>The tasks this object is a target of. Read when the cue wakes up.</summary>
+        public IReadOnlyList<GameObject> Tasks => tasks;
+
+        public bool BlockInteractionWhenCompleted
+        {
+            get => blockInteractionWhenCompleted;
+            set { blockInteractionWhenCompleted = value; Refresh(); }
+        }
 
         public InteractionCueSettings Settings => settings;
         public ECueNextTargetStyle NextTargetStyle { get => nextTargetStyle; set { nextTargetStyle = value; Refresh(); } }
@@ -148,6 +167,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// <summary>
         /// Sets the base state: <see cref="EInteractionCueState.Available"/>, <see cref="EInteractionCueState.NextTarget"/>
         /// or <see cref="EInteractionCueState.Completed"/>. Any other value is refused with an exception. This client only.
+        /// A cue with tasks also sets it whenever one of them changes status: the last change wins.
         /// </summary>
         public void SetBaseState(EInteractionCueState newBaseState)
         {

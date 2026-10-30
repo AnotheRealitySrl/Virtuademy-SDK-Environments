@@ -253,7 +253,9 @@ one usable connection, which changes what a script that relied on the project's 
   client; `CueChanged` (`InteractionCueChangedHandler`) and UnityEvents. The cue follows the object's Interactable by
   itself: hovered while any local controller hovers it (each VR ray and hand counts), selected, locked while the
   Interactable is blocked; with `ECueHoverStyle.RimAndLabel` its feedback objects' label shows `labelKey`/`labelText`
-  while hovered or selected. The rim is drawn on copies of the object's
+  while hovered or selected. A cue with `tasks` (or on an object whose task elements name one) follows them: next
+  target while any is to do or in progress, completed when all are completed or failed, again after a revert;
+  `blockInteractionWhenCompleted` blocks the Interactable while completed. The rim is drawn on copies of the object's
   renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
   never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
   `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
