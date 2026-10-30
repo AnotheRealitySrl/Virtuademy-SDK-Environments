@@ -36,6 +36,30 @@ environment project now uses every connection of the computer and a command that
 one usable connection, which changes what a script that relied on the project's list gets.
 
 #### Added
+- **A scene's thumbnail and localization file, per place, from the SDK** (minor). `EnvironmentsCli` gets `published` (where each scene of the
+  scene list is published, with the thumbnail and localization file each place holds: address, SHA-256, `canWrite`, and whether the project's
+  `Assets/Virtuademy/Editor/PublishFiles/` holds the same file), `save-files` (saves those files into the project, never writing a file the project
+  already holds, and a manifest; `-vdBackupFolder` writes a full copy elsewhere), `set-files` (replaces them at some places with project assets, after
+  saving the current ones to the project; a place that already holds the same file is `unchanged`; `-vdDryRun`), `restore -vdManifest` (puts back what
+  a `save-files` manifest recorded) and `scene-files` (the scene's default files). New exit codes: 37 a file would be refused by the platform (nothing is
+  sent), 38 one or more places were not changed (not allowed, the tenant cannot receive files yet, or an error). An image is prepared before it goes
+  online: a JPEG of at most 2560 x 1440, never upscaled, transparency flattened on white, quality 85. The platform keeps an upload byte for byte only
+  when it is a plain baseline JPEG: before its scan only SOI, APP0 JFIF, DQT, DHT, DRI and one SOF0 (8 bits, 1 or 3 components), in the scan only
+  entropy-coded bytes, FF D9 as the last two bytes and nothing after, within 2560 x 1440 (no EXIF, XMP, ICC, comment or progressive scan). The SDK sends such a
+  file unchanged (after decoding it once to catch corrupt data); anything else is converted into a new JPEG in the publish folder, written only right before it is
+  sent, and a file the project already holds anywhere under `Assets/` (same SHA-256) is reused, never copied again. An image over 50 megapixels is refused (exit 37);
+  a JPEG Unity cannot read is sent as it is with a warning. A localization file is checked against the platform's rules, which are those of the player's I2 reader
+  (message for message, with a port of that reader that compares what it reads with the rules): UTF-8 (a BOM is dropped), the header is the first line, no empty line
+  after it, no row of only commas, a line end or a lone CR ends a row, a quote only at the start of a quoted cell (`""` inside; no quote elsewhere, no empty `""`, no text
+  after a closing quote), `Key` exactly, `Type` and `Desc` only in columns 2 and 3, language names without brackets or a leading `$` and, in columns 2 and 3, without
+  "type" or "desc", language codes like `it` or `pt-BR` once each, keys of letters, digits, `/`, `_` and `-` that are unique also once the slashes are removed,
+  at most 2 MB; and against the tenant's languages (a missing language says which one its users will see; no language in common is exit 37). The
+  command line and the service (`EnvironmentFilesService`) read a file's hash from the platform, or download and hash it where the platform does not say.
+  Writes need a tenant whose platform has the routes; for the others the SDK says so and reads still work. Downloads are anonymous and never carry the session's token.
+- **A scene's default files** (minor): `SceneConfiguration` has a default thumbnail (an image asset) and a default localization file (a `.csv`
+  asset), kept in the scene list (`scene-files`). When a deploy makes the scene's environment in a place, it waits (up to three minutes) for the environment
+  to show up in the place's list and sends them, and says what it did in `deploy.targets[].scenes[].defaultFiles`; a later deploy never touches a place's
+  files. `deploy -vdDryRun` reports them in `defaultFiles`.
 - **`EnvironmentsCli` commands `login`, `logout`, `connections` and `whoami`** (meta-repo ADR 0037, first slice), over the
   per-user connection store of `Virtuademy-SDK-Core`. `login [-vdConnection <connection> | -vdApp <app> [-vdEnv <key>]]
   [-vdNoBrowser] [-vdLoginTimeoutSeconds <n>]` logs in to a connection of the store, or to the one of a configuration file

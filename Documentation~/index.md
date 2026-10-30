@@ -58,6 +58,12 @@ Unity -batchmode -nographics -projectPath <project> -logFile -
 | `preview (-vdWorlds <ids> \| -vdTenant) [-vdConnection <connection>] [-vdExpectTenant <label>] [-vdScenes a,b]` | what a deploy there would add and update; checks the tenant label when given |
 | `deploy (-vdWorlds <ids> \| -vdTenant) [-vdConnection <connection>] -vdExpectTenant <label> [-vdBuild] [-vdDryRun] [-vdScenes a,b]` | uploads and imports the built zips (and the interpreted assembly, to worlds); `-vdExpectTenant` is the tenant label of the connection it acts on (`whoami` shows it) and is mandatory (exit 24 when missing, 30 when it is another tenant's); `-vdBuild` builds first, `-vdDryRun` sends nothing |
 
+| `published [-vdScenes a,b] [-vdConnection <connection>]` | every scene of the scene list (included in the build or not): where it is published and the thumbnail and localization file each place holds (address, SHA-256, whether the project's `Assets/Virtuademy/Editor/PublishFiles/` holds the same file, `canWrite`); whether the tenant can receive files from the SDK. Read-only, any tenant |
+| `save-files [-vdScenes a,b] [-vdWorlds <ids> \| -vdTenant] [-vdBackupFolder <path>] [-vdDryRun] [-vdConnection <connection>]` | saves those files into `PublishFiles/` (never twice the same file) and writes a manifest for `restore`; `-vdBackupFolder` writes a full copy and its manifest to that folder instead |
+| `set-files -vdExpectTenant <label> -vdScenes <one> [-vdThumbnail <asset>] [-vdLocalization <asset>] (-vdWorlds <ids> \| -vdAllWorlds \| -vdTenant) [-vdExcludeWorlds <ids>] [-vdDryRun] [-vdConnection <connection>]` | replaces the files at those places with project assets (under `Assets/`); an image goes online as a JPEG of at most 2560 x 1440 (converted into `PublishFiles/` when it is not one already), the files the places hold now are saved to the project first, a place with the same file is `unchanged`; a file the platform would refuse is exit 37, a place not changed is exit 38 |
+| `restore -vdExpectTenant <label> -vdManifest <path> [-vdScenes a,b] [-vdWorlds <ids> \| -vdTenant] [-vdDryRun] [-vdConnection <connection>]` | puts back what a `save-files` manifest recorded, for the same connection, at the same environments |
+| `scene-files -vdScenes <one> [-vdThumbnail <asset>] [-vdLocalization <asset>] [-vdClear]` | the scene's default thumbnail and localization file, in the scene list (needs no network; without options it shows them). A deploy sends them when it makes the scene's environment in a place, and never again: `deploy.targets[].scenes[].defaultFiles` says what it did, `-vdDryRun` reports it in `defaultFiles` |
+
 A connection is one tenant of one Configuration-API instance (ADR 0037). It is named by its key (the instance's base URL, `#`,
 the tenant key), its tenant key, its tenant label or `app/env`; a name that fits none or several is exit 26. The connections live
 outside the project, in `%USERPROFILE%\.virtuademy\sdk\`, encrypted for the OS user. A command that names no connection acts on
@@ -85,7 +91,9 @@ mismatch (`-vdExpectTenant` is not the tenant of the connection the command acts
 `deploy` to a tenant whose platform version has another year or release than the one the project was set up from, or reports
 none; a project set up from `develop` is not checked), 32 platform mismatch (the connection's app is not a CreatorKit app: `worlds`,
 `preview`, `deploy` and `build` on it, a `login` or `tenant-config` with a key of another platform; the remedy is the CreatorKit
-configuration file). 25 (API host not matching the logged-in tenant) is no longer
+configuration file), 37 a thumbnail or localization file would be refused by the platform (nothing was sent), 38 one or more places
+were not changed (`set-files`, `restore`: not allowed, the tenant's platform cannot receive files yet, not published there, or an error; the
+others may have changed). 25 (API host not matching the logged-in tenant) is no longer
 returned and stays reserved, and so does 23 (configuration file not ignored by git, up to 2026.6: `tenant-config` writes
 nothing to the project any more). Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
 a deploy lets the step in flight finish and reports what was and was not done. Batch mode never starts an interactive login on its own: log in once with `login` (or from the connection's group in **Virtuademy > Publish Environments**), and the
