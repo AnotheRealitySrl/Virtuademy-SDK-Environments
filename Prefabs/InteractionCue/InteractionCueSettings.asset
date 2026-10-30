@@ -22,7 +22,7 @@ MonoBehaviour:
   arrowPrefab: {fileID: 4410000000000000001, guid: 4b9f898cb170424b83a25d2be3ee0d9e, type: 3}
   arrowHeight: 0.25
   feedbackPrefab: {fileID: 8407900295140853467, guid: 65a8a0b2dbabb8b42827c13363e03800, type: 3}
-  rightClip: {fileID: 0}
-  wrongClip: {fileID: 0}
-  taskCompletedClip: {fileID: 0}
-  summaryClip: {fileID: 0}
+  rightClip: {fileID: 8300000, guid: 6781aca6f7364970b36cf453b83a4bfe, type: 3}
+  wrongClip: {fileID: 8300000, guid: fd30f8f3611f46cdb995dfe22dfee27e, type: 3}
+  taskCompletedClip: {fileID: 8300000, guid: 1b90dd41387d4700861dba1ad5ef1e0f, type: 3}
+  summaryClip: {fileID: 8300000, guid: 9fb6ace638e041168f3c51ad74c68c12, type: 3}
