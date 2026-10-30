@@ -2,7 +2,7 @@
 using SPACS.Tasks;
 using SPACS.Tasks.UI;
 
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
@@ -68,7 +68,13 @@ namespace Virtuademy.SDK.Environments.Tasks
 
             if (isNetworked)
             {
-                StartCoroutine(AddRevertCallbacks());
+                // A manager already on the object (one baked into a prefab) is ready now; otherwise the application's
+                // bridge hands one over with SetRpcManager.
+                if (rpcManagerInterface == null && TryGetComponent(out ITasksRPCManager baked))
+                {
+                    SetRpcManager(baked);
+                }
+                WhenRpcManagerReady(manager => manager.SetOnRevert(base.Revert));
             }
 
             if (startImmediately)
@@ -77,25 +83,35 @@ namespace Virtuademy.SDK.Environments.Tasks
             }
         }
 
-        public IEnumerator WaitForRPCManager()
+        private event Action<ITasksRPCManager> RpcManagerReady;
+
+        /// <summary>
+        /// Hands the task system its RPC manager (the application's task network bridge does, in multiplayer) and runs
+        /// what was waiting for it. Replaces polling for the component every frame.
+        /// </summary>
+        public void SetRpcManager(ITasksRPCManager manager)
         {
-            if (rpcManagerInterface == null)
+            if (manager == null || ReferenceEquals(rpcManagerInterface, manager))
             {
-                while (gameObject.GetComponent<ITasksRPCManager>() == null)
-                {
-                    yield return null;
-                }
-                rpcManagerInterface = gameObject.GetComponent<ITasksRPCManager>();
+                return;
             }
+            rpcManagerInterface = manager;
+            Action<ITasksRPCManager> waiting = RpcManagerReady;
+            RpcManagerReady = null;
+            waiting?.Invoke(manager);
         }
 
-        public IEnumerator AddRevertCallbacks()
+        /// <summary>Runs <paramref name="onReady"/> with the RPC manager: now if it is there, otherwise once it is set.</summary>
+        public void WhenRpcManagerReady(Action<ITasksRPCManager> onReady)
         {
-            if (rpcManagerInterface == null)
+            if (rpcManagerInterface != null)
             {
-                yield return StartCoroutine(WaitForRPCManager());
+                onReady(rpcManagerInterface);
             }
-            rpcManagerInterface.SetOnRevert(base.Revert);
+            else
+            {
+                RpcManagerReady += onReady;
+            }
         }
 
         //function called when the descriptions on the tasks have been initialized in the localizeTaskBridge

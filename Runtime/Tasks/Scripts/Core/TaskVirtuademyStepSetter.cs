@@ -1,6 +1,5 @@
 using Unity.VisualScripting;
 using SPACS.Tasks;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,19 +16,14 @@ namespace Virtuademy.SDK.Environments.Tasks
             systemVirtuademy = GetComponent<TaskSystemVirtuademy>();
             if (systemVirtuademy.isNetworked)
             {
-                StartCoroutine(WaitForRPCManager());
+                systemVirtuademy.WhenRpcManagerReady(OnRpcManagerReady);
             }
 
         }
 
-        private IEnumerator WaitForRPCManager()
+        private void OnRpcManagerReady(ITasksRPCManager manager)
         {
-            while (rpcManagerInterface == null)
-            {
-                rpcManagerInterface = systemVirtuademy.rpcManagerInterface;
-                yield return null;
-            }
-            rpcManagerInterface = systemVirtuademy.rpcManagerInterface;
+            rpcManagerInterface = manager;
             rpcManagerInterface.AddJoinRoomEvent(Init);
         }
 

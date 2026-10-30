@@ -245,6 +245,12 @@ one usable connection, which changes what a script that relied on the project's 
   only. Every handler runs; a handler's exception is then thrown, not swallowed.
 - **`InteractablePlaceholder.VRControllers`** (`EVRInteractionControllers` flags: `Ray`, `Hands`; both by default)
   (2026.7, minor): which VR controllers can hover, select and interact with the object.
+- **Task nodes Fail Task, Unlock Task, On Task Unlocked, On Task Failed** (2026.7, minor) ("Virtuademy Tasks"); a node
+  without a task throws. On Task Failed is raised for failures only (On Task Completed still carries Completed false).
+- **`TaskUIPlaceholder.ETaskPanelPlacement.Hidden`** (2026.7, minor): no task panel on that platform.
+- **`TaskSystemVirtuademy.SetRpcManager`** and **`WhenRpcManagerReady`** (2026.7, minor): the application hands the task
+  system its RPC manager, and the tasks, the step setter and the revert callback wait for it on that call instead of
+  checking every frame.
 - **Interaction cue** (2026.7, minor): `InteractionCuePlaceholder` shows how an object can be used, with the look of the
   Showcase highlight: a cyan rim that pulses on the next target (or is fixed, `ECueNextTargetStyle`), a rim on hover and
   selection, green or red for a right or wrong action (`ShowRight`, `ShowWrong`, `ShowResult`, for `FeedbackSeconds`),
@@ -426,6 +432,11 @@ one usable connection, which changes what a script that relied on the project's 
   name and does not check the tenant's set. Comments only: the behaviour is unchanged.
 
 #### Fixed
+
+- **On Task System Ready declares its input as a task system** (it was declared as a `Task` but read as a
+  `TaskSystemVirtuademy`).
+- **`TasksLogic.prefab` no longer carries an XRI `TrackedDeviceGraphicRaycaster`** on `MainUIWorldSpaceCanvas`: the
+  application adds the raycaster it needs at scene setup. Environments rebuilt from the prefab only.
 
 - **`Informative_Highlight.ResetMaterials` no longer throws with fewer than two highlight materials**: it removes
   every highlight material it has instead of indexing the first two.
