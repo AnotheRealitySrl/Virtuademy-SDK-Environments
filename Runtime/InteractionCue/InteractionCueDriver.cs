@@ -21,7 +21,7 @@ namespace Virtuademy.SDK.Environments.InteractionCue
     /// </remarks>
     [DisallowMultipleComponent]
     [AddComponentMenu("")]
-    public class InteractionCueDriver : MonoBehaviour
+    public class InteractionCueDriver : MonoBehaviour, SPACS.Tasks.ITaskReactorExempt
     {
         private const string ShellName = "__Cue";
 
