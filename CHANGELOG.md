@@ -261,7 +261,8 @@ one usable connection, which changes what a script that relied on the project's 
   here" arrow above the next target (or at `arrowAnchor`), created the first time it shows. The inspector also says
   what the cue cannot show (no settings, no renderer, Batching Static, a label without feedback objects) and the cost
   of skinned cues. In multiplayer a cue with Is Networked (the default) shows `ShowRight`/`ShowWrong` to every user
-  of the room (one message per action, never sent on). The rim is drawn on copies of the object's
+  of the room (one message per action, never sent on). Nodes: Get Cue State, Set Cue State, Set Cue Locked, Show Cue
+  Feedback, On Cue Changed ("Virtuademy Interaction Cue"). The rim is drawn on copies of the object's
   renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
   never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
   `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
@@ -425,6 +426,9 @@ one usable connection, which changes what a script that relied on the project's 
   name and does not check the tenant's set. Comments only: the behaviour is unchanged.
 
 #### Fixed
+
+- **`Informative_Highlight.ResetMaterials` no longer throws with fewer than two highlight materials**: it removes
+  every highlight material it has instead of indexing the first two.
 - **Reload Scene plays the current experience again, in the session's mode.** It started the experience again
   single-player whatever the session was, so in a multiplayer session the player left the others, and it looked the
   experience up by the environment's name, which could open another experience of the same environment. It now calls
