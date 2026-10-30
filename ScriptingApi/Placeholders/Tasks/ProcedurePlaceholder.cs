@@ -73,7 +73,16 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 
         [Header("Feedback and summary")]
         [SerializeField] private EFeedbackPresentation feedbackPresentation = EFeedbackPresentation.Toast;
+        [SerializeField, Tooltip("Panel presentation: the panel shown for a right action (a Virtuademy Panel, Success variant).")]
+        private GameObject successPanel;
+        [SerializeField, Tooltip("Panel presentation: the panel shown for a wrong action (a Virtuademy Panel, Error variant).")]
+        private GameObject errorPanel;
         [SerializeField] private bool playSounds = true;
+        [SerializeField, Tooltip("The sounds of right and wrong actions, steps done and the summary (the interaction cue " +
+            "settings). The SDK's asset by default.")]
+        private InteractionCueSettings sounds;
+        [SerializeField, Tooltip("Feedback objects (mark, flash) moved to a target whose cue has none of its own.")]
+        private Transform sharedFeedback;
         [SerializeField, Tooltip("Show the summary at the end (the task panel's own end panel is not shown).")]
         private bool showSummary = true;
         [SerializeField] private ETimelineMode timeline = ETimelineMode.LostPointsOnly;
@@ -116,6 +125,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public bool OutOfOrderIsError => outOfOrderIsError;
         public EFeedbackPresentation FeedbackPresentation => feedbackPresentation;
         public bool PlaySounds => playSounds;
+        public GameObject SuccessPanel => successPanel;
+        public GameObject ErrorPanel => errorPanel;
+        public InteractionCueSettings Sounds => sounds;
+        public Transform SharedFeedback => sharedFeedback;
         public bool ShowSummaryAtEnd => showSummary;
         public ETimelineMode Timeline => timeline;
         public int TimelineMaxRows => timelineMaxRows;
@@ -269,6 +282,14 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         private void Awake()
         {
             Created?.Invoke(this);
+        }
+
+        private void Reset()
+        {
+#if UNITY_EDITOR
+            sounds = UnityEditor.AssetDatabase.LoadAssetAtPath<InteractionCueSettings>(
+                UnityEditor.AssetDatabase.GUIDToAssetPath(InteractionCuePlaceholder.DefaultSettingsGuid));
+#endif
         }
     }
 }

@@ -5,6 +5,8 @@ using SPACS.Tasks;
 using UnityEngine;
 
 using Virtuademy.Environments.ScriptingApi.Placeholders;
+using Virtuademy.Environments.ScriptingApi.Tasks;
+using Virtuademy.SDK.Environments.Tasks;
 
 using static SPACS.Tasks.TaskNode;
 
@@ -13,12 +15,24 @@ namespace Virtuademy.SDK.Environments.InteractionCue
     /// <summary>
     /// Sets a cue's base state from the status of the tasks it is a target of: next target while any of them is to do
     /// or in progress, completed when all are completed or failed, available otherwise. Listens to each task's
-    /// <see cref="TaskNode.onStatusChanged"/>; nothing runs between two changes.
+    /// <see cref="TaskNode.onStatusChanged"/>; nothing runs between two changes. In a procedure in Assessed mode the cue is
+    /// never the next target. It also shows the tasks' results, from any player: a wrong result or attempt as Wrong, a
+    /// completion as Right (not the tasks a step setter skips).
     /// </summary>
     internal sealed class InteractionCueTaskBinding
     {
         private readonly InteractionCuePlaceholder cue;
         private readonly List<TaskNode> nodes = new();
+        private readonly List<Task> tasks = new();
+        private readonly List<UnityEngine.Events.UnityAction<TaskStatus>> listeners = new();
+        private bool lastResultWrong;
+
+        // The cues bound to each task, for the procedure's feedback (hint targets, shared feedback objects, sounds).
+        private static readonly Dictionary<Task, List<InteractionCuePlaceholder>> cuesByTask = new();
+
+        /// <summary>The cues bound to <paramref name="task"/> (empty when none).</summary>
+        public static IReadOnlyList<InteractionCuePlaceholder> CuesOf(Task task) =>
+            cuesByTask.TryGetValue(task, out List<InteractionCuePlaceholder> list) ? list : System.Array.Empty<InteractionCuePlaceholder>();
 
         private InteractionCueTaskBinding(InteractionCuePlaceholder cue)
         {
@@ -66,32 +80,93 @@ namespace Virtuademy.SDK.Environments.InteractionCue
                 if (!binding.nodes.Exists(n => ReferenceEquals(n, task.Node)))
                 {
                     binding.nodes.Add(task.Node);
-                    task.Node.onStatusChanged.AddListener(binding.OnStatusChanged);
+                    binding.tasks.Add(task);
+                    TaskNode node = task.Node;
+                    UnityEngine.Events.UnityAction<TaskStatus> listener = previous => binding.OnStatusChanged(node, previous);
+                    binding.listeners.Add(listener);
+                    node.onStatusChanged.AddListener(listener);
+                    if (!cuesByTask.TryGetValue(task, out List<InteractionCuePlaceholder> list))
+                    {
+                        cuesByTask[task] = list = new List<InteractionCuePlaceholder>();
+                    }
+                    list.Add(cue);
                 }
             }
             if (binding.nodes.Count == 0)
             {
                 return null;
             }
+            TasksApi.Instance.TaskResultReported += binding.OnResult;
             binding.Apply();
             return binding;
         }
 
         public void Dispose()
         {
-            foreach (TaskNode node in nodes)
+            for (int i = 0; i < nodes.Count; i++)
             {
-                node.onStatusChanged.RemoveListener(OnStatusChanged);
+                nodes[i].onStatusChanged.RemoveListener(listeners[i]);
             }
+            listeners.Clear();
+            foreach (Task task in tasks)
+            {
+                if (cuesByTask.TryGetValue(task, out List<InteractionCuePlaceholder> list))
+                {
+                    list.Remove(cue);
+                    if (list.Count == 0)
+                    {
+                        cuesByTask.Remove(task);
+                    }
+                }
+            }
+            TasksApi.Instance.TaskResultReported -= OnResult;
             nodes.Clear();
+            tasks.Clear();
         }
 
-        private void OnStatusChanged(TaskStatus previous) => Apply();
+        private void OnStatusChanged(TaskNode node, TaskStatus previous)
+        {
+            Apply();
+            // A task done now (not one a step setter skips) shows Right, unless its completing result was wrong.
+            if (node.Status == TaskStatus.Completed && !TaskStepSetter.IsSkipping && !lastResultWrong && cue.isActiveAndEnabled)
+            {
+                cue.ShowResultLocally(true);
+            }
+            lastResultWrong = false;
+        }
+
+        // Every result reported on a bound task, from this user or (in a shared procedure) another one.
+        private void OnResult(GameObject task, TaskResult result)
+        {
+            if (!tasks.Exists(t => t != null && t.gameObject == task))
+            {
+                return;
+            }
+            lastResultWrong = result.Outcome == ETaskOutcome.Wrong;
+            if (lastResultWrong)
+            {
+                cue.ShowResultLocally(false);
+            }
+        }
 
         /// <summary>The base state the tasks give, applied to the cue.</summary>
         public void Apply()
         {
             cue.SetBaseState(BaseState());
+        }
+
+        // In a procedure in Assessed mode nothing is highlighted as the next target.
+        private bool Assessed()
+        {
+            foreach (Task task in tasks)
+            {
+                TaskSystemVirtuademy system = task != null ? task.GetComponentInParent<TaskSystemVirtuademy>(true) : null;
+                if (system != null && system.Procedure != null && system.Procedure.Procedure.Mode == EProcedureMode.Assessed)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private EInteractionCueState BaseState()
@@ -103,7 +178,7 @@ namespace Virtuademy.SDK.Environments.InteractionCue
                 {
                     case TaskStatus.Todo:
                     case TaskStatus.InProgress:
-                        return EInteractionCueState.NextTarget;
+                        return Assessed() ? EInteractionCueState.Available : EInteractionCueState.NextTarget;
                     case TaskStatus.Completed:
                     case TaskStatus.Failed:
                         break;

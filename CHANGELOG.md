@@ -258,7 +258,13 @@ one usable connection, which changes what a script that relied on the project's 
   `WrongFeedbackText`, events `Unlocked`, `Attempted`, `Completed`, `TaskFailed`, `HintShown` and methods `Complete`,
   `Attempt`, `Fail`, `Unlock`, `ShowHint`. `LocalizeTaskPlaceholder` gains `hintKey`, `rightFeedbackKey`,
   `wrongFeedbackKey`. A task system without a Procedure placeholder works as before. Tasks completed by a step setter
-  (start from a later step, a restored room) are left out of the score.
+  (start from a later step, a restored room) are left out of the score. Feedback: in Guided mode the right/wrong texts
+  (the task's texts, else the reason, else a generic one) show as a toast or in the `successPanel`/`errorPanel`
+  (`feedbackPresentation`), in Assessed mode a neutral "Recorded" and no next-target highlight; the step-done and
+  wrong sounds of `sounds` (cue settings) play when no bound cue plays its own; a hint shows its text and highlights the
+  task's targets for a moment (`hintShowsTarget`); `sharedFeedback` gives a mark and flash to targets whose cue has no
+  feedback objects. Cues bound to tasks now show Wrong for a wrong result and Right for a completion, with or without a
+  procedure (not for steps a step setter skips).
 - **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
   minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
   `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`

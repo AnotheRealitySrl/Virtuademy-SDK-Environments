@@ -67,9 +67,12 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// <summary>Raised when a run starts (also after a retry in place).</summary>
         internal event Action RunStarted;
 
+        /// <summary>What a scored result was.</summary>
+        internal enum EResultKind { Attempt, Completion, Distractor, Failure }
+
         /// <summary>Raised for every result scored, after the score changed: the step (null for a distractor without a
-        /// task), the result, and the points it cost (0 for a good one).</summary>
-        internal event Action<Step, TaskResult, float> ResultScored;
+        /// task), the result (for a failure: a wrong one with the reason), the points it cost, and what it was.</summary>
+        internal event Action<Step, TaskResult, float, EResultKind> ResultScored;
 
         /// <summary>Raised for every hint used, with its step.</summary>
         internal event Action<Step> HintGiven;
@@ -321,7 +324,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             }
             scoring.Recompute();
             AddTimeline(step, result.Outcome != ETaskOutcome.Wrong, lost, result.Reason, result);
-            ResultScored?.Invoke(step, result, lost);
+            ResultScored?.Invoke(step, result, lost, EResultKind.Attempt);
             procedure.RaiseScoreChanged();
             if (result.Outcome == ETaskOutcome.Wrong)
             {
@@ -352,7 +355,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             scoring.DistractorPenalty += Mathf.Max(0f, penaltyPoints);
             scoring.Recompute();
             AddTimeline(step, false, penaltyPoints, result.Reason, result);
-            ResultScored?.Invoke(step, result, penaltyPoints);
+            ResultScored?.Invoke(step, result, penaltyPoints, EResultKind.Distractor);
             procedure.RaiseScoreChanged();
             if (countsAsError)
             {
@@ -396,7 +399,7 @@ namespace Virtuademy.SDK.Environments.Tasks
                     // What the result itself cost; wrong attempts and hints have their own entries.
                     float lost = Mathf.Round(step.Score.MaxPoints * (1f - result.Score));
                     AddTimeline(step, result.Outcome != ETaskOutcome.Wrong, lost, result.Reason, result);
-                    ResultScored?.Invoke(step, result, 0f);
+                    ResultScored?.Invoke(step, result, lost, EResultKind.Completion);
                     procedure.RaiseScoreChanged();
                 }
             }
@@ -406,6 +409,8 @@ namespace Virtuademy.SDK.Environments.Tasks
                 step.Score.Failed = true;
                 scoring.Recompute();
                 AddTimeline(step, false, step.Score.MaxPoints, failReason ?? "", null);
+                ResultScored?.Invoke(step, new TaskResult(ETaskOutcome.Wrong, 0f, task.gameObject, failReason ?? "", ""),
+                    step.Score.MaxPoints, EResultKind.Failure);
                 procedure.RaiseScoreChanged();
                 if (procedure.OnTaskFailed == ETaskFailedBehaviour.EndProcedure)
                 {

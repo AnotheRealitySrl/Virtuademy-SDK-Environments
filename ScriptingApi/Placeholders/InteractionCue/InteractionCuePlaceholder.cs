@@ -163,6 +163,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         private bool selectedByInteractable;
         private bool blockedByInteractable;
         private Coroutine transientEnd;
+        private Coroutine hintTargetEnd;
+        private bool hintTarget;
 
         /// <summary>The state the cue shows now.</summary>
         public EInteractionCueState State => state;
@@ -305,6 +307,32 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             Refresh();
         }
 
+        /// <summary>Shows the cue as the next target for <paramref name="seconds"/> (a procedure's hint), whatever its
+        /// base state, unless it is completed.</summary>
+        internal void ShowTargetFor(float seconds)
+        {
+            if (hintTargetEnd != null)
+            {
+                StopCoroutine(hintTargetEnd);
+                hintTargetEnd = null;
+            }
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+            hintTarget = true;
+            hintTargetEnd = StartCoroutine(EndHintTarget(seconds));
+            Refresh();
+        }
+
+        private IEnumerator EndHintTarget(float seconds)
+        {
+            yield return new WaitForSeconds(seconds);
+            hintTargetEnd = null;
+            hintTarget = false;
+            Refresh();
+        }
+
         internal void ShowResultLocally(bool right)
         {
             transient = right ? EInteractionCueState.Right : EInteractionCueState.Wrong;
@@ -363,10 +391,12 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         private void OnDisable()
         {
             // Coroutines stop with the object: a right or wrong action being shown ends with it.
-            if (transientEnd != null)
+            if (transientEnd != null || hintTargetEnd != null)
             {
                 transientEnd = null;
+                hintTargetEnd = null;
                 transient = EInteractionCueState.Available;
+                hintTarget = false;
                 Refresh();
             }
         }
@@ -389,7 +419,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             {
                 return EInteractionCueState.Hover;
             }
-            return baseState;
+            return hintTarget && baseState != EInteractionCueState.Completed ? EInteractionCueState.NextTarget : baseState;
         }
 
         private void Refresh()
