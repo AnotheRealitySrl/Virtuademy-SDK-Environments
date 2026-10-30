@@ -23,6 +23,12 @@ namespace Virtuademy.SDK.Environments.Editor
             [SerializeField] private bool includeInBuild = true;
             [SerializeField] private ESupportedPlatform supportedPlatforms = ESupportedPlatform.VR | ESupportedPlatform.WebGL;
 
+            [Tooltip("The thumbnail (a PNG or JPEG image of the project) the scene's environment gets the first time a deploy makes it in a place. Later deploys never touch a place's files.")]
+            [SerializeField] private Texture2D defaultThumbnail;
+
+            [Tooltip("The localization file (a .csv of the project) the scene's environment gets the first time a deploy makes it in a place. Later deploys never touch a place's files.")]
+            [SerializeField] private TextAsset defaultLocalization;
+
             public SceneConfiguration() { }
 
             /// <summary>The entry the registry creates for a scene it has not seen yet: not in the build until someone ticks it.</summary>
@@ -35,6 +41,12 @@ namespace Virtuademy.SDK.Environments.Editor
             public SceneAsset Scene { get => scene; set => scene = value; }
             public bool IncludeInBuild { get => includeInBuild; set => includeInBuild = value; }
             public ESupportedPlatform SupportedPlatforms { get => supportedPlatforms; set => supportedPlatforms = value; }
+
+            /// <summary>The image sent as the thumbnail when a deploy creates the scene's environment in a place; null for none. Read from the file, never from the import.</summary>
+            public Texture2D DefaultThumbnail { get => defaultThumbnail; set => defaultThumbnail = value; }
+
+            /// <summary>The <c>.csv</c> sent as the localization file when a deploy creates the scene's environment in a place; null for none.</summary>
+            public TextAsset DefaultLocalization { get => defaultLocalization; set => defaultLocalization = value; }
 
             /// <summary>
             /// The scene's name as its folder, zip and environment file name carry it: lower-cased with

@@ -248,6 +248,20 @@ namespace Virtuademy.SDK.Environments.Editor
         /// </summary>
         public const int ExitPlatformMismatch = 32;
 
+        /// <summary>
+        /// A file is not valid, or has no language the tenant offers: nothing was sent. The platform would refuse it (not a PNG or JPEG, an image over
+        /// 50 megapixels or with corrupt data, a localization file that breaks its rules, a file that is too large or not under <c>Assets/</c>), or the
+        /// tenant would show none of its texts. <c>invalidFiles</c> in the report says what is wrong.
+        /// </summary>
+        public const int ExitFileNotValid = 37;
+
+        /// <summary>
+        /// <c>set-files</c> or <c>restore</c> left one or more places as they were: the login may not change the environment (<c>canWrite</c> false),
+        /// the tenant's platform cannot receive files from the SDK yet, the scene is not published there, or the platform answered with an error.
+        /// The other places may have changed: <c>outcomes</c> in the report says place by place.
+        /// </summary>
+        public const int ExitTargetsNotChanged = 38;
+
         private const string log_prefix = "[EnvironmentsCli] ";
         private const int default_timeout_minutes = 60;
 
@@ -270,15 +284,20 @@ namespace Virtuademy.SDK.Environments.Editor
             { "experiences", new[] { "-vdWorlds", "-vdScenes", "-vdExpectTenant", "-vdConnection" } },
             { "create-core", new[] { "-vdWorlds", "-vdScenes", "-vdLabel", "-vdPublished", "-vdDryRun", "-vdExpectTenant", "-vdConnection" } },
             { "experience-status", new[] { "-vdWorlds", "-vdExperience", "-vdStatus", "-vdExpectTenant", "-vdConnection" } },
+            { "published", new[] { "-vdScenes", "-vdConnection" } },
+            { "save-files", new[] { "-vdScenes", "-vdWorlds", "-vdTenant", "-vdBackupFolder", "-vdDryRun", "-vdConnection" } },
+            { "set-files", new[] { "-vdExpectTenant", "-vdScenes", "-vdThumbnail", "-vdLocalization", "-vdWorlds", "-vdAllWorlds", "-vdTenant", "-vdExcludeWorlds", "-vdDryRun", "-vdConnection" } },
+            { "restore", new[] { "-vdExpectTenant", "-vdManifest", "-vdScenes", "-vdWorlds", "-vdTenant", "-vdDryRun", "-vdConnection" } },
+            { "scene-files", new[] { "-vdScenes", "-vdThumbnail", "-vdLocalization", "-vdClear" } },
         };
 
-        private static readonly string[] flag_options = { "-vdRenew", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdAllowTracked", "-vdNoBrowser", "-vdPublished" };
+        private static readonly string[] flag_options = { "-vdRenew", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdAllowTracked", "-vdNoBrowser", "-vdAllWorlds", "-vdClear", "-vdPublished" };
 
         // Every option that takes a value, the two every command reads included.
         private static readonly string[] value_options =
         {
             "-vdCommand", "-vdTimeoutMinutes", "-vdResultFile", "-vdConfigFile", "-vdEnv", "-vdConfigFolder", "-vdScenes", "-vdWorlds", "-vdExpectTenant",
-            "-vdConnection", "-vdApp", "-vdLoginTimeoutSeconds", "-vdLabel", "-vdExperience", "-vdStatus",
+            "-vdConnection", "-vdApp", "-vdLoginTimeoutSeconds", "-vdThumbnail", "-vdLocalization", "-vdBackupFolder", "-vdManifest", "-vdExcludeWorlds", "-vdLabel", "-vdExperience", "-vdStatus",
         };
 
         // Unity's own options that take a value: the token after one is Unity's, not a stray value of ours.
@@ -463,6 +482,13 @@ namespace Virtuademy.SDK.Environments.Editor
             public bool NoBrowser;
             public int? LoginTimeoutSeconds;
             public List<int> Worlds;
+            public bool AllWorlds;
+            public bool Clear;
+            public string Thumbnail;
+            public string Localization;
+            public string BackupFolder;
+            public string Manifest;
+            public List<int> ExcludeWorlds;
         }
 
         private static string GetArgument(string[] args, string name)
@@ -594,6 +620,8 @@ namespace Virtuademy.SDK.Environments.Editor
             options.DryRun = flags.Contains("-vdDryRun");
             options.AllowTracked = flags.Contains("-vdAllowTracked");
             options.NoBrowser = flags.Contains("-vdNoBrowser");
+            options.AllWorlds = flags.Contains("-vdAllWorlds");
+            options.Clear = flags.Contains("-vdClear");
 
             options.ConfigFile = Value("-vdConfigFile");
             options.ConfigFolder = Value("-vdConfigFolder");
@@ -602,6 +630,10 @@ namespace Virtuademy.SDK.Environments.Editor
             options.ExpectTenant = Value("-vdExpectTenant")?.Trim();
             options.Connection = Value("-vdConnection")?.Trim();
             options.App = Value("-vdApp")?.Trim();
+            options.Thumbnail = Value("-vdThumbnail");
+            options.Localization = Value("-vdLocalization");
+            options.BackupFolder = Value("-vdBackupFolder");
+            options.Manifest = Value("-vdManifest");
 
             if (values.TryGetValue("-vdLoginTimeoutSeconds", out string loginTimeout))
             {
@@ -676,7 +708,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 }
             }
 
-            return TryReadExperienceOptions(values, flags, options, out error);
+            return TryReadExperienceOptions(values, flags, options, out error)
+                && TryValidateFilesArguments(options, values, out error);
         }
 
         #endregion
@@ -710,6 +743,11 @@ namespace Virtuademy.SDK.Environments.Editor
                 case "experiences": return await SceneExperiencesAsync(options, create: false);
                 case "create-core": return await SceneExperiencesAsync(options, create: true);
                 case "experience-status": return await ExperienceStatusAsync(options);
+                case "published": return await PublishedAsync(options);
+                case "save-files": return await SaveFilesAsync(options);
+                case "set-files": return await SetFilesAsync(options);
+                case "restore": return await RestoreAsync(options);
+                case "scene-files": return SceneFilesCommand(options);
                 default: return await DeployAsync(options);
             }
         }
@@ -1005,6 +1043,7 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             report["previews"] = previews;
+            await ReportDefaultFilesAsync(options, scenes, listing);
             return ExitDone;
         }
 
@@ -1046,6 +1085,8 @@ namespace Virtuademy.SDK.Environments.Editor
                 return targets.Code;
 
             WorldListResult listing = targets.Listing;
+
+            await ReportDefaultFilesAsync(options, scenes, listing);
 
             if (options.Tenant)
             {
@@ -1593,6 +1634,8 @@ namespace Virtuademy.SDK.Environments.Editor
             ExitStoreNotPersistent => "connection store not persistent on this OS",
             ExitPlatformVersionMismatch => "platform version mismatch: the tenant runs another platform version than the project",
             ExitPlatformMismatch => "platform mismatch: the connection's app is not a CreatorKit app",
+            ExitFileNotValid => "a file is not valid: nothing was sent",
+            ExitTargetsNotChanged => "one or more places were not changed",
             _ => DescribeExperienceExit(code),
         };
 
