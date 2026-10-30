@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
+using Virtuademy.Environments.ScriptingApi.Interaction;
 using Virtuademy.Environments.ScriptingApi.Placeholders;
+using Virtuademy.SDK.Environments.UIKit;
 
 namespace Virtuademy.SDK.Environments.InteractionCue
 {
@@ -34,18 +36,84 @@ namespace Virtuademy.SDK.Environments.InteractionCue
         private Material shownMaterial;
         private bool reportedMissingSettings;
 
+        private InteractablePlaceholder interactable;
+        private int hoveringControllers;
+
+        private VirtuademyLabel label;
+        private bool labelSearched;
+        private bool labelShown;
+        private bool reportedMissingLabel;
+
         internal void Bind(InteractionCuePlaceholder placeholder)
         {
             cue = placeholder;
             cue.VisualChanged += Draw;
+            BindInteractable();
             Draw();
         }
+
+        // The Interactable of the object: on the cue's object, or the nearest one above it. Its events come from the
+        // application only (none in a creator's play mode).
+        private void BindInteractable()
+        {
+            interactable = cue.GetComponentInParent<InteractablePlaceholder>(true);
+            if (interactable == null)
+            {
+                return;
+            }
+            interactable.OnHoverEnter += OnHoverEnter;
+            interactable.OnHoverExit += OnHoverExit;
+            interactable.OnSelectEnter += OnSelectEnter;
+            interactable.OnSelectExit += OnSelectExit;
+            interactable.OnBlockedChanged += OnBlockedChanged;
+            if (interactable.IsBlocked)
+            {
+                cue.SetInteractableBlocked(true);
+            }
+        }
+
+        // One enter and one exit per controller (mouse, each ray, each hand, the touch): hovered while any is on it.
+        private void OnHoverEnter(InteractionEventArgs args)
+        {
+            hoveringControllers++;
+            if (hoveringControllers == 1)
+            {
+                cue.SetInteractableHovered(true);
+            }
+        }
+
+        private void OnHoverExit(InteractionEventArgs args)
+        {
+            if (hoveringControllers == 0)
+            {
+                return;
+            }
+            hoveringControllers--;
+            if (hoveringControllers == 0)
+            {
+                cue.SetInteractableHovered(false);
+            }
+        }
+
+        private void OnSelectEnter(InteractionEventArgs args) => cue.SetInteractableSelected(true);
+
+        private void OnSelectExit(InteractionEventArgs args) => cue.SetInteractableSelected(false);
+
+        private void OnBlockedChanged(bool blocked) => cue.SetInteractableBlocked(blocked);
 
         private void OnDestroy()
         {
             if (cue != null)
             {
                 cue.VisualChanged -= Draw;
+            }
+            if (interactable != null)
+            {
+                interactable.OnHoverEnter -= OnHoverEnter;
+                interactable.OnHoverExit -= OnHoverExit;
+                interactable.OnSelectEnter -= OnSelectEnter;
+                interactable.OnSelectExit -= OnSelectExit;
+                interactable.OnBlockedChanged -= OnBlockedChanged;
             }
             // Shells under renderers outside this object (renderers listed by the creator) do not go with it.
             foreach (Renderer shell in shells)
@@ -60,6 +128,7 @@ namespace Virtuademy.SDK.Environments.InteractionCue
 
         private void Draw()
         {
+            DrawLabel();
             Material material = MaterialFor(cue.RimState);
             if (material == shownMaterial)
             {
@@ -96,6 +165,53 @@ namespace Virtuademy.SDK.Environments.InteractionCue
                 shell.sharedMaterials = materials;
                 shell.enabled = true;
             }
+        }
+
+        // The hover label is a VirtuademyLabel among the cue's feedback objects (its children). The text is resolved
+        // each time the label shows, so a language change applies from the next hover.
+        private void DrawLabel()
+        {
+            bool show = cue.LabelVisible;
+            if (show == labelShown && !show)
+            {
+                return;
+            }
+            if (!labelSearched)
+            {
+                labelSearched = true;
+                foreach (VirtuademyLabel candidate in cue.GetComponentsInChildren<VirtuademyLabel>(true))
+                {
+                    if (candidate.GetComponentInParent<InteractionCuePlaceholder>(true) == cue)
+                    {
+                        label = candidate;
+                        break;
+                    }
+                }
+            }
+            if (label == null)
+            {
+                if (show && !reportedMissingLabel)
+                {
+                    reportedMissingLabel = true;
+                    Debug.LogWarning("[InteractionCue] " + cue.name + ": Hover Style is Rim And Label, but the cue has no " +
+                        "label. Add its feedback objects (Add feedback objects, in its inspector).", cue);
+                }
+                return;
+            }
+            if (show)
+            {
+                label.SetText(PanelEnvironment.Text(cue.LabelKey, cue.LabelText));
+                if (!labelShown)
+                {
+                    label.gameObject.SetActive(true);
+                    label.Show();
+                }
+            }
+            else
+            {
+                label.Hide();
+            }
+            labelShown = show;
         }
 
         private Material MaterialFor(EInteractionCueState state)

@@ -45,6 +45,14 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [SerializeField, Tooltip("How the cue shows that the local user hovers the object.")]
         private ECueHoverStyle hoverStyle = ECueHoverStyle.Rim;
 
+        [SerializeField, Tooltip("Key of the hover label's text in the environment's Localization File. Empty: the text " +
+            "below as written.")]
+        private string labelKey = "";
+
+        [SerializeField, Tooltip("The hover label's text, shown when Hover Style is Rim And Label (needs the cue's feedback " +
+            "objects), and when the key has no translation.")]
+        private string labelText = "";
+
         [SerializeField, Tooltip("What a right or wrong action shows.")]
         private ECueFeedback feedback = ECueFeedback.Rim | ECueFeedback.Mark | ECueFeedback.Flash | ECueFeedback.Sound;
 
@@ -74,6 +82,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public ECueNextTargetStyle NextTargetStyle { get => nextTargetStyle; set { nextTargetStyle = value; Refresh(); } }
         public ECueHoverStyle HoverStyle { get => hoverStyle; set { hoverStyle = value; Refresh(); } }
         public ECueFeedback Feedback { get => feedback; set { feedback = value; Refresh(); } }
+        public string LabelKey { get => labelKey; set { labelKey = value ?? ""; Refresh(); } }
+        public string LabelText { get => labelText; set { labelText = value ?? ""; Refresh(); } }
         public float FeedbackSeconds { get => feedbackSeconds; set => feedbackSeconds = Mathf.Max(0.1f, value); }
 
         /// <summary>The renderers that get the rim; empty means every renderer under this object. Read once, the first
@@ -106,6 +116,9 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         private bool hoveredByScript;
         private bool selectedByScript;
         private bool lockedByScript;
+        private bool hoveredByInteractable;
+        private bool selectedByInteractable;
+        private bool blockedByInteractable;
         private Coroutine transientEnd;
 
         /// <summary>The state the cue shows now.</summary>
@@ -116,13 +129,14 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public EInteractionCueState BaseState => baseState;
 
         /// <summary>Whether the local user hovers the object (with any controller), or a script set it hovered.</summary>
-        public bool IsHovered => hoveredByScript;
+        public bool IsHovered => hoveredByScript || hoveredByInteractable;
 
         /// <summary>Whether the object is selected by the local user, or a script set it selected.</summary>
-        public bool IsSelected => selectedByScript;
+        public bool IsSelected => selectedByScript || selectedByInteractable;
 
-        /// <summary>Whether the cue is locked by <see cref="SetLocked"/>.</summary>
-        public bool IsLocked => lockedByScript;
+        /// <summary>Whether the cue is locked: by <see cref="SetLocked"/>, or because the object's Interactable is
+        /// blocked (<see cref="InteractablePlaceholder.IsBlocked"/>).</summary>
+        public bool IsLocked => lockedByScript || blockedByInteractable;
 
         /// <summary>Raised when <see cref="State"/> changes, with the previous and the new state.</summary>
         public event InteractionCueChangedHandler CueChanged;
@@ -147,7 +161,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             Refresh();
         }
 
-        /// <summary>Locks or unlocks the cue: a locked cue shows no rim and ignores hover. This client only.</summary>
+        /// <summary>
+        /// Locks or unlocks the cue: a locked cue shows no rim and ignores hover. This client only. A cue is also locked
+        /// while its object's Interactable is blocked; unlocking here does not unblock it.
+        /// </summary>
         public void SetLocked(bool locked)
         {
             lockedByScript = locked;
@@ -202,6 +219,31 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             (state == EInteractionCueState.Right || state == EInteractionCueState.Wrong) && (feedback & ECueFeedback.Rim) == 0
                 ? Resolve(false)
                 : state;
+
+        /// <summary>Whether the label shows: hovered or selected, Rim And Label, and a text to show.</summary>
+        internal bool LabelVisible => hoverStyle == ECueHoverStyle.RimAndLabel
+            && (state == EInteractionCueState.Hover || state == EInteractionCueState.Selected)
+            && (labelKey.Length > 0 || labelText.Length > 0);
+
+        // The object's Interactable, as the SDK runtime sees it: hovered by at least one local controller, selected,
+        // blocked.
+        internal void SetInteractableHovered(bool hovered)
+        {
+            hoveredByInteractable = hovered;
+            Refresh();
+        }
+
+        internal void SetInteractableSelected(bool selected)
+        {
+            selectedByInteractable = selected;
+            Refresh();
+        }
+
+        internal void SetInteractableBlocked(bool blocked)
+        {
+            blockedByInteractable = blocked;
+            Refresh();
+        }
 
         internal void ShowResultLocally(bool right)
         {
@@ -271,7 +313,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 
         private EInteractionCueState Resolve(bool withTransient)
         {
-            if (lockedByScript)
+            if (IsLocked)
             {
                 return EInteractionCueState.Locked;
             }
@@ -279,11 +321,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             {
                 return transient;
             }
-            if (selectedByScript)
+            if (IsSelected)
             {
                 return EInteractionCueState.Selected;
             }
-            if (hoveredByScript && hoverStyle != ECueHoverStyle.None)
+            if (IsHovered && hoverStyle != ECueHoverStyle.None)
             {
                 return EInteractionCueState.Hover;
             }

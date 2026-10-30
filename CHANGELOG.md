@@ -250,7 +250,10 @@ one usable connection, which changes what a script that relied on the project's 
   selection, green or red for a right or wrong action (`ShowRight`, `ShowWrong`, `ShowResult`, for `FeedbackSeconds`),
   nothing when completed or locked. `State` (`EInteractionCueState`) resolves Locked > Right/Wrong > Selected > Hover >
   base state (`SetBaseState`: Available, NextTarget, Completed); `SetLocked`, `SetHovered`, `SetSelected` act on this
-  client; `CueChanged` (`InteractionCueChangedHandler`) and UnityEvents. The rim is drawn on copies of the object's
+  client; `CueChanged` (`InteractionCueChangedHandler`) and UnityEvents. The cue follows the object's Interactable by
+  itself: hovered while any local controller hovers it (each VR ray and hand counts), selected, locked while the
+  Interactable is blocked; with `ECueHoverStyle.RimAndLabel` its feedback objects' label shows `labelKey`/`labelText`
+  while hovered or selected. The rim is drawn on copies of the object's
   renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
   never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
   `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
