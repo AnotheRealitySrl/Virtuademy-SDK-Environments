@@ -85,6 +85,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         private Transform sharedFeedback;
         [SerializeField, Tooltip("Show the summary at the end (the task panel's own end panel is not shown).")]
         private bool showSummary = true;
+        [SerializeField, Tooltip("The summary panel (ProcedureSummary.prefab, in TasksLogic_Procedure).")]
+        private GameObject summaryPanel;
         [SerializeField] private ETimelineMode timeline = ETimelineMode.LostPointsOnly;
         [SerializeField, Min(1)] private int timelineMaxRows = 13;
         [SerializeField, Tooltip("A shared procedure always retries in place.")]
@@ -130,6 +132,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public InteractionCueSettings Sounds => sounds;
         public Transform SharedFeedback => sharedFeedback;
         public bool ShowSummaryAtEnd => showSummary;
+        public GameObject SummaryPanel => summaryPanel;
         public ETimelineMode Timeline => timeline;
         public int TimelineMaxRows => timelineMaxRows;
         public ERetryMode RetryMode => retryMode;

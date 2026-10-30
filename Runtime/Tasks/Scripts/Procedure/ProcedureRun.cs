@@ -480,6 +480,10 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         #region Texts
 
+        /// <summary>The hint of the task on <paramref name="task"/>, translated (empty: none). For the task panel.</summary>
+        public static string HintTextOf(GameObject task) =>
+            task != null && task.TryGetComponent(out Task t) && t.Node != null ? TextOf(t, l => l.hintKey, t.Node.Hint, "") : "";
+
         /// <summary>The step's hint: the Localize Task placeholder's key translated, else the node's text, else none.</summary>
         internal static string HintOf(Step step) => TextOf(step.Task, l => l.hintKey, step.Task.Node.Hint, "");
 
@@ -592,6 +596,10 @@ namespace Virtuademy.SDK.Environments.Tasks
                 + ", " + summary.ElapsedSeconds.ToString("0.0") + " s", procedure);
             procedure.RaiseFinished(summary);
             RunFinished?.Invoke(summary);
+            if (procedure.ShowSummaryAtEnd && result != EProcedureOutcome.Abandoned)
+            {
+                ShowSummary();
+            }
         }
 
         private ProcedureSummary BuildSummary(EProcedureOutcome result, EProcedureFailReason reason)
@@ -652,6 +660,7 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         public void Retry()
         {
+            SummaryPanelView?.Hide();
             procedure.RaiseRetry();
             if (procedure.OverrideButtonActions)
             {
@@ -692,11 +701,28 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         public void ShowSummary()
         {
-            if (finished)
+            if (!finished)
             {
-                SummaryRequested?.Invoke();
+                return;
+            }
+            SummaryRequested?.Invoke();
+            if (procedure.SummaryPanel != null && procedure.SummaryPanel.TryGetComponent(out ProcedureSummaryPanel panel))
+            {
+                panel.Show(this, summary);
+                if (TryGetComponent(out ProcedureFeedbackPresenter presenter))
+                {
+                    presenter.PlaySummarySound();
+                }
+            }
+            else
+            {
+                Debug.Log("[Procedure] " + procedure.name + ": no summary panel set; the summary is on Finished.", procedure);
             }
         }
+
+        /// <summary>The summary panel, when it is set (Retry and Exit show their wait on it).</summary>
+        internal ProcedureSummaryPanel SummaryPanelView =>
+            procedure.SummaryPanel != null && procedure.SummaryPanel.TryGetComponent(out ProcedureSummaryPanel panel) ? panel : null;
 
         #endregion
     }

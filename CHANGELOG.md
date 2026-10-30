@@ -276,7 +276,10 @@ one usable connection, which changes what a script that relied on the project's 
   `shuffle`), **Item On Target** (beside an Inventory Item Trigger Detector: the right item or tool completes, a wrong
   one is an attempt; the master reports in a shared procedure). Without a task an element raises its events and shows
   its cue. `TasksLogic_Procedure.prefab`: TasksLogic with a Procedure placeholder, its success and error panels and
-  shared cue feedback.
+  shared cue feedback. **Summary**: `ProcedureSummary.prefab` (a Virtuademy panel on the screen, in front of the user in
+  VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
+  `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
+  `timelineMaxRows`); Retry and Exit. `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
 - **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
   minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
   `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`
