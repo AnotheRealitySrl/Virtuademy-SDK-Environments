@@ -245,6 +245,14 @@ one usable connection, which changes what a script that relied on the project's 
   only. Every handler runs; a handler's exception is then thrown, not swallowed.
 - **`InteractablePlaceholder.VRControllers`** (`EVRInteractionControllers` flags: `Ray`, `Hands`; both by default)
   (2026.7, minor): which VR controllers can hover, select and interact with the object.
+- **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
+  minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
+  `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`
+  (`TaskStateChangedHandler`) and `TaskResultReported` (`TaskResultHandler`). `TaskResult` (class: `ETaskOutcome`
+  Right/Wrong/Partial, score 0..1, source, reason, data, `IsLocalActor`, `ActorName`), `ETaskState`. A script could not
+  call `Task.CompleteTask()` itself (CS0012: `Task` derives from a `SPACS.Graphs` type the script assembly does not
+  reference); these go through the object. Nodes: Complete Task With Result, Report Attempt, Get Task State, On Task
+  Attempt. A report on a completed, failed or locked task is ignored (logged once per task).
 - **Task nodes Fail Task, Unlock Task, On Task Unlocked, On Task Failed** (2026.7, minor) ("Virtuademy Tasks"); a node
   without a task throws. On Task Failed is raised for failures only (On Task Completed still carries Completed false).
 - **`TaskUIPlaceholder.ETaskPanelPlacement.Hidden`** (2026.7, minor): no task panel on that platform.

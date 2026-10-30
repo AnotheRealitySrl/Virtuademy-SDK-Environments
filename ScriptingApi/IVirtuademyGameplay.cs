@@ -1,6 +1,7 @@
 using System;
 
 using Virtuademy.ScriptingApi;
+using Virtuademy.Environments.ScriptingApi.Tasks;
 
 namespace Virtuademy.Environments.ScriptingApi
 {
@@ -96,5 +97,8 @@ namespace Virtuademy.Environments.ScriptingApi
 
         /// <summary>Whether the application's tablet is open, and when it opens and closes.</summary>
         ITabletApi Tablet { get; }
+
+        /// <summary>The tasks of the world: their state, results, attempts and failures.</summary>
+        ITasksApi Tasks { get; }
     }
 }

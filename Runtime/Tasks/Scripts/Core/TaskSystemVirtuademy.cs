@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+using Virtuademy.Environments.ScriptingApi.Tasks;
 using Virtuademy.ScriptingApi;
 
 namespace Virtuademy.SDK.Environments.Tasks
@@ -59,6 +60,8 @@ namespace Virtuademy.SDK.Environments.Tasks
 
             initializedTaskDescriptions = 0;
 
+            ForwardStateChanges();
+
             /*if (isNetworked)
             {
                 Debug.Log(gameObject.GetComponent<ITasksRPCManager>());
@@ -81,6 +84,33 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 base.Awake();
             }
+        }
+
+        // Every task of this system tells ITasksApi.TaskStateChanged when its status changes, with the task's object.
+        private void ForwardStateChanges()
+        {
+            TasksApi.Instance.SystemAwake();
+            Dictionary<TaskNode, GameObject> objects = new();
+            foreach (Task task in GetComponentsInChildren<Task>(true))
+            {
+                if (task.Node != null)
+                {
+                    objects[task.Node] = task.gameObject;
+                }
+            }
+            foreach (TaskNode node in Tasks)
+            {
+                if (objects.TryGetValue(node, out GameObject taskObject))
+                {
+                    node.onStatusChanged.AddListener(previous =>
+                        TasksApi.Instance.RaiseStateChanged(taskObject, (ETaskState)previous, (ETaskState)node.Status));
+                }
+            }
+        }
+
+        protected virtual void OnDestroy()
+        {
+            TasksApi.Instance.SystemDestroyed();
         }
 
         private event Action<ITasksRPCManager> RpcManagerReady;
