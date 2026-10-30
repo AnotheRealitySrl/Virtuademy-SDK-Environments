@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+using Virtuademy.Environments.ScriptingApi.Placeholders;
 using Virtuademy.Environments.ScriptingApi.Tasks;
 using Virtuademy.ScriptingApi;
 
@@ -102,11 +103,43 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 if (objects.TryGetValue(node, out GameObject taskObject))
                 {
-                    node.onStatusChanged.AddListener(previous =>
-                        TasksApi.Instance.RaiseStateChanged(taskObject, (ETaskState)previous, (ETaskState)node.Status));
+                    Task task = taskObject.GetComponent<Task>();
+                    node.onStatusChanged.AddListener(previous => OnTaskStatusChanged(task, previous));
                 }
             }
         }
+
+        // One listener per task, so the order is fixed: the step's events, the procedure, then ITasksApi.
+        private void OnTaskStatusChanged(Task task, TaskNode.TaskStatus previous)
+        {
+            TaskNode.TaskStatus status = task.Node.Status;
+            TaskResult result = status == TaskNode.TaskStatus.Completed ? TaskReports.TakePending(task) : null;
+            string failReason = status == TaskNode.TaskStatus.Failed ? TaskReports.TakeFailReason(task) : null;
+            if (task.TryGetComponent(out TaskStepPlaceholder step))
+            {
+                if (status == TaskNode.TaskStatus.Todo)
+                {
+                    step.RaiseUnlocked();
+                }
+                else if (status == TaskNode.TaskStatus.Completed)
+                {
+                    step.RaiseCompleted(result ?? new TaskResult(ETaskOutcome.Right, 1f, task.gameObject, "", ""));
+                }
+                else if (status == TaskNode.TaskStatus.Failed)
+                {
+                    step.RaiseFailed(failReason ?? "");
+                }
+            }
+            Procedure?.OnTaskStatusChanged(task, previous, result, failReason);
+            TasksApi.Instance.RaiseStateChanged(task.gameObject, (ETaskState)previous, (ETaskState)status);
+        }
+
+        /// <summary>The procedure run of this task system, when it has a Procedure placeholder.</summary>
+        internal ProcedureRun Procedure { get; set; }
+
+        // With a procedure whose failed tasks continue, a failed task lets the flow go on as a completed one does.
+        protected override bool AdvancesFlow(TaskNode task) => task.Status == TaskNode.TaskStatus.Completed
+            || (task.Status == TaskNode.TaskStatus.Failed && Procedure != null && Procedure.FailedTasksAdvance);
 
         protected virtual void OnDestroy()
         {
@@ -165,6 +198,7 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         public override void Revert()
         {
+            Procedure?.OnSystemReverted();
             if (isNetworked)
             {
                 rpcManagerInterface.SendRPCTaskRevert();

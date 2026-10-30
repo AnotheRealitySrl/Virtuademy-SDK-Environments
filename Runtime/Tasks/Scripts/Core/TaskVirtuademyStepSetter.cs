@@ -67,15 +67,23 @@ namespace Virtuademy.SDK.Environments.Tasks
 
             // Ordered list of tasks. I assign the state "Complete" until I find the node I want.
             IReadOnlyCollection<TaskNode> allNodes = systemVirtuademy.Tasks;
-            foreach (TaskNode node in allNodes)
+            IsSkipping = true;
+            try
             {
-                if (CompleteTaskRecursive(node, newNode))
+                foreach (TaskNode node in allNodes)
                 {
-                    // Target reached. Nothing else to do in this loop.
-                    if (targetNode.Status == TaskNode.TaskStatus.Todo)
-                        targetNode.Status = TaskNode.TaskStatus.Completed;
-                    break;
+                    if (CompleteTaskRecursive(node, newNode))
+                    {
+                        // Target reached. Nothing else to do in this loop.
+                        if (targetNode.Status == TaskNode.TaskStatus.Todo)
+                            targetNode.Status = TaskNode.TaskStatus.Completed;
+                        break;
+                    }
                 }
+            }
+            finally
+            {
+                IsSkipping = false;
             }
         }
     }

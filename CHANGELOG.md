@@ -245,6 +245,20 @@ one usable connection, which changes what a script that relied on the project's 
   only. Every handler runs; a handler's exception is then thrown, not swallowed.
 - **`InteractablePlaceholder.VRControllers`** (`EVRInteractionControllers` flags: `Ray`, `Hands`; both by default)
   (2026.7, minor): which VR controllers can hover, select and interact with the object.
+- **Procedures** (2026.7, minor): `ProcedurePlaceholder` on a task system's object turns it into a procedure: scored
+  tasks (each worth `maxScore x weight / total weight`, largest-remainder rounding), wrong attempts (`errorPenalty`),
+  hints (`hintsEnabled`, `hintPenalty`, `hintCharge`: OncePerTask, EveryRequest, Never), errors (`maxErrors`), time
+  (`timeLimitSeconds`), fail conditions (`onFailCondition`: EndNow, ContinueAsFailed), failed tasks (`onTaskFailed`:
+  Continue, EndProcedure), out-of-order actions (`outOfOrderIsError`), pass percentage, timeline mode, retry mode.
+  Live state (`Score`, `MaxScore`, `PassingScore`, `Percent`, `Errors`, `HintsUsed`, `ElapsedSeconds`,
+  `RemainingSeconds`, `Outcome`, `Summary`), methods `RequestHint`, `Finish`, `Abort`, `Retry`, `Exit`, `ShowSummary`,
+  events `Attempted`, `HintUsed`, `ScoreChanged`, `Passed`, `Failed`, `Finished` (`ProcedureFinishedHandler`,
+  `ProcedureSummary` with task rows and timeline) and UnityEvents. `TaskStepPlaceholder` on a task's object: `weight`,
+  `scored` (`ETaskScored` Auto/Yes/No), `stepId`, `maxAttempts`, the resolved `HintText`, `RightFeedbackText`,
+  `WrongFeedbackText`, events `Unlocked`, `Attempted`, `Completed`, `TaskFailed`, `HintShown` and methods `Complete`,
+  `Attempt`, `Fail`, `Unlock`, `ShowHint`. `LocalizeTaskPlaceholder` gains `hintKey`, `rightFeedbackKey`,
+  `wrongFeedbackKey`. A task system without a Procedure placeholder works as before. Tasks completed by a step setter
+  (start from a later step, a restored room) are left out of the score.
 - **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
   minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
   `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`
