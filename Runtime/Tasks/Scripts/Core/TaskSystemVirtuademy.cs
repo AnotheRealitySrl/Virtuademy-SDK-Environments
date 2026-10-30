@@ -134,6 +134,25 @@ namespace Virtuademy.SDK.Environments.Tasks
             TasksApi.Instance.RaiseStateChanged(task.gameObject, (ETaskState)previous, (ETaskState)status);
         }
 
+        private TaskNetworkSync networkSync;
+
+        /// <summary>
+        /// The room, when this task system is shared (the application's procedure network, in multiplayer): every task
+        /// event (results, failures, hints, distractors) goes to the other clients and theirs come here, and a procedure
+        /// keeps its snapshot there.
+        /// </summary>
+        public void SetProcedureNetwork(IProcedureNetwork network)
+        {
+            networkSync?.Dispose();
+            networkSync = network == null ? null : new TaskNetworkSync(this, network);
+            if (networkSync != null && Procedure != null)
+            {
+                Procedure.BindNetwork(networkSync);
+            }
+        }
+
+        internal TaskNetworkSync NetworkSync => networkSync;
+
         /// <summary>The procedure run of this task system, when it has a Procedure placeholder.</summary>
         internal ProcedureRun Procedure { get; set; }
 
@@ -143,6 +162,7 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         protected virtual void OnDestroy()
         {
+            networkSync?.Dispose();
             TasksApi.Instance.SystemDestroyed();
         }
 

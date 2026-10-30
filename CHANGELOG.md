@@ -287,6 +287,15 @@ one usable connection, which changes what a script that relied on the project's 
   NA with the score so far); sent in order, one at a time, a failed one again after 2, 4, 8, 16 then 30 s. Retry and
   Exit wait for the queue (at most 8 s, the summary says so); the scene's unload ends the run and waits 8 s if
   statements are still queued. Without the application the statements are logged.
+  **Shared procedures** (a networked task system in multiplayer): every result, failure, hint, distractor and the time
+  running out reach every client (the sender applies it first), with the actor's name, so feedback and cues show on
+  everyone's screen and every client scores the same; the master keeps a snapshot in the room (counters, steps, run
+  key, analytics flags, question draws) that a client joining late, or after a master change, applies; the master runs
+  the time limit on the network clock. Analytics form one team run per room: the master mints the key and is the
+  sender of record (ExpStart, steps, ExpComplete, the latter flagged before it is sent so it goes out at most once);
+  every participant sends ExpJoin once per run; a new master sends what the room's flags say is missing. Retry in a
+  shared procedure is always in place and starts a new team run. `TaskSystemVirtuademy.SetProcedureNetwork` and
+  `IProcedureNetwork` (SDK runtime) are what the application implements.
 - **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
   minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
   `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`

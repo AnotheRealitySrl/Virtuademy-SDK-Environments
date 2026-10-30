@@ -25,7 +25,7 @@ namespace Virtuademy.SDK.Environments.Tasks
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("")]
-    public class ProcedureRun : MonoBehaviour, IProcedureSink
+    public partial class ProcedureRun : MonoBehaviour, IProcedureSink
     {
         /// <summary>One task of the procedure, scored or not.</summary>
         internal sealed class Step
@@ -54,8 +54,8 @@ namespace Virtuademy.SDK.Environments.Tasks
         private bool systemReady;
         private bool running;
         private bool finished;
-        private float startTime;
-        private float finishTime;
+        private double startTime;
+        private double finishTime;
         private int errors;
         private int hintsUsed;
         private EProcedureFailReason failCondition = EProcedureFailReason.None;
@@ -112,7 +112,7 @@ namespace Virtuademy.SDK.Environments.Tasks
         public float Percent => scoring.Percent;
         public int Errors => errors;
         public int HintsUsed => hintsUsed;
-        public float ElapsedSeconds => !running ? 0f : (finished ? finishTime : Time.realtimeSinceStartup) - startTime;
+        public float ElapsedSeconds => !running ? 0f : (float)((finished ? finishTime : Now()) - startTime);
         public float RemainingSeconds => procedure.TimeLimitSeconds <= 0f ? -1f
             : Mathf.Max(0f, procedure.TimeLimitSeconds - ElapsedSeconds);
         public EProcedureOutcome Outcome => outcome;
@@ -132,6 +132,11 @@ namespace Virtuademy.SDK.Environments.Tasks
                 return;
             }
             system.Procedure = this;
+            if (system.NetworkSync != null)
+            {
+                // The room arrived before this procedure woke up.
+                BindNetwork(system.NetworkSync);
+            }
             scoring.MaxScoreSetting = procedure.MaxScoreSetting;
             scoring.PassPercent = procedure.PassPercent;
             scoring.ErrorPenalty = procedure.ErrorPenalty;
@@ -174,6 +179,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 IVirtuademyGameplay.Current.Scene.Ready -= OnSceneReady;
             }
+            UnbindNetwork();
         }
 
         private void CollectSteps()
@@ -265,13 +271,10 @@ namespace Virtuademy.SDK.Environments.Tasks
                 }
             }
             scoring.Recompute();
-            startTime = Time.realtimeSinceStartup;
+            startTime = Now();
             runKey = "";
-            if (timeLimit != null)
-            {
-                StopCoroutine(timeLimit);
-            }
-            timeLimit = procedure.TimeLimitSeconds > 0f ? StartCoroutine(TimeLimit(procedure.TimeLimitSeconds)) : null;
+            OnRunStartNetwork();
+            StartTimeLimit();
             Debug.Log("[Procedure] " + procedure.name + ": run started, " + scoring.Tasks.Count(t => !t.Skipped)
                 + " scored steps, max " + scoring.MaxScore + ", passing " + scoring.PassingScore, procedure);
             RunStarted?.Invoke();
@@ -301,6 +304,7 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// <summary>The task system was reverted: the run so far is over; a new one starts when it is ready again.</summary>
         internal void OnSystemReverted()
         {
+            OnRevertNetwork();
             if (running && !finished)
             {
                 Finish(EProcedureOutcome.Abandoned, EProcedureFailReason.None);
@@ -316,6 +320,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             if (!finished)
             {
                 AddTimeline(null, false, 0f, "Time is up");
+                SendTimeUp();
                 FailCondition(EProcedureFailReason.TimeLimit);
             }
         }
@@ -398,7 +403,7 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// one was reported, and the reason if it failed.</summary>
         internal void OnTaskStatusChanged(Task task, TaskStatus previous, TaskResult result, string failReason)
         {
-            if (!stepsByTask.TryGetValue(task, out Step step))
+            if (restoring || !stepsByTask.TryGetValue(task, out Step step))
             {
                 return;
             }
@@ -467,15 +472,15 @@ namespace Virtuademy.SDK.Environments.Tasks
             GiveHint(step);
         }
 
-        internal void GiveHint(Task task)
+        internal void GiveHint(Task task, bool remote = false)
         {
             if (stepsByTask.TryGetValue(task, out Step step))
             {
-                GiveHint(step);
+                GiveHint(step, remote);
             }
         }
 
-        private void GiveHint(Step step)
+        private void GiveHint(Step step, bool remote = false)
         {
             if (!procedure.HintsEnabled)
             {
@@ -499,6 +504,10 @@ namespace Virtuademy.SDK.Environments.Tasks
                 scoring.Recompute();
             }
             AddTimeline(step, true, lost, "Hint", null);
+            if (!remote)
+            {
+                SendHint(step);
+            }
             step.Placeholder?.RaiseHintShown();
             HintGiven?.Invoke(step);
             procedure.RaiseHintUsed(step.Task.gameObject, hintsUsed);
@@ -614,7 +623,7 @@ namespace Virtuademy.SDK.Environments.Tasks
                 return;
             }
             finished = true;
-            finishTime = Time.realtimeSinceStartup;
+            finishTime = Now();
             if (timeLimit != null)
             {
                 StopCoroutine(timeLimit);
@@ -649,7 +658,7 @@ namespace Virtuademy.SDK.Environments.Tasks
                 MaxScore = scoring.MaxScore,
                 PassingScore = scoring.PassingScore,
                 Percent = scoring.Percent,
-                ElapsedSeconds = finishTime - startTime,
+                ElapsedSeconds = (float)(finishTime - startTime),
                 Errors = errors,
                 HintsUsed = hintsUsed,
                 Tasks = steps.Where(s => s.Score != null && !s.Score.Skipped).Select(s => new ProcedureTaskRow

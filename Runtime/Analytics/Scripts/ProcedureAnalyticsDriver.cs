@@ -35,6 +35,10 @@ namespace Virtuademy.SDK.Environments.Analytics
                 ? new PlatformSender(this)
                 : new LogSender(run.Procedure.name);
             analytics = new ProcedureAnalytics(sender, this, prefix, context);
+            analytics.RunIdReady += OnRunIdReady;
+            analytics.Sent += OnSent;
+            run.SnapshotApplied += OnSnapshotApplied;
+            run.BecameMaster += OnBecameMaster;
             run.RunStarted += OnRunStarted;
             run.StepStarted += OnStepStarted;
             run.ResultScored += OnResultScored;
@@ -48,8 +52,15 @@ namespace Virtuademy.SDK.Environments.Analytics
 
         private void OnDestroy()
         {
+            if (analytics != null)
+            {
+                analytics.RunIdReady -= OnRunIdReady;
+                analytics.Sent -= OnSent;
+            }
             if (run != null)
             {
+                run.SnapshotApplied -= OnSnapshotApplied;
+                run.BecameMaster -= OnBecameMaster;
                 run.RunStarted -= OnRunStarted;
                 run.StepStarted -= OnStepStarted;
                 run.ResultScored -= OnResultScored;
@@ -65,15 +76,89 @@ namespace Virtuademy.SDK.Environments.Analytics
             context = run.Procedure.AnalyticsContext.Length > 0 ? run.Procedure.AnalyticsContext : environment;
         }
 
+        // In a shared procedure the master is the sender of record: it mints the team run and sends ExpStart, the steps
+        // and ExpComplete; every participant sends ExpJoin once per run (D.10).
+        private bool SendsRun => !run.IsShared || run.IsMaster;
+
         private void OnRunStarted()
         {
-            analytics.StartRun();
-            run.SetRunKey(analytics.RunKey);
+            if (SendsRun)
+            {
+                analytics.StartRun();
+                run.SetRunKey(analytics.RunKey);
+            }
+        }
+
+        private void OnRunIdReady(string key)
+        {
+            run.SetRunKey(key);
+            if (run.IsShared)
+            {
+                // The key reaches the room only once its id exists there; then the master joins like everyone.
+                run.SetFlag("id." + key);
+                analytics.JoinRun(key);
+            }
+        }
+
+        private void OnSnapshotApplied()
+        {
+            if (run.RunKey.Length > 0 && run.HasFlag("id." + run.RunKey))
+            {
+                analytics.JoinRun(run.RunKey);
+            }
+        }
+
+        // Statements the platform stored, as the room's flags (a new master sends what is not flagged).
+        private void OnSent(EAnalyticVerb verb, AnalyticDTO dto)
+        {
+            if (!run.IsShared || !run.IsMaster)
+            {
+                return;
+            }
+            switch (verb)
+            {
+                case EAnalyticVerb.ExpStart: run.SetFlag("es"); break;
+                case EAnalyticVerb.StepStart: run.SetFlag("ss." + ((ExperienceStepDTO)dto).stepId); break;
+                case EAnalyticVerb.StepComplete: run.SetFlag("sc." + ((ExperienceStepDTO)dto).stepId); break;
+            }
+        }
+
+        // The master left during a run: this client takes the run over from the room's flags.
+        private void OnBecameMaster()
+        {
+            if (run.RunKey.Length == 0)
+            {
+                return;
+            }
+            analytics.AdoptRun(run.RunKey, run.HasFlag);
+            foreach (ProcedureRun.Step step in run.Steps)
+            {
+                if (!step.Scored || !step.Started)
+                {
+                    continue;
+                }
+                if (run.HasFlag("ss." + step.StepId))
+                {
+                    analytics.StepStartedSent(step.StepId);
+                }
+                else
+                {
+                    analytics.StepStarted(step.StepId, step.Name);
+                }
+                if (step.Score != null && step.Score.Done && !run.HasFlag("sc." + step.StepId))
+                {
+                    SendStepComplete(step, step.Score.Failed);
+                }
+            }
+            if (run.IsFinished && run.Summary != null)
+            {
+                OnRunFinished(run.Summary);
+            }
         }
 
         private void OnStepStarted(ProcedureRun.Step step)
         {
-            if (step.Scored)
+            if (step.Scored && SendsRun)
             {
                 analytics.StepStarted(step.StepId, step.Name);
             }
@@ -81,20 +166,39 @@ namespace Virtuademy.SDK.Environments.Analytics
 
         private void OnResultScored(ProcedureRun.Step step, TaskResult result, float lost, ProcedureRun.EResultKind kind)
         {
-            if (step?.Score == null || (kind != ProcedureRun.EResultKind.Completion && kind != ProcedureRun.EResultKind.Failure))
+            if (step?.Score == null || !SendsRun
+                || (kind != ProcedureRun.EResultKind.Completion && kind != ProcedureRun.EResultKind.Failure))
             {
                 return;
             }
+            SendStepComplete(step, kind == ProcedureRun.EResultKind.Failure);
+        }
+
+        private void SendStepComplete(ProcedureRun.Step step, bool failed)
+        {
             int max = step.Score.MaxPoints;
             int passing = Mathf.RoundToInt(max * run.Procedure.PassPercent / 100f);
-            EExperienceOutcome outcome = kind == ProcedureRun.EResultKind.Failure || step.Score.Points < passing
-                ? EExperienceOutcome.Fail : EExperienceOutcome.Pass;
+            EExperienceOutcome outcome = failed || step.Score.Points < passing ? EExperienceOutcome.Fail : EExperienceOutcome.Pass;
             analytics.StepCompleted(step.StepId, step.Score.Points, max, passing, outcome);
         }
 
         // Passed: Pass. Failed: Fail. Ended early: Fail if a fail condition happened, else NA with the score so far.
         private void OnRunFinished(ProcedureSummary summary)
         {
+            if (!SendsRun)
+            {
+                return;
+            }
+            if (run.IsShared)
+            {
+                // At most once for the room: the flag goes to the room before the statement is sent (a second
+                // ExpComplete from another user would add a second row in the Back Office).
+                if (run.HasFlag("ec"))
+                {
+                    return;
+                }
+                run.SetFlag("ec");
+            }
             EExperienceOutcome outcome = summary.Outcome switch
             {
                 EProcedureOutcome.Passed => EExperienceOutcome.Pass,

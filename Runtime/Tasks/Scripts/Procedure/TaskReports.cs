@@ -25,31 +25,62 @@ namespace Virtuademy.SDK.Environments.Tasks
         private static readonly Dictionary<Task, TaskResult> pending = new();
         private static readonly Dictionary<Task, string> failReasons = new();
 
+        /// <summary>Raised for every report made on this client (not for one received from another client), once it is
+        /// applied: a shared task system sends it to the others.</summary>
+        internal static event System.Action<Task, ProcedureNetworkEvent> LocalReported;
+
+        private static ProcedureNetworkEvent EventOf(int kind, TaskResult result) => new()
+        {
+            Kind = kind,
+            Outcome = result != null ? (int)result.Outcome : 0,
+            Score = result != null ? result.Score : 0f,
+            Reason = result != null ? result.Reason : "",
+        };
+
         private static ProcedureRun ProcedureOf(Task task)
         {
             TaskSystemVirtuademy system = task.GetComponentInParent<TaskSystemVirtuademy>(true);
             return system != null ? system.Procedure : null;
         }
 
-        public static void Complete(Task task, TaskResult result)
+        public static void Complete(Task task, TaskResult result) => Complete(task, result, false);
+
+        /// <summary>A completion; <paramref name="remote"/>: received from another client, applied here and not sent on.</summary>
+        public static void Complete(Task task, TaskResult result, bool remote)
         {
             ProcedureRun procedure = ProcedureOf(task);
-            if (OutOfOrder(task, result, procedure) || !Accepts(task, "completion"))
+            if ((!remote && OutOfOrder(task, result, procedure)) || !Accepts(task, "completion"))
             {
                 return;
             }
             Raise(task, result, procedure);
             // A completion with a Wrong outcome still completes the task; a procedure scores it 0.
             pending[task] = result;
-            task.CompleteTask();
+            if (!remote)
+            {
+                task.CompleteTask();
+                // Applied here first, then sent: the room's snapshot never counts it before this client does.
+                LocalReported?.Invoke(task, EventOf(ProcedureNetworkEvent.Complete, result));
+            }
+            else if (task is TaskVirtuademy shared)
+            {
+                // As the task network's own completion does: no echo to the room.
+                shared.ForceTaskComplete(shared.TaskID);
+            }
+            else
+            {
+                task.CompleteTask();
+            }
             // A task that did not complete (CompleteTask completes To Do tasks only) keeps no stale result.
             pending.Remove(task);
         }
 
-        public static void Attempt(Task task, TaskResult result)
+        public static void Attempt(Task task, TaskResult result) => Attempt(task, result, false);
+
+        public static void Attempt(Task task, TaskResult result, bool remote)
         {
             ProcedureRun procedure = ProcedureOf(task);
-            if (OutOfOrder(task, result, procedure) || !Accepts(task, "attempt"))
+            if ((!remote && OutOfOrder(task, result, procedure)) || !Accepts(task, "attempt"))
             {
                 return;
             }
@@ -59,9 +90,15 @@ namespace Virtuademy.SDK.Environments.Tasks
                 step.RaiseAttempted(result);
             }
             procedure?.OnAttempt(task, result);
+            if (!remote)
+            {
+                LocalReported?.Invoke(task, EventOf(ProcedureNetworkEvent.Attempt, result));
+            }
         }
 
-        public static void Fail(Task task, string reason)
+        public static void Fail(Task task, string reason) => Fail(task, reason, false);
+
+        public static void Fail(Task task, string reason, bool remote)
         {
             if (!Accepts(task, "failure"))
             {
@@ -70,16 +107,35 @@ namespace Virtuademy.SDK.Environments.Tasks
             failReasons[task] = reason ?? "";
             task.FailTask();
             failReasons.Remove(task);
+            if (!remote)
+            {
+                LocalReported?.Invoke(task, new ProcedureNetworkEvent { Kind = ProcedureNetworkEvent.Fail, Reason = reason ?? "" });
+            }
         }
 
         /// <summary>A distractor used, with or without a task: raised, and charged by the task's procedure.</summary>
         public static void Distractor(Task task, ProcedureRun procedure, TaskResult result, float penaltyPoints, bool countsAsError)
+            => Distractor(task, procedure, result, penaltyPoints, countsAsError, false);
+
+        public static void Distractor(Task task, ProcedureRun procedure, TaskResult result, float penaltyPoints,
+            bool countsAsError, bool remote)
         {
             if (task != null)
             {
                 TasksApi.Instance.RaiseResultReported(task.gameObject, result);
             }
             procedure?.OnDistractor(task, result, penaltyPoints, countsAsError);
+            if (!remote && (task != null || procedure != null))
+            {
+                ProcedureNetworkEvent e = EventOf(ProcedureNetworkEvent.Distractor, result);
+                e.Penalty = penaltyPoints;
+                e.CountsAsError = countsAsError;
+                LocalReported?.Invoke(task, e);
+                if (task == null)
+                {
+                    procedure.ReportDistractorWithoutTask(e);
+                }
+            }
         }
 
         public static TaskResult TakePending(Task task)
@@ -123,6 +179,8 @@ namespace Virtuademy.SDK.Environments.Tasks
             ProcedureRun.CopyActor(result, wrong);
             Raise(task, wrong, procedure);
             procedure.OnOutOfOrder(task, wrong);
+            // Sent as the wrong attempt it counts as: another client may have the task unlocked already.
+            LocalReported?.Invoke(task, EventOf(ProcedureNetworkEvent.Attempt, wrong));
             return true;
         }
 

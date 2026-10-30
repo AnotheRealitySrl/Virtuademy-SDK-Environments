@@ -24,6 +24,20 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         private QuestionElementPlaceholder Question => (QuestionElementPlaceholder)Element;
 
+        // The question elements awake, for a shared procedure's snapshot (the master's draws).
+        private static readonly List<QuestionElementDriver> all = new();
+
+        internal static IReadOnlyList<QuestionElementDriver> All => all;
+
+        internal static QuestionElementDriver For(Task task) => task == null ? null : all.Find(q => q.TaskForSync == task);
+
+        /// <summary>The task this question reports on (null without one).</summary>
+        internal Task TaskForSync => TaskOf();
+
+        private void OnEnable() => all.Add(this);
+
+        private void OnDisable() => all.Remove(this);
+
         protected override void OnBind()
         {
             Draw();

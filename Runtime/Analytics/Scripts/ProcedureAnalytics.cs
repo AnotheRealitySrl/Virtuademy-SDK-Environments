@@ -69,6 +69,14 @@ namespace Virtuademy.SDK.Environments.Analytics
         /// <summary>Raised when nothing is queued or in flight any more.</summary>
         public event Action Drained;
 
+        /// <summary>Raised for every statement the platform stored.</summary>
+        public event Action<EAnalyticVerb, AnalyticDTO> Sent;
+
+        /// <summary>Raised when the current run's experience id exists, with its key.</summary>
+        public event Action<string> RunIdReady;
+
+        private readonly HashSet<string> joined = new();
+
         public ProcedureAnalytics(IProcedureAnalyticsSender sender, IProcedureScheduler scheduler, string keyPrefix,
             string context, int seed = 0)
         {
@@ -120,8 +128,9 @@ namespace Virtuademy.SDK.Environments.Analytics
         public void StartRun()
         {
             current = new Run { Key = MintKey() };
-            GenerateId(current);
+            // Queued first, so ExpStart leads even when the id answers at once.
             Enqueue(current, EAnalyticVerb.ExpStart, new ExperienceStartDTO(current.Key, context));
+            GenerateId(current);
         }
 
         public void StepStarted(string stepId, string description)
@@ -165,6 +174,37 @@ namespace Virtuademy.SDK.Environments.Analytics
                 outcome, EExperienceScoringType.Numeric));
         }
 
+        /// <summary>Joins the team run <paramref name="key"/> (its id is already in the room): one ExpJoin per key.</summary>
+        public void JoinRun(string key)
+        {
+            if (string.IsNullOrEmpty(key) || !joined.Add(key))
+            {
+                return;
+            }
+            Run run = current != null && current.Key == key ? current : new Run { Key = key, IdReady = true };
+            Enqueue(run, EAnalyticVerb.ExpJoin, new ExperienceJoinDTO(key, context));
+        }
+
+        /// <summary>
+        /// Takes over the team run <paramref name="key"/> from a master that left: what was sent is known from the room's
+        /// flags; ExpStart again if it was not.
+        /// </summary>
+        public void AdoptRun(string key, Func<string, bool> sent)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+            current = new Run { Key = key, IdReady = true, Completed = sent("ec") };
+            if (!sent("es"))
+            {
+                Enqueue(current, EAnalyticVerb.ExpStart, new ExperienceStartDTO(key, context));
+            }
+        }
+
+        /// <summary>Marks a step as started without sending its StepStart (it was sent by a master that left).</summary>
+        public void StepStartedSent(string stepId) => current?.StartedSteps.Add(stepId);
+
         #endregion
 
         #region Id
@@ -184,6 +224,10 @@ namespace Virtuademy.SDK.Environments.Analytics
             }
             run.IdReady = true;
             scheduler.Cancel(run.IdTimeout);
+            if (run == current)
+            {
+                RunIdReady?.Invoke(run.Key);
+            }
             Pump();
         }
 
@@ -245,6 +289,7 @@ namespace Virtuademy.SDK.Environments.Analytics
                 {
                     queue.RemoveFirst();
                 }
+                Sent?.Invoke(item.Verb, item.Dto);
                 Pump();
                 return;
             }
