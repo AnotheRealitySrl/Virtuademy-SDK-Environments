@@ -280,6 +280,13 @@ one usable connection, which changes what a script that relied on the project's 
   VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
   `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
   `timelineMaxRows`); Retry and Exit. `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
+  **Analytics** (`sendAnalytics`): one run per procedure run, its key the prefix (`analyticsKeyPrefix`, else the scene's
+  name; letters and digits, at most 7) and 8 random characters, its experience id generated first (a new key after
+  10 s without one); ExpStart, a StepStart when a scored step starts, exactly one StepComplete per started step (0,
+  Fail when the run ends first), one ExpComplete per run (Pass, Fail; ended early: Fail after a fail condition, else
+  NA with the score so far); sent in order, one at a time, a failed one again after 2, 4, 8, 16 then 30 s. Retry and
+  Exit wait for the queue (at most 8 s, the summary says so); the scene's unload ends the run and waits 8 s if
+  statements are still queued. Without the application the statements are logged.
 - **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
   minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
   `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`

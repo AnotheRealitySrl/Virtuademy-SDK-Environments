@@ -36,6 +36,14 @@ namespace Virtuademy.SDK.Environments.Tasks
                 presenter = procedure.gameObject.AddComponent<ProcedureFeedbackPresenter>();
             }
             presenter.Bind(run);
+            if (procedure.SendAnalytics)
+            {
+                if (!procedure.TryGetComponent(out Analytics.ProcedureAnalyticsDriver analytics))
+                {
+                    analytics = procedure.gameObject.AddComponent<Analytics.ProcedureAnalyticsDriver>();
+                }
+                analytics.Bind(run);
+            }
         }
 
         private static void OnStepCreated(TaskStepPlaceholder step)

@@ -74,6 +74,24 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// task), the result (for a failure: a wrong one with the reason), the points it cost, and what it was.</summary>
         internal event Action<Step, TaskResult, float, EResultKind> ResultScored;
 
+        /// <summary>Raised when a step starts (it is unlocked during a run).</summary>
+        internal event Action<Step> StepStarted;
+
+        /// <summary>Set by the analytics: runs the action once the statements are sent (or after a timeout).</summary>
+        internal Action<Action> LeaveGate { get; set; }
+
+        /// <summary>The run's analytics key, given by the analytics when the run starts.</summary>
+        internal void SetRunKey(string key) => runKey = key ?? "";
+
+        /// <summary>The scene unloads before the run finished: it ends, abandoned (keeping a fail condition if any).</summary>
+        internal void EndForUnload()
+        {
+            if (IsRunning)
+            {
+                Finish(EProcedureOutcome.Abandoned, failCondition);
+            }
+        }
+
         /// <summary>Raised for every hint used, with its step.</summary>
         internal event Action<Step> HintGiven;
 
@@ -262,8 +280,21 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 if (step.Task.Node.Status == TaskStatus.Todo || step.Task.Node.Status == TaskStatus.InProgress)
                 {
-                    step.Started = true;
+                    MarkStarted(step);
                 }
+            }
+        }
+
+        private void MarkStarted(Step step)
+        {
+            if (step.Started)
+            {
+                return;
+            }
+            step.Started = true;
+            if (IsRunning)
+            {
+                StepStarted?.Invoke(step);
             }
         }
 
@@ -374,7 +405,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             TaskStatus status = task.Node.Status;
             if (status == TaskStatus.Todo || status == TaskStatus.InProgress)
             {
-                step.Started = true;
+                MarkStarted(step);
                 return;
             }
             if (!IsRunning || step.Score == null || step.Score.Done || step.Score.Skipped)
@@ -670,13 +701,29 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 Finish(EProcedureOutcome.Abandoned, failCondition);
             }
-            if (procedure.RetryMode == ERetryMode.ReloadSession && !system.isNetworked && IVirtuademyFramework.IsAvailable)
+            // Once the run's statements are sent (or after the analytics' timeout).
+            Leave(() =>
             {
-                StartCoroutine(IVirtuademyFramework.Current.Session.ReloadSession());
-                return;
+                if (procedure.RetryMode == ERetryMode.ReloadSession && !system.isNetworked && IVirtuademyFramework.IsAvailable)
+                {
+                    StartCoroutine(IVirtuademyFramework.Current.Session.ReloadSession());
+                    return;
+                }
+                // In place: the task system reverts (and a shared one reverts every client), then a new run starts.
+                system.Revert();
+            });
+        }
+
+        private void Leave(Action then)
+        {
+            if (LeaveGate != null)
+            {
+                LeaveGate(then);
             }
-            // In place: the task system reverts (and a shared one reverts every client), then a new run starts.
-            system.Revert();
+            else
+            {
+                then();
+            }
         }
 
         public void Exit()
@@ -690,10 +737,13 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 Finish(EProcedureOutcome.Abandoned, failCondition);
             }
-            if (IVirtuademyGameplay.IsAvailable)
+            Leave(() =>
             {
-                IVirtuademyGameplay.Current.Scene.ReturnToLobby();
-            }
+                if (IVirtuademyGameplay.IsAvailable)
+                {
+                    IVirtuademyGameplay.Current.Scene.ReturnToLobby();
+                }
+            });
         }
 
         /// <summary>Raised by <see cref="ShowSummary"/>; the summary panel shows on it (D6).</summary>
