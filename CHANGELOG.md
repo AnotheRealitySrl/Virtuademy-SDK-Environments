@@ -296,6 +296,10 @@ one usable connection, which changes what a script that relied on the project's 
   every participant sends ExpJoin once per run; a new master sends what the room's flags say is missing. Retry in a
   shared procedure is always in place and starts a new team run. `TaskSystemVirtuademy.SetProcedureNetwork` and
   `IProcedureNetwork` (SDK runtime) are what the application implements.
+  Nodes ("Virtuademy Procedure"): Get Procedure State, Finish Procedure, Retry Procedure, Request Hint, On Procedure
+  Finished (Passed, Score, MaxScore), On Score Changed, On Hint Used; `ITasksApi.RequestHint(procedure)`. The Procedure
+  placeholder's inspector says what will not work as set (not on a task system, missing summary or feedback panels) and
+  warns when the scene's legacy ControlManager / ExperienceVerbManager graphs also send experience statements.
 - **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
   minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
   `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`

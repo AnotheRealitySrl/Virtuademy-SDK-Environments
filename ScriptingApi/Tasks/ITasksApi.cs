@@ -45,6 +45,10 @@ namespace Virtuademy.Environments.ScriptingApi.Tasks
         /// <summary>Unlocks <paramref name="task"/> (to do). Node: <c>Virtuademy Tasks: Unlock Task</c>.</summary>
         void UnlockTask(GameObject task);
 
+        /// <summary>Shows the hint of the current task of the procedure on <paramref name="procedure"/> (its object, or
+        /// the task system's). Node: <c>Virtuademy Procedure: Request Hint</c>.</summary>
+        void RequestHint(GameObject procedure);
+
         /// <summary>Raised for every task whose state changes, in every task system of the world.</summary>
         event TaskStateChangedHandler TaskStateChanged;
 

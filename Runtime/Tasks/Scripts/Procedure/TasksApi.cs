@@ -78,6 +78,21 @@ namespace Virtuademy.SDK.Environments.Tasks
             }
         }
 
+        public void RequestHint(GameObject procedure)
+        {
+            if (procedure != null && procedure.TryGetComponent(out Virtuademy.Environments.ScriptingApi.Placeholders.ProcedurePlaceholder placeholder))
+            {
+                placeholder.RequestHint();
+                return;
+            }
+            int id = procedure == null ? 0 : procedure.GetInstanceID();
+            if (warned.Add(id))
+            {
+                Debug.LogWarning("[Tasks] RequestHint: " + (procedure == null ? "no object" : procedure.name + " has no Procedure placeholder")
+                    + ": the call does nothing.", procedure);
+            }
+        }
+
         private bool Resolve(GameObject task, string member, out Task resolved)
         {
             resolved = null;
