@@ -108,6 +108,44 @@ a deploy lets the step in flight finish and reports what was and was not done. B
 commands renew the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list
 (`Assets/Virtuademy/Editor/Settings/AddressablesSceneList.asset`). Details: the class's XML documentation.
 
+## Environment Details window
+
+Where a scene is published, what its thumbnail and localization file are in each place, and the experiences that use it: the **i** button at the end of
+a scene's row in **Virtuademy > Publish Environments** opens the **Environment Details** window on that scene, and **Virtuademy > Environment Details** opens it on the scene it showed last (one window for the project, reused when it is
+open; it is not compiled in the application, like Publish Environments). It is the window's counterpart of the `published`, `save-files`, `set-files`,
+`restore`, `scene-files`, `experiences`, `create-core` and `experience-status` commands, and uses the same services. A *place* is a world, or a tenant's tenant
+level, where the scene's environment exists online, on one connection; the tenant level is one environment shared by its worlds.
+
+**In the scene row.** After the scene's name: a 32 x 18 preview of the scene's default thumbnail (a dashed slot with a plus when it has none) and a
+**Localization** chip (dim when it has no default file). The defaults are what a deploy sends the first time it makes the scene's environment in a
+place; later deploys never touch a place's files. Drop an image asset of the project (PNG or JPEG) on the slot, or a `.csv` on the chip, to set one;
+a click on either opens the details. The platform toggles (VR, WebGL, Mobile) are filled when the scene is built for them and outlined when it is not. A new
+scene is built for all three. The line under the scene says in how many places and on how many connections it is published; its tooltip has the text of
+each connection. In the deploy preview, a scene that is new in a world and has no default thumbnail or localization file is said under that world's `New` line.
+
+**The window.** The scene bar chooses the scene of the scene list and has **Refresh**; the defaults strip under it edits the scene's two defaults (local,
+no request). The window reads each connection on its own when it opens, on Refresh and when the scene changes; a connection that is not logged in says so
+with **Log in**, one that could not be read says why with **Retry**. The left list groups the places by connection, as Publish Environments groups its
+targets, with two squares for each place: thumbnail and localization file, green when the project holds the same file (same SHA-256), amber when the file
+is online only, empty when there is none. When every connection was read and the scene is in one place, the list goes away.
+
+**A place** shows its thumbnail and localization file, whether the project holds the same file, and its experiences (worlds only). **Save to project**
+keeps the online file in `Assets/Virtuademy/Editor/PublishFiles/`, unless a project file already has the same hash. **Replace in this world only...** (**Replace...** at
+tenant level) picks a project asset with Unity's object picker, checks it on this computer (an image decodes as PNG or JPEG; a localization file follows the
+platform's rules), says when an image will be converted to a JPEG of at most 2560 x 1440 in the publish folder, and sends it after **Replace**; the file the
+place holds now is saved to the project first. A tenant on a platform that cannot receive files yet, and an account that may not change a place, are said
+once in a banner and the buttons are disabled with the reason in their tooltips. The Core experiences of the world are listed with a popup that sets each one's
+state (Published or Draft) at once; when there is none, **Create Core experience** makes it (as a draft).
+
+**All places** holds what acts on many places: **Save** the online files the project lacks, **Replace in all places** (two asset fields and **Use the defaults**;
+**Preview changes** lists each place with what would change, which ones are skipped and why; **Apply** sends, place by place, and nothing is rolled back when one
+fails: the result says which, and **Retry failed** sends again to them only), and **Create Core experiences** in the worlds that have none.
+
+The window remembers its size and the last scene per user (`EditorPrefs`); the files it downloads for previews are in `Library/Virtuademy/EnvironmentDetails/`,
+outside git. It writes in `Assets/` only on **Save to project** (and **Save N files** in All places, which writes one file for each online file the project
+lacks: many at once), on the save of a place's previous file before a replace, and on the conversion of an image before an upload. Setting a default, in the
+defaults strip or by a drop on a scene's row, writes the scene list asset (`AddressablesSceneList.asset`) and saves it at once (one undo step).
+
 ## Addressables groups
 
 A project that publishes environments has one Addressables group, the default one, and keeps it

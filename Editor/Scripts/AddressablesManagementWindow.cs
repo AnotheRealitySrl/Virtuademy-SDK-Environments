@@ -220,16 +220,6 @@ namespace Virtuademy.SDK.Environments.Editor
             public int Count => Worlds.Count + (Tenant ? 1 : 0);
         }
 
-        /// <summary>The answer of <c>GET /tenants/backoffice-access/my</c> (meta-repo ADR 0038, decision 7).</summary>
-        private sealed class BackofficeAccess
-        {
-            [JsonProperty("canAccess")] public bool CanAccess;
-            [JsonProperty("tenantLevel")] public bool TenantLevel;
-            [JsonProperty("worldIds")] public List<int> WorldIds;
-
-            public bool Covers(int worldId) => TenantLevel || (WorldIds?.Contains(worldId) ?? false);
-        }
-
 #if !VIRTUADEMY_APPLICATION
         // Second in the Virtuademy menu, under Setup project (the setup package's, priority 0).
         [MenuItem("Virtuademy/Publish Environments", false, 1)]
@@ -251,6 +241,7 @@ namespace Virtuademy.SDK.Environments.Editor
             EditorLoginState.OnLoginStateChanged -= OnLoginStateChanged;
             EditorLoginState.OnTokenChanged -= OnTokenChanged;
             PublishedEnvironmentsIndex.Changed -= OnPublishedIndexChanged;
+            SceneDefaults.Changed -= RefreshDeployPreviews;
         }
 
         private void OnFocus()
@@ -528,7 +519,7 @@ namespace Virtuademy.SDK.Environments.Editor
             versionNotice.Add(new HelpBox(text, HelpBoxMessageType.Info) { style = { marginBottom = 4 } });
         }
 
-        private static bool IsProduction(ConnectionRecord record) =>
+        internal static bool IsProduction(ConnectionRecord record) =>
             string.Equals(record.Environment, nameof(Env.Production), StringComparison.OrdinalIgnoreCase)
             || record.Tenant?.Env == Env.Production;
 
@@ -1052,7 +1043,7 @@ namespace Virtuademy.SDK.Environments.Editor
         /// </summary>
         private async Task LoadGroupBackofficeAccessAsync(TargetGroup group, int generation)
         {
-            BackofficeAccess access = await LoadBackofficeAccessAsync(group.Key);
+            BackofficeAccess access = await EnvironmentBackoffice.LoadAccessAsync(group.Key);
             if (generation != group.Generation)
                 return;
 
@@ -1060,51 +1051,8 @@ namespace Virtuademy.SDK.Environments.Editor
             RefreshBackofficeButton(group);
         }
 
-        /// <summary>
-        /// The access when the account may enter, else null. The token goes to this connection's Application API only.
-        /// A tenant with no Back Office address is not asked. An API older than the route answers 404 or 405, and is
-        /// skipped without a word (the version rule of meta-repo ADR 0037); any other failure is logged and shows no
-        /// button either.
-        /// </summary>
-        private static async Task<BackofficeAccess> LoadBackofficeAccessAsync(string connectionKey)
-        {
-            string applicationApiUrl = EditorApiEndpoint.ApplicationApiUrlOf(connectionKey);
-            if (string.IsNullOrEmpty(applicationApiUrl) || BackofficeUriOf(connectionKey) == null)
-                return null;
-
-            string url = $"{applicationApiUrl}/tenants/backoffice-access/my?api-version=2";
-            try
-            {
-                using HttpResponseMessage response = await EditorSessionManager.SendAuthorizedAsync(connectionKey,
-                    () => new HttpRequestMessage(HttpMethod.Get, url), allowInteractive: false);
-
-                if (response == null || response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed)
-                    return null;
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    Debug.LogWarning($"[PublishEnvironments] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {response.StatusCode}");
-                    return null;
-                }
-
-                BackofficeAccess access = JsonConvert.DeserializeObject<BackofficeAccess>(await response.Content.ReadAsStringAsync());
-                return access?.CanAccess == true ? access : null;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[PublishEnvironments] Could not read the Back Office access of {PublishedEnvironmentsIndex.LabelOf(connectionKey)}: {ex.Message}");
-                return null;
-            }
-        }
-
         /// <summary>The connection's Back Office address, when it is an absolute http(s) URL.</summary>
-        private static Uri BackofficeUriOf(string connectionKey)
-        {
-            string value = ConnectionStore.Get(connectionKey)?.BackofficeUrl;
-            return Uri.TryCreate(value, UriKind.Absolute, out Uri uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
-                ? uri
-                : null;
-        }
+        private static Uri BackofficeUriOf(string connectionKey) => EnvironmentBackoffice.UriOf(connectionKey);
 
         /// <summary>
         /// The world the button opens the Back Office on: the first ticked world, in the group's order, that the access
@@ -1113,16 +1061,7 @@ namespace Virtuademy.SDK.Environments.Editor
         private static PublishableWorld BackofficeWorld(TargetGroup group) => group.Deployable
             .FirstOrDefault(w => group.WorldToggles.TryGetValue(w.Id, out Toggle toggle) && toggle.value && group.Backoffice.Covers(w.Id));
 
-        private static string BackofficeLink(Uri home, int? worldId)
-        {
-            if (worldId == null)
-                return home.AbsoluteUri;
-
-            UriBuilder builder = new(home);
-            string query = builder.Query.TrimStart('?');
-            builder.Query = (query.Length > 0 ? query + "&" : "") + "world=" + worldId.Value.ToString(CultureInfo.InvariantCulture);
-            return builder.Uri.AbsoluteUri;
-        }
+        private static string BackofficeLink(Uri home, int? worldId) => EnvironmentBackoffice.LinkTo(home, worldId);
 
         /// <summary>Shown while the group's connection has a session, a Back Office address and an access that says yes.</summary>
         private void RefreshBackofficeButton(TargetGroup group)
@@ -1243,10 +1182,10 @@ namespace Virtuademy.SDK.Environments.Editor
             ScheduleSessionExpiryRefresh();
         }
 
-        private static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
+        internal static string Plural(int count, string noun) => $"{count} {noun}{(count == 1 ? "" : "s")}";
 
         /// <summary>A moment in local time: the hour today, the day and the hour otherwise ("3 Nov 09:32").</summary>
-        private static string ShortTime(DateTime? utc)
+        internal static string ShortTime(DateTime? utc)
         {
             if (utc == null)
                 return "?";
@@ -1696,6 +1635,8 @@ namespace Virtuademy.SDK.Environments.Editor
 
             PublishedEnvironmentsIndex.Changed -= OnPublishedIndexChanged;
             PublishedEnvironmentsIndex.Changed += OnPublishedIndexChanged;
+            SceneDefaults.Changed -= RefreshDeployPreviews;
+            SceneDefaults.Changed += RefreshDeployPreviews;
             RebuildSceneList();
         }
 
@@ -1949,12 +1890,24 @@ namespace Virtuademy.SDK.Environments.Editor
         /// </summary>
         private void RefreshDeployPreviews()
         {
+            // The scenes' default files, read from the scene list once for the whole refresh.
+            Dictionary<string, (string Thumbnail, string Localization)> defaults = new();
+            foreach (SceneConfiguration config in sceneConfigurations?.SceneConfigurations ?? new List<SceneConfiguration>())
+            {
+                if (config.Scene == null)
+                    continue;
+
+                string thumbnail = config.DefaultThumbnail != null ? AssetDatabase.GetAssetPath(config.DefaultThumbnail) : null;
+                string localization = config.DefaultLocalization != null ? AssetDatabase.GetAssetPath(config.DefaultLocalization) : null;
+                defaults[config.SceneNameFiltered] = (string.IsNullOrEmpty(thumbnail) ? null : thumbnail, string.IsNullOrEmpty(localization) ? null : localization);
+            }
+
             foreach (TargetGroup group in groups.Values)
             {
                 foreach (KeyValuePair<int, VisualElement> pair in group.WorldPreviews)
                 {
                     if (group.WorldToggles.TryGetValue(pair.Key, out Toggle toggle) && toggle.value)
-                        FillDeployPreview(pair.Value, pair.Key, group.Key);
+                        FillDeployPreview(pair.Value, pair.Key, group.Key, defaults);
                     else
                         pair.Value.Clear();
                 }
@@ -1963,13 +1916,13 @@ namespace Virtuademy.SDK.Environments.Editor
                     continue;
 
                 if (group.TenantToggle?.value == true)
-                    FillDeployPreview(group.TenantPreview, null, group.Key);
+                    FillDeployPreview(group.TenantPreview, null, group.Key, defaults);
                 else
                     group.TenantPreview.Clear();
             }
         }
 
-        private void FillDeployPreview(VisualElement target, int? worldId, string connectionKey)
+        private void FillDeployPreview(VisualElement target, int? worldId, string connectionKey, Dictionary<string, (string Thumbnail, string Localization)> defaults)
         {
             target.Clear();
             if (sceneConfigurations?.SceneConfigurations == null) return;
@@ -1990,7 +1943,19 @@ namespace Virtuademy.SDK.Environments.Editor
             }
 
             if (preview.Updated.Count > 0) target.Add(PreviewLine($"Updated ({preview.Updated.Count}): {string.Join(", ", preview.Updated)}", preview_update_color));
-            if (preview.Added.Count > 0) target.Add(PreviewLine($"New ({preview.Added.Count}): {string.Join(", ", preview.Added)}", preview_new_color));
+            if (preview.Added.Count > 0)
+            {
+                target.Add(PreviewLine($"New ({preview.Added.Count}): {string.Join(", ", preview.Added)}", preview_new_color));
+
+                // A new scene is published with its default files; one that has none is said here, before the deploy. Read from the scene list: no request.
+                foreach (string scene in preview.Added)
+                {
+                    defaults.TryGetValue(PublishedEnvironmentsIndex.Key(scene), out (string Thumbnail, string Localization) files);
+                    string note = EnvironmentFilesService.MissingDefaultsNote(scene, files.Thumbnail, files.Localization);
+                    if (note != null)
+                        target.Add(PreviewLine(note, preview_update_color));
+                }
+            }
         }
 
         private static Label PreviewLine(string text, Color color)
