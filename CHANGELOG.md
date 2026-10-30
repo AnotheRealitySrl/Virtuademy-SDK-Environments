@@ -34,8 +34,23 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
 connections instead of a file, change for a script that drives them: that warrants a major bump at the release cut. Every
 environment project now uses every connection of the computer and a command that names none works only on a computer with
 one usable connection, which changes what a script that relied on the project's list gets.
+The experiences commands add three `EnvironmentsCli` commands, four options (`-vdLabel`, `-vdPublished`, `-vdExperience`, `-vdStatus`) and the exit codes 33 to 36, and
+a public `EnvironmentExperiencesService` (minor).
 
 #### Added
+- **`EnvironmentsCli` commands `experiences`, `create-core` and `experience-status`, and `EnvironmentExperiencesService`**: for an environment
+  published in a world, which experiences use it and how many (by type and state, with the Core experiences the login is shown, whether it may change
+  their state and whether it may create one), creating its Core experience when none exists, and setting an experience's publication state. The
+  commands are `experiences -vdWorlds <ids> [-vdScenes a,b]`, `create-core -vdWorlds <ids> -vdScenes a,b [-vdLabel <text>] [-vdPublished] [-vdDryRun]`
+  (idempotent: it creates only where no Core experience exists, of any author and state) and `experience-status -vdWorlds <id> -vdExperience <id>
+  -vdStatus Draft|Published`; each takes `-vdConnection` and `-vdExpectTenant`, does not apply the version rule (a tenant without the routes answers exit 34), and reports every scene and
+  world it tried. They ask the platform, which decides per world who may: a login that may not gets exit 33 and a message that says so, and a tenant
+  whose API has no such routes yet gets exit 34 ("cannot show or change the experiences of an environment from the SDK yet: use the Back Office"). New exit
+  codes: 33 not allowed, 34 the tenant does not offer it, 35 the environment is not published in that world or the experience was not found, 36 the world has no session
+  capacity set; with several targets the exit code is the most telling outcome (11, 20, 34, 33, 36, 35), and the REPORT has each one. The service
+  (`Editor/Scripts/EnvironmentExperiencesService.cs`) is what the Publish Environments window will use: async methods that take a connection key and answer
+  with a status (`Ok`, `NotAllowed`, `NotSupportedByTenant`, `NotPublishedInWorld`, `ExperienceNotFound`, `WorldHasNoCapacity`, `LoginRequired`,
+  `Unreachable`, `Failed`), the data and a message. `EnvironmentsCli` is now `partial`; the three commands are in `EnvironmentsCli.Experiences.cs`.
 - **`EnvironmentsCli` commands `login`, `logout`, `connections` and `whoami`** (meta-repo ADR 0037, first slice), over the
   per-user connection store of `Virtuademy-SDK-Core`. `login [-vdConnection <connection> | -vdApp <app> [-vdEnv <key>]]
   [-vdNoBrowser] [-vdLoginTimeoutSeconds <n>]` logs in to a connection of the store, or to the one of a configuration file

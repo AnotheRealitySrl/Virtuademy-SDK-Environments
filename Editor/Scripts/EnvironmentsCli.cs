@@ -83,6 +83,13 @@ namespace Virtuademy.SDK.Environments.Editor
     /// already in <c>ServerData</c> are uploaded. <c>-vdDryRun</c> does everything but the uploads and imports and
     /// reports what it would send. At tenant level the interpreted scripts are not uploaded: the environment runs
     /// without them.</description></item>
+    /// <item><description><c>experiences -vdWorlds &lt;ids&gt; [-vdScenes a,b] [-vdConnection &lt;connection&gt;] [-vdExpectTenant &lt;label&gt;]</c>:
+    /// which experiences use each scene's environment in each world, how many, and what the login may do about them. Read-only.
+    /// <c>create-core -vdWorlds &lt;ids&gt; -vdScenes a,b [-vdLabel &lt;text&gt;] [-vdPublished] [-vdDryRun] [-vdConnection &lt;connection&gt;] [-vdExpectTenant &lt;label&gt;]</c>:
+    /// creates the Core experience of each scene's environment in each world where none exists. <c>experience-status -vdWorlds &lt;one id&gt;
+    /// -vdExperience &lt;id&gt; -vdStatus Draft|Published [-vdConnection &lt;connection&gt;] [-vdExpectTenant &lt;label&gt;]</c>: sets one experience's
+    /// publication state. They answer with <see cref="ExitNotAllowed"/>, <see cref="ExitNotOfferedByTenant"/> and <see cref="ExitNotPublishedInWorld"/>;
+    /// the several-targets rule and the REPORT's shape are in <c>EnvironmentsCli.Experiences.cs</c>.</description></item>
     /// </list>
     /// <para>
     /// <b>Where a command talks to.</b> The commands that call the platform (<c>worlds</c>, <c>preview</c>,
@@ -149,7 +156,7 @@ namespace Virtuademy.SDK.Environments.Editor
     /// afterwards, so it is not a count of live environments.
     /// </para>
     /// </summary>
-    public static class EnvironmentsCli
+    public static partial class EnvironmentsCli
     {
         /// <summary>The command did what it was asked.</summary>
         public const int ExitDone = 0;
@@ -260,15 +267,18 @@ namespace Virtuademy.SDK.Environments.Editor
             { "build", new[] { "-vdScenes", "-vdConnection" } },
             { "preview", new[] { "-vdWorlds", "-vdTenant", "-vdScenes", "-vdExpectTenant", "-vdConnection" } },
             { "deploy", new[] { "-vdWorlds", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdScenes", "-vdExpectTenant", "-vdConnection" } },
+            { "experiences", new[] { "-vdWorlds", "-vdScenes", "-vdExpectTenant", "-vdConnection" } },
+            { "create-core", new[] { "-vdWorlds", "-vdScenes", "-vdLabel", "-vdPublished", "-vdDryRun", "-vdExpectTenant", "-vdConnection" } },
+            { "experience-status", new[] { "-vdWorlds", "-vdExperience", "-vdStatus", "-vdExpectTenant", "-vdConnection" } },
         };
 
-        private static readonly string[] flag_options = { "-vdRenew", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdAllowTracked", "-vdNoBrowser" };
+        private static readonly string[] flag_options = { "-vdRenew", "-vdTenant", "-vdBuild", "-vdDryRun", "-vdAllowTracked", "-vdNoBrowser", "-vdPublished" };
 
         // Every option that takes a value, the two every command reads included.
         private static readonly string[] value_options =
         {
             "-vdCommand", "-vdTimeoutMinutes", "-vdResultFile", "-vdConfigFile", "-vdEnv", "-vdConfigFolder", "-vdScenes", "-vdWorlds", "-vdExpectTenant",
-            "-vdConnection", "-vdApp", "-vdLoginTimeoutSeconds",
+            "-vdConnection", "-vdApp", "-vdLoginTimeoutSeconds", "-vdLabel", "-vdExperience", "-vdStatus",
         };
 
         // Unity's own options that take a value: the token after one is Unity's, not a stray value of ours.
@@ -436,7 +446,7 @@ namespace Virtuademy.SDK.Environments.Editor
 
         #region Arguments
 
-        private sealed class Options
+        private sealed partial class Options
         {
             public bool Renew;
             public bool Tenant;
@@ -666,7 +676,7 @@ namespace Virtuademy.SDK.Environments.Editor
                 }
             }
 
-            return true;
+            return TryReadExperienceOptions(values, flags, options, out error);
         }
 
         #endregion
@@ -697,6 +707,9 @@ namespace Virtuademy.SDK.Environments.Editor
                 case "worlds": return await WorldsAsync(options);
                 case "build": return await BuildAsync(options);
                 case "preview": return await PreviewAsync(options);
+                case "experiences": return await SceneExperiencesAsync(options, create: false);
+                case "create-core": return await SceneExperiencesAsync(options, create: true);
+                case "experience-status": return await ExperienceStatusAsync(options);
                 default: return await DeployAsync(options);
             }
         }
@@ -1580,7 +1593,7 @@ namespace Virtuademy.SDK.Environments.Editor
             ExitStoreNotPersistent => "connection store not persistent on this OS",
             ExitPlatformVersionMismatch => "platform version mismatch: the tenant runs another platform version than the project",
             ExitPlatformMismatch => "platform mismatch: the connection's app is not a CreatorKit app",
-            _ => "unknown",
+            _ => DescribeExperienceExit(code),
         };
 
         #endregion
