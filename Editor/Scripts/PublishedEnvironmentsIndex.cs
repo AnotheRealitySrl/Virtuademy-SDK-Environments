@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Virtuademy.SDK.TenantConfiguration.Editor;
 using UnityEngine;
@@ -57,6 +58,7 @@ namespace Virtuademy.SDK.Environments.Editor
         }
 
         private const string api_version = "2";
+        private const int max_parallel_requests = 4;
         private static readonly HttpClient httpClient = new();
         private static readonly Regex filter = new(@"[^a-z0-9]", RegexOptions.Compiled);
 
@@ -120,22 +122,41 @@ namespace Virtuademy.SDK.Environments.Editor
             Dictionary<string, List<Entry>> next = new(StringComparer.OrdinalIgnoreCase);
             try
             {
-                foreach ((int id, string label) in state.Worlds.ToList())
+                // The worlds are read a few at a time, the tenant list alongside them; the results are added below in
+                // the order the API listed the worlds, then the tenant list, as a sequential read added them.
+                List<(int Id, string Label)> worlds = state.Worlds.ToList();
+                using SemaphoreSlim slots = new(max_parallel_requests);
+                Task<List<EnvironmentDto>[]> worldsRead = Task.WhenAll(worlds.Select(async world =>
                 {
-                    List<EnvironmentDto> envs = await GetAsync<List<EnvironmentDto>>(connectionKey, $"{apiUrl}/worlds/{id}/environments?api-version={api_version}");
-                    if (started != state.Generation) return;
-                    if (envs == null) continue;
-                    foreach (EnvironmentDto env in envs)
+                    await slots.WaitAsync();
+                    try
                     {
-                        // a tenant environment shared to the world comes back with isTenant = true: count it once, as tenant
-                        Add(next, env, env.IsTenant == true ? null : (id, label));
+                        if (started != state.Generation) return null;
+                        return await GetAsync<List<EnvironmentDto>>(connectionKey, $"{apiUrl}/worlds/{world.Id}/environments?api-version={api_version}");
                     }
-                }
-
-                List<EnvironmentDto> tenantEnvs = await GetAsync<List<EnvironmentDto>>(connectionKey, $"{apiUrl}/tenants/environments?api-version={api_version}");
+                    finally
+                    {
+                        slots.Release();
+                    }
+                }));
+                Task<List<EnvironmentDto>> tenantRead = GetAsync<List<EnvironmentDto>>(connectionKey, $"{apiUrl}/tenants/environments?api-version={api_version}");
+                await Task.WhenAll(worldsRead, tenantRead);
 
                 // Cleared (logout) while the requests were in flight: what came back belongs to the old session.
                 if (started != state.Generation) return;
+
+                List<EnvironmentDto>[] worldEnvs = worldsRead.Result;
+                for (int i = 0; i < worlds.Count; i++)
+                {
+                    if (worldEnvs[i] == null) continue;
+                    foreach (EnvironmentDto env in worldEnvs[i])
+                    {
+                        // a tenant environment shared to the world comes back with isTenant = true: count it once, as tenant
+                        Add(next, env, env.IsTenant == true ? null : worlds[i]);
+                    }
+                }
+
+                List<EnvironmentDto> tenantEnvs = tenantRead.Result;
 
                 state.TenantUnknown = tenantEnvs == null;
                 if (tenantEnvs != null)

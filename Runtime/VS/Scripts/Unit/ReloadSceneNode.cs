@@ -21,11 +21,6 @@ namespace Virtuademy.SDK.Environments.VisualScripting
         //[PortLabelHidden]
         //public ValueInput IsTenantEnvironment { get; private set; }
 
-        /*[NullMeansSelf]
-        [DoNotSerialize]
-        [PortLabelHidden]
-        public ValueInput Multiplayer { get; private set; }*/
-
         protected override void Definition()
         {
             //IsTenantEnvironment = ValueInput<bool>(nameof(IsTenantEnvironment), false);
@@ -33,24 +28,17 @@ namespace Virtuademy.SDK.Environments.VisualScripting
             base.Definition();
         }
 
+        /// <remarks>
+        /// The current experience, in the session's mode. Until the reload went through
+        /// <see cref="ISessionApi.ReloadSession"/>, the node looked an experience up by the
+        /// environment's name, which could find another experience of the same environment, and
+        /// joined it single-player whatever the session was.
+        /// </remarks>
         protected override Task AwaitableAction(Flow flow)
         {
-            bool multiplayer = IVirtuademyFramework.Current.Session.IsEnvironmentMultiplayer;
             TaskCompletionSource<bool> done = new();
 
-            IVirtuademyFramework.Current.Session.FindExperience(
-                IVirtuademyFramework.Current.Session.EnvironmentName, experience =>
-            {
-                if (experience == null)
-                {
-                    done.TrySetResult(false);
-
-                    return;
-                }
-
-                IVirtuademyFramework.Current.Session.JoinExperience(experience, multiplayer,
-                                                                   joined => done.TrySetResult(joined));
-            });
+            IVirtuademyFramework.Current.Session.ReloadSession(reloaded => done.TrySetResult(reloaded));
 
             return done.Task;
         }

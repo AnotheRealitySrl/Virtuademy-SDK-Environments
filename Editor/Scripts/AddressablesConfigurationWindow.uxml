@@ -6,7 +6,7 @@
             <engine:VisualElement name="blocking-icon" class="row-icon" />
             <engine:Label text="The build settings are not the ones the SDK needs: a build would fail at the end." name="blocking-text" class="banner-text" />
             <engine:Button text="Fix" name="blocking-fix-button" tooltip="Applies the build settings the SDK needs. It resets the project's asset groups to a single default group." />
-            <engine:Button text="Details" name="blocking-details-button" tooltip="Opens the advanced settings, where each item says what the SDK expects." />
+            <engine:Button text="Details" name="blocking-details-button" tooltip="Opens Addressables settings, where each item says what the SDK expects." />
         </engine:VisualElement>
         <engine:VisualElement name="scenes-section" class="section">
             <engine:VisualElement class="section-header">
@@ -45,58 +45,8 @@
             </engine:VisualElement>
             <engine:VisualElement name="deploy-errors-slot" />
         </engine:VisualElement>
-        <engine:VisualElement name="addressables-settings" class="section">
-            <engine:Foldout text="Advanced settings" name="addressables-settings-foldout" value="false" tooltip="The Unity Addressables settings the build relies on. A warning icon marks an item that is not what the SDK expects: its tooltip says what is expected, and Fix build settings applies it." class="section-foldout">
-                <engine:VisualElement name="advanced-fix-row" class="banner banner-warning" style="display: none;">
-                    <engine:Label text="Some settings are not the ones the SDK needs." class="banner-text" />
-                    <engine:Button text="Fix build settings" name="advanced-fix-button" tooltip="Applies the build settings the SDK needs. It resets the project's asset groups to a single default group." />
-                </engine:VisualElement>
-                <engine:VisualElement name="top-level-settings" class="settings-group">
-                    <engine:Foldout text="Top-level settings" name="top-level-settings-foldout" class="settings-foldout">
-                        <engine:VisualElement name="project-settings-git-instance" class="settings-item">
-                            <engine:VisualElement name="addressables-profile-check" class="row-icon" />
-                            <engine:Label text="Active addressables profile:" name="addressables-profile-label" />
-                            <engine:Label text="&lt;value&gt;" name="addressables-profile-value" class="settings-value" />
-                        </engine:VisualElement>
-                    </engine:Foldout>
-                    <engine:Button text="Select" name="top-level-settings-button" class="settings-button" />
-                </engine:VisualElement>
-                <engine:VisualElement name="profile-settings" class="settings-group">
-                    <engine:Foldout text="Profile settings" name="profile-settings-foldout" class="settings-foldout">
-                        <engine:VisualElement name="remote-buildpath" class="settings-item">
-                            <engine:VisualElement name="remote-buildpath-check" class="row-icon" />
-                            <engine:Label text="Remote.BuildPath:" name="remote-buildpath-text" />
-                            <engine:Label text="&lt;value&gt;" name="remote-buildpath-value" class="settings-value" />
-                        </engine:VisualElement>
-                        <engine:VisualElement name="remote-loadpath" class="settings-item">
-                            <engine:VisualElement name="remote-loadpath-check" class="row-icon" />
-                            <engine:Label text="Remote.LoadPath:" name="remote-loadpath-text" />
-                            <engine:Label text="&lt;value&gt;" name="remote-loadpath-value" class="settings-value" />
-                        </engine:VisualElement>
-                        <engine:VisualElement name="build-target" class="settings-item">
-                            <engine:VisualElement name="build-target-check" class="row-icon" />
-                            <engine:Label text="BuildTarget:" name="build-target-text" />
-                            <engine:Label text="&lt;value&gt;" name="build-target-value" class="settings-value" />
-                        </engine:VisualElement>
-                        <engine:VisualElement name="player-version-override" class="settings-item">
-                            <engine:VisualElement name="player-version-override-check" class="row-icon" />
-                            <engine:Label text="PlayerVersionOverride:" name="player-version-override-text" />
-                            <engine:Label text="&lt;value&gt;" name="player-version-override-value" class="settings-value" />
-                        </engine:VisualElement>
-                    </engine:Foldout>
-                    <engine:Button text="Open" name="profile-settings-button" class="settings-button" />
-                </engine:VisualElement>
-                <engine:VisualElement name="groups-settings" class="settings-group">
-                    <engine:Foldout text="Groups settings" name="groups-settings-foldout" class="settings-foldout">
-                        <engine:VisualElement name="default-local-group" class="settings-item">
-                            <engine:VisualElement name="default-local-group-check" class="row-icon" />
-                            <engine:Label text="Default Local Group" name="default-local-group-text" />
-                            <engine:Button text="Select" name="default-local-group-button" />
-                        </engine:VisualElement>
-                    </engine:Foldout>
-                    <engine:Button text="Select" name="addressables-groups-button" class="settings-button" />
-                </engine:VisualElement>
-            </engine:Foldout>
+        <engine:VisualElement name="window-footer" class="window-footer">
+            <engine:Button text="Addressables settings..." name="addressables-settings-button" tooltip="The Unity Addressables settings the build relies on, each with what the SDK expects (Virtuademy &gt; Advanced &gt; Addressables settings)." />
         </engine:VisualElement>
     </engine:ScrollView>
 </engine:UXML>

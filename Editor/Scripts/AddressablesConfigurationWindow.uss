@@ -61,11 +61,6 @@
     margin-left: 0;
 }
 
-.section-foldout > .unity-foldout__toggle {
-    margin: 4px 6px;
-    -unity-font-style: bold;
-}
-
 .banner {
     flex-direction: row;
     align-items: center;
@@ -159,24 +154,11 @@
     flex-shrink: 1;
 }
 
-.settings-group {
+/* The foot of Publish Environments: the way to the Addressables settings window. */
+.window-footer {
     flex-direction: row;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin: 0 6px;
-}
-
-.settings-foldout {
-    flex-grow: 1;
-    flex-shrink: 1;
-}
-
-.settings-foldout > .unity-foldout__toggle {
-    -unity-font-style: bold;
-}
-
-.settings-button {
-    flex-shrink: 0;
+    justify-content: flex-end;
+    margin: 0 4px 6px 4px;
 }
 
 .build-error-item {
