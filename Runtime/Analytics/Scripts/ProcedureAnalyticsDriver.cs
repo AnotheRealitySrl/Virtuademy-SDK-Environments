@@ -13,9 +13,15 @@ namespace Virtuademy.SDK.Environments.Analytics
     /// <summary>
     /// Gives a procedure with Send Analytics its <see cref="ProcedureAnalytics"/>: added by the runtime beside
     /// <see cref="ProcedureRun"/>. Turns the run's events into statements, sends them through the platform (or, without
-    /// it, logs them), and holds Retry, Exit and the scene's unload until the queue is sent, for at most
-    /// <see cref="FlushSeconds"/>. Timers are one-shot coroutines; the waits end on the queue's Drained event.
+    /// it, logs them), and holds Retry and Exit until the queue is sent, for at most <see cref="FlushSeconds"/>. Timers
+    /// are one-shot coroutines; the waits end on the queue's Drained event.
     /// </summary>
+    /// <remarks>
+    /// ExpComplete is sent by the procedure's own logic only (finish, a fail condition, Finish, Abort, Retry, Exit). A
+    /// user who leaves the scene through the application (menu, back to home, a disconnection) sends nothing more and
+    /// nobody waits: that run stays incomplete in the analytics (user decision, 2026-10-30). An environment that needs a
+    /// completed run calls Finish or Abort from its own logic.
+    /// </remarks>
     [DisallowMultipleComponent]
     [AddComponentMenu("")]
     public class ProcedureAnalyticsDriver : MonoBehaviour, IProcedureScheduler
@@ -44,10 +50,6 @@ namespace Virtuademy.SDK.Environments.Analytics
             run.ResultScored += OnResultScored;
             run.RunFinished += OnRunFinished;
             run.LeaveGate = WaitThen;
-            if (IVirtuademyGameplay.IsAvailable)
-            {
-                IVirtuademyGameplay.Current.Scene.RunBeforeUnload(FlushBeforeUnload);
-            }
         }
 
         private void OnDestroy()
@@ -234,21 +236,6 @@ namespace Virtuademy.SDK.Environments.Analytics
             run.SummaryPanelView?.SetWaiting(true);
             analytics.Drained += Finish;
             timeout = After(FlushSeconds, Finish);
-        }
-
-        // The platform waits for this before tearing the scene down: a run not finished ends (abandoned), then, if
-        // statements are still queued, the queue gets FlushSeconds (a one-shot wait: a coroutine cannot be ended early
-        // by an event, and stopping one does not release the coroutine waiting on it).
-        private IEnumerator FlushBeforeUnload()
-        {
-            if (run != null && run.IsRunning)
-            {
-                run.EndForUnload();
-            }
-            if (!analytics.IsIdle)
-            {
-                yield return new WaitForSecondsRealtime(FlushSeconds);
-            }
         }
 
         #region IProcedureScheduler

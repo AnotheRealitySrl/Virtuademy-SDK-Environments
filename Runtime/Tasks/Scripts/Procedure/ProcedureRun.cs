@@ -83,15 +83,6 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// <summary>The run's analytics key, given by the analytics when the run starts.</summary>
         internal void SetRunKey(string key) => runKey = key ?? "";
 
-        /// <summary>The scene unloads before the run finished: it ends, abandoned (keeping a fail condition if any).</summary>
-        internal void EndForUnload()
-        {
-            if (IsRunning)
-            {
-                Finish(EProcedureOutcome.Abandoned, failCondition);
-            }
-        }
-
         /// <summary>Raised for every hint used, with its step.</summary>
         internal event Action<Step> HintGiven;
 

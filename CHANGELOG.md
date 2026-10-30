@@ -285,8 +285,10 @@ one usable connection, which changes what a script that relied on the project's 
   10 s without one); ExpStart, a StepStart when a scored step starts, exactly one StepComplete per started step (0,
   Fail when the run ends first), one ExpComplete per run (Pass, Fail; ended early: Fail after a fail condition, else
   NA with the score so far); sent in order, one at a time, a failed one again after 2, 4, 8, 16 then 30 s. Retry and
-  Exit wait for the queue (at most 8 s, the summary says so); the scene's unload ends the run and waits 8 s if
-  statements are still queued. Without the application the statements are logged.
+  Exit wait for the queue (at most 8 s, the summary says so). ExpComplete is sent by the procedure's own logic only:
+  leaving the scene through the application (menu, home, disconnection) sends nothing and the run stays incomplete in
+  the analytics; an environment that needs a completed run calls `Finish` or `Abort`. Without the application the
+  statements are logged.
   **Shared procedures** (a networked task system in multiplayer): every result, failure, hint, distractor and the time
   running out reach every client (the sender applies it first), with the actor's name, so feedback and cues show on
   everyone's screen and every client scores the same; the master keeps a snapshot in the room (counters, steps, run
