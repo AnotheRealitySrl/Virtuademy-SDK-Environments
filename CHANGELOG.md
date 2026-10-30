@@ -339,7 +339,9 @@ one usable connection, which changes what a script that relied on the project's 
   renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
   never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
   `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
-  `Virtuademy/InteractionCue/Rim` and `.../Arrow`. No per-frame code: the pulse is in the shader.
+  `Virtuademy/InteractionCue/Rim` and `.../Arrow`. The rim has a minimum fill (`_RimMin`, 0.15 on every cue
+  material) so a flat face seen head-on still shows it, with the edges brighter. No per-frame code: the pulse is in
+  the shader.
 - **`InteractablePlaceholder.IsBlocked`** and **`OnBlockedChanged`** (`InteractableBlockedChangedHandler(bool blocked)`)
   (2026.7, minor): whether the application blocks interaction with the object (selected or manipulated by another
   user, edited, locked, blocked by a node), and an event when that changes from free to blocked or back.

@@ -29,6 +29,7 @@ Material:
     - _FresnelPower: 2.35
     - _Intensity: 1
     - _PulseMin: 0.35
+    - _RimMin: 0.15
     - _PulseSpeed: 0
     m_Colors:
     - _Color: {r: 0, g: 2.65, b: 4, a: 1}

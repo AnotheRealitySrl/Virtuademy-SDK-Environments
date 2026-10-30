@@ -1,5 +1,6 @@
 // Rim of the interaction cue (InteractionCuePlaceholder), drawn on shell renderers that copy the target's mesh.
-// The look of Showcase's Highlight.mat: a cyan Fresnel rim, transparent and additive. The pulse is computed here
+// The look of Showcase's Highlight.mat: a cyan Fresnel rim, transparent and additive, with a minimum fill so flat
+// faces (a cube, per-face normals) still show it. The pulse is computed here
 // from _Time, so a pulsing cue costs no script time. URP unlit, no texture, no keyword; SRP Batcher compatible
 // (one UnityPerMaterial buffer) and single-pass instanced stereo (instance id and stereo output in the structs).
 Shader "Virtuademy/InteractionCue/Rim"
@@ -10,6 +11,7 @@ Shader "Virtuademy/InteractionCue/Rim"
         _Intensity ("Intensity", Float) = 1
         _FresnelPower ("Fresnel power", Float) = 2.35
         _Alpha ("Alpha", Range(0, 1)) = 0.5
+        _RimMin ("Minimum fill (flat faces)", Range(0, 1)) = 0.15
         _PulseSpeed ("Pulse speed (Hz, 0 = fixed)", Float) = 0
         _PulseMin ("Pulse minimum", Range(0, 1)) = 0.35
     }
@@ -38,6 +40,7 @@ Shader "Virtuademy/InteractionCue/Rim"
                 half _Alpha;
                 half _PulseSpeed;
                 half _PulseMin;
+                half _RimMin;
             CBUFFER_END
 
             struct Attributes
@@ -74,7 +77,8 @@ Shader "Virtuademy/InteractionCue/Rim"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 half facing = saturate(dot(normalize(input.normalWS), normalize(input.viewDirWS)));
-                half rim = pow(1.0h - facing, _FresnelPower);
+                // A minimum fill: a flat face seen head-on (facing 1) still glows faintly, the edges stay brighter.
+                half rim = lerp(_RimMin, 1.0h, pow(1.0h - facing, _FresnelPower));
                 half wave = 0.5h + 0.5h * sin(TWO_PI * _PulseSpeed * _Time.y);
                 half pulse = _PulseSpeed > 0 ? lerp(_PulseMin, 1.0h, wave) : 1.0h;
                 return half4(_Color.rgb * (_Intensity * rim * pulse * _Alpha), 0);
