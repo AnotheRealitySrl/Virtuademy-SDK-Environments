@@ -134,6 +134,10 @@ a public `EnvironmentExperiencesService` (minor).
   route answers 404 or 405 and the group shows no button, with no message. The group's **Log out** button is red.
 
 #### Changed
+- **A new scene in the Publish Environments list is built for every platform: VR, WebGL and Mobile.** It was VR and
+  WebGL. A platform turned off is saved with the scene's entry, as before, so it stays off. Entries saved earlier keep
+  their platforms: an entry with VR and WebGL cannot tell the old default from a choice. Mobile builds for Android and
+  iOS, so the iOS build module is needed, as the setup already checks.
 - **Publish Environments takes its header from `Virtuademy-SDK-Core`** (`VirtuademyWindowHeader`): the same logo and
   window name as the SDK's other windows and the setup window. The two logo images and `Editor/Icons/` moved there with
   their GUIDs; nothing else referenced them.

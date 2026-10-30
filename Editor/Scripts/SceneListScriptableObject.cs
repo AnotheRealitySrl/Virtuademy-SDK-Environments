@@ -21,7 +21,10 @@ namespace Virtuademy.SDK.Environments.Editor
 
             [SerializeField] private SceneAsset scene;
             [SerializeField] private bool includeInBuild = true;
-            [SerializeField] private ESupportedPlatform supportedPlatforms = ESupportedPlatform.VR | ESupportedPlatform.WebGL;
+            // A scene the list has not seen yet is built for every platform; a platform the creator turns off is saved
+            // with the scene's entry, so it stays off. Entries saved before 2026.7 keep what they have: an entry with VR
+            // and WebGL cannot tell the old default from a choice.
+            [SerializeField] private ESupportedPlatform supportedPlatforms = ESupportedPlatform.VR | ESupportedPlatform.WebGL | ESupportedPlatform.Mobile;
 
             [Tooltip("The thumbnail (a PNG or JPEG image of the project) the scene's environment gets the first time a deploy makes it in a place. Later deploys never touch a place's files.")]
             [SerializeField] private Texture2D defaultThumbnail;
