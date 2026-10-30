@@ -171,6 +171,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             if (right)
             {
                 ParticleSystem flash = shared.GetComponentInChildren<ParticleSystem>(true);
+                InteractionCueFeedback.MakeReplayable(flash);
                 if (flash != null)
                 {
                     flash.gameObject.SetActive(true);

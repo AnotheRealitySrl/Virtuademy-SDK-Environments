@@ -39,7 +39,26 @@ namespace Virtuademy.SDK.Environments.InteractionCue
             }
             mark = root.GetComponentInChildren<VirtuademyCheckMark>(true);
             flash = root.GetComponentInChildren<ParticleSystem>(true);
+            MakeReplayable(flash);
             audio = root.GetComponentInChildren<AudioSource>(true);
+        }
+
+        /// <summary>
+        /// The SDK's Flash destroys itself when it ends (Stop Action Destroy), which suits a one-off effect: this
+        /// instance (a cue's own, or a procedure's shared one) is kept instead, so every right action plays it again.
+        /// The Flash prefab is not changed.
+        /// </summary>
+        internal static void MakeReplayable(ParticleSystem flash)
+        {
+            if (flash == null)
+            {
+                return;
+            }
+            foreach (ParticleSystem system in flash.GetComponentsInChildren<ParticleSystem>(true))
+            {
+                ParticleSystem.MainModule main = system.main;
+                main.stopAction = ParticleSystemStopAction.None;
+            }
         }
 
         /// <summary>A right or wrong action was shown: mark, flash (right only) and sound, as the cue's Feedback says.</summary>

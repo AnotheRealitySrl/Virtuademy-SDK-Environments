@@ -45,7 +45,7 @@ namespace Virtuademy.SDK.Environments.InteractionCue
 
         // The Interactable block this cue holds while completed (Block Interaction When Completed). Only a flag this
         // cue set is cleared by it.
-        private const IInteractable.EBlockedState CompletedBlock = IInteractable.EBlockedState.BlockedByGenericLogic;
+        private const IInteractable.EBlockedState CompletedBlock = IInteractable.EBlockedState.BlockedByTaskCompletion;
         private IInteractable blockedInteractable;
 
         private VirtuademyLabel label;

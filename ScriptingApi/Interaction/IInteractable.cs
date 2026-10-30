@@ -33,6 +33,9 @@ namespace Virtuademy.Environments.ScriptingApi.Interaction
             BlockedByLockObject = 16, //interactions blocked because someone has locked the object
             BlockedByEdit = 32, //interactions blocked because the object is in edit mode
             BlockedByOtherUser = 64, //another user is currently using the object --> collaborative tools only
+            // 2026.7: the object's task is done (an interaction cue with Block Interaction When Completed). Unlike the
+            // other reasons, it also stops hover and clicks (interact, select) on every platform.
+            BlockedByTaskCompletion = 128,
         }
 
         GameObject GameObjectRef { get; }

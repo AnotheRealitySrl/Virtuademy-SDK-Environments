@@ -326,7 +326,9 @@ one usable connection, which changes what a script that relied on the project's 
   Interactable is blocked; with `ECueHoverStyle.RimAndLabel` its feedback objects' label shows `labelKey`/`labelText`
   while hovered or selected. A cue with `tasks` (or on an object whose task elements name one) follows them: next
   target while any is to do or in progress, completed when all are completed or failed, again after a revert;
-  `blockInteractionWhenCompleted` blocks the Interactable while completed. Its inspector's **Add feedback objects**
+  `blockInteractionWhenCompleted` blocks the Interactable while completed with a reason of its own,
+  `IInteractable.EBlockedState.BlockedByTaskCompletion`, the only one that also stops hover and clicks (interact,
+  select) on every platform; the other reasons behave as before. Its inspector's **Add feedback objects**
   puts `CueFeedback.prefab` under the cue (the label, a check and cross mark, a flash, a 2D audio source), which a
   right or wrong action uses as `feedback` says (`ECueFeedback`: Rim, Mark, Flash, Sound); `showArrow` shows a "go
   here" arrow above the next target (or at `arrowAnchor`), created the first time it shows. The inspector also says
@@ -497,6 +499,9 @@ one usable connection, which changes what a script that relied on the project's 
   name and does not check the tenant's set. Comments only: the behaviour is unchanged.
 
 #### Fixed
+
+- **The interaction cue's flash plays on every right action**, not only the first: the SDK's Flash destroys itself when
+  it ends; a cue's (and a procedure's shared) instance now stays and plays again. The Flash prefab is unchanged.
 
 - **On Task System Ready declares its input as a task system** (it was declared as a `Task` but read as a
   `TaskSystemVirtuademy`).
