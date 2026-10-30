@@ -245,6 +245,16 @@ one usable connection, which changes what a script that relied on the project's 
   only. Every handler runs; a handler's exception is then thrown, not swallowed.
 - **`InteractablePlaceholder.VRControllers`** (`EVRInteractionControllers` flags: `Ray`, `Hands`; both by default)
   (2026.7, minor): which VR controllers can hover, select and interact with the object.
+- **Interaction cue** (2026.7, minor): `InteractionCuePlaceholder` shows how an object can be used, with the look of the
+  Showcase highlight: a cyan rim that pulses on the next target (or is fixed, `ECueNextTargetStyle`), a rim on hover and
+  selection, green or red for a right or wrong action (`ShowRight`, `ShowWrong`, `ShowResult`, for `FeedbackSeconds`),
+  nothing when completed or locked. `State` (`EInteractionCueState`) resolves Locked > Right/Wrong > Selected > Hover >
+  base state (`SetBaseState`: Available, NextTarget, Completed); `SetLocked`, `SetHovered`, `SetSelected` act on this
+  client; `CueChanged` (`InteractionCueChangedHandler`) and UnityEvents. The rim is drawn on copies of the object's
+  renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
+  never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
+  `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
+  `Virtuademy/InteractionCue/Rim` and `.../Arrow`. No per-frame code: the pulse is in the shader.
 - **`InteractablePlaceholder.IsBlocked`** and **`OnBlockedChanged`** (`InteractableBlockedChangedHandler(bool blocked)`)
   (2026.7, minor): whether the application blocks interaction with the object (selected or manipulated by another
   user, edited, locked, blocked by a node), and an event when that changes from free to blocked or back.

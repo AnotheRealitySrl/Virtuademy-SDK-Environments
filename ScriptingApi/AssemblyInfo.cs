@@ -13,3 +13,8 @@ using System.Runtime.CompilerServices;
 // The application's interaction core raises the interaction events of InteractablePlaceholder
 // (IInteractableEventSink). Internal so that a script cannot raise them.
 [assembly: InternalsVisibleTo("Virtuademy.Worlds.Interaction")]
+
+// The SDK runtime draws and binds the placeholders whose logic is not the application's (the interaction cue): it
+// subscribes to their internal hooks (a "created" event, a state-changed event). Internal so that a script sees none
+// of them; a script still reaches these placeholders through their public members only.
+[assembly: InternalsVisibleTo("Virtuademy.SDK.Environments")]
