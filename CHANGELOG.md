@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **`AddressablesBundleScriptableObject` removed** (major: three public editor types go, `AddressablesBundleScriptableObject`,
+  `EnvironmentAssetDefinition` and `AddressablesBundleScriptableObjectEditor`). The 2024 asset that set up the Addressables groups
+  per bundle had been read by nothing since 2025-04 (its loader menu went in `436784d`), and its thumbnail field had been obsolete
+  since 2024-11: thumbnails are set in the Back Office. Its **Configure Addressables Bundle** button still worked, and rewrote the
+  Default, Environments and Thumbnails groups after the 2024 model, emptying the default group but for the localization file, which
+  goes against the single-group rule of today's build. The *Create ▸ Virtuademy ▸ SDK-Environments ▸ AddressablesBundle* menu goes
+  with it. Projects from 2024 may keep `AddressablesBundle-*.asset` files (under `Assets/Virtuademy/Settings/Editor/AddressablesConfigurations`
+  after the folder update routine, `Assets/ReflectisSettings/...` before it): they now show a missing script and can be deleted.
+  Nothing is migrated from them: the thumbnails they hold are older than the ones set in the Back Office since.
+
 - **The Virtuademy menu is grouped and ordered** (minor): **Setup project**, **Publish Environments** and **Readme** first, then
   **Update routines** (newest first), then **Advanced**, with a separator before each submenu (menu priorities). **Update VS Library** is
   now **Advanced ▸ Update Visual Scripting library**: the setup updates the library itself, and does it again when the library lacks
