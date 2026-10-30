@@ -36,6 +36,8 @@ environment project now uses every connection of the computer and a command that
 one usable connection, which changes what a script that relied on the project's list gets.
 The experiences commands add three `EnvironmentsCli` commands, four options (`-vdLabel`, `-vdPublished`, `-vdExperience`, `-vdStatus`) and the exit codes 33 to 36, and
 a public `EnvironmentExperiencesService` (minor).
+The files commands add five `EnvironmentsCli` commands (`published`, `save-files`, `set-files`, `restore`, `scene-files`), their options
+and the exit codes 37 and 38; the Environment Details window and the scene row's default files are new editor UI (minor).
 
 #### Added
 - **The Environment Details window** (minor). The `i` button at the end of a scene's row in Publish Environments opens `EnvironmentDetailsWindow`
