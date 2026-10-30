@@ -38,6 +38,35 @@ The experiences commands add three `EnvironmentsCli` commands, four options (`-v
 a public `EnvironmentExperiencesService` (minor).
 
 #### Added
+- **The Environment Details window** (minor). The `i` button at the end of a scene's row in Publish Environments opens `EnvironmentDetailsWindow`
+  (title *Environment Details*, one window for the project, minimum 760 x 480; its size and the last scene it showed are kept per user in `EditorPrefs`)
+  on that scene; **Virtuademy > Environment Details** (under Publish Environments) opens it on the scene it showed last. It reads every connection of the computer each time it opens, on **Refresh** and when the scene changes, each connection on its own (a
+  slow tenant does not hold the others), and shows where the scene's environment is published: the tenant level and every world the account can see.
+  *The left list* has one group per connection, drawn as in Publish Environments (dot, tenant, environment chip, platform version, account), with a
+  row for each place: two squares for the thumbnail and the localization file (green: the same file is in the project; amber: online only; empty:
+  none), a padlock when the account can see the place and not change it, and the number of experiences. A connection that is not logged in says so
+  with **Log in**, one that could not be read says why with **Retry**. When every connection was read and the scene is in one place, the list goes away
+  and the window shows that place; when it is in none, it says to publish it from Publish Environments. *The pane of a place* shows its thumbnail
+  (192 x 108 preview, size and format) and its localization file (keys and languages), whether the project holds the same file (**Show**, or **Save to
+  project**, which keeps the online file in `Assets/Virtuademy/Editor/PublishFiles/` unless the project already holds it), **Replace in this world
+  only...** (an object picker on the project's images or `.csv` files, a check of the file before anything is sent, a note when an image will be
+  converted to a JPEG, then **Replace**; the file the place holds now is saved to the project first), its **Experiences** (counts, the Core
+  experiences with a popup to set each one's state, **Create Core experience** when there is none) and **Back Office**. It tells a tenant that cannot
+  receive files yet, a place the account cannot change and experiences it cannot see apart, in words that never name a version. *All places* saves
+  every online file the project lacks, **Replace in all places** (two asset fields, **Use the defaults**, a local check, then a preview table of what
+  changes in each place, ticks, and a result per place with **Retry failed**; nothing is rolled back) and **Create Core experiences** for the worlds
+  that have none. The strip under the scene bar holds the scene's default thumbnail and localization file, which a deploy sends the first time it
+  makes the scene's environment in a place. Everything it does also exists on the command line; the window is only a client of
+  `EnvironmentFilesService` and `EnvironmentExperiencesService`, plus two members the window needed on the first (`EnsureCachedAsync`, which downloads
+  into `Library/Virtuademy/EnvironmentDetails/` a file whose hash the platform said, so it can be previewed, and `MissingDefaultsNote`). The Back Office
+  link and the read of the account's Back Office access moved from Publish Environments to `EnvironmentBackoffice`, which both windows use; that
+  window behaves as before. The Environment Details window is not compiled in the application (`VIRTUADEMY_APPLICATION`), like Publish Environments.
+- **Scene rows in Publish Environments show the scene's defaults** (minor). After the scene's name, a 32 x 18 preview of the default thumbnail (a
+  dashed slot with a plus when there is none) and a **Localization** chip (dim when there is none): a drop of an image asset on the slot, or of a `.csv`
+  on the chip, sets the default (one undo step), a click opens the Environment Details window. The platform toggles are outlined when off, with the normal
+  text colour, so they read as buttons; their tooltips say what a click does. The line under a scene is one sentence, `Published in 4 places on 2
+  connections` or `Not published yet`, with the text of each connection in its tooltip. The deploy preview says, under each world's `New (n)` line, which
+  new scene lacks a default thumbnail or localization file and will be published without it (computed from the scene list: no request).
 - **`EnvironmentsCli` commands `experiences`, `create-core` and `experience-status`, and `EnvironmentExperiencesService`**: for an environment
   published in a world, which experiences use it and how many (by type and state, with the Core experiences the login is shown, whether it may change
   their state and whether it may create one), creating its Core experience when none exists, and setting an experience's publication state. The

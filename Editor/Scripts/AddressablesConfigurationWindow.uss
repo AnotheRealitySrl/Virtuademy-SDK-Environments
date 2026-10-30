@@ -113,20 +113,110 @@
     color: rgb(240, 150, 150);
 }
 
+/* A platform toggle. On: filled. Off: transparent with a 1 px outline and the normal text colour, so it reads as a button to click, never as disabled. */
 .chip-toggle {
     min-width: 0;
     height: 16px;
     padding: 0 5px;
     margin: 0 1px;
     font-size: 10px;
-    border-width: 0;
-    background-color: rgba(255, 255, 255, 0.05);
-    color: rgb(120, 120, 120);
+    border-width: 1px;
+    border-color: rgba(128, 128, 128, 0.7);
+    background-color: rgba(0, 0, 0, 0);
+    color: var(--unity-colors-default-text);
+}
+
+.chip-toggle:hover {
+    border-color: rgba(170, 170, 170, 0.95);
+    background-color: rgba(128, 128, 128, 0.22);
 }
 
 .chip-toggle--on {
+    border-color: rgba(80, 140, 230, 0.55);
     background-color: rgba(80, 140, 230, 0.35);
-    color: rgb(220, 230, 245);
+}
+
+.chip-toggle--on:hover {
+    border-color: rgba(110, 165, 240, 0.9);
+    background-color: rgba(80, 140, 230, 0.5);
+}
+
+/* The scene row's default thumbnail (a 32 x 18 preview, or a dashed slot with a plus, painted by the drawer), the Localization chip and the details button. */
+.default-slot {
+    width: 32px;
+    height: 18px;
+    margin: 0 3px 0 4px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-width: 1px;
+    border-color: rgba(128, 128, 128, 0.5);
+    border-radius: 2px;
+    background-color: rgba(128, 128, 128, 0.12);
+}
+
+.default-slot--empty {
+    border-width: 0;
+    border-color: rgba(128, 128, 128, 0.9);
+}
+
+.default-slot:hover {
+    background-color: rgba(128, 128, 128, 0.3);
+}
+
+.default-slot-image {
+    align-self: stretch;
+    flex-grow: 1;
+}
+
+.default-slot-plus {
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+    color: rgba(128, 128, 128, 0.95);
+    -unity-text-align: middle-center;
+}
+
+.default-chip {
+    min-width: 0;
+    height: 16px;
+    padding: 0 5px;
+    margin: 0 3px 0 1px;
+    font-size: 10px;
+    border-width: 0;
+    background-color: rgba(128, 128, 128, 0.22);
+    color: var(--unity-colors-default-text);
+}
+
+.default-chip:hover {
+    background-color: rgba(128, 128, 128, 0.38);
+}
+
+.default-chip--empty {
+    opacity: 0.45;
+}
+
+.default-drop {
+    border-width: 1px;
+    border-color: rgb(80, 140, 230);
+    background-color: rgba(80, 140, 230, 0.25);
+}
+
+.default-refusal {
+    color: rgb(230, 160, 70);
+}
+
+.info-button {
+    width: 16px;
+    height: 16px;
+    min-width: 0;
+    flex-shrink: 0;
+    margin: 0 0 0 4px;
+    padding: 0;
+    border-radius: 8px;
+    font-size: 10px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
 }
 
 .muted {

@@ -131,16 +131,10 @@ namespace Virtuademy.SDK.Environments.Editor
                 if (!plan.IsNew)
                     continue;
 
+                // The sentences are the same ones the Publish Environments window says from the scene list (MissingDefaultsNote).
+                plan.Note = MissingDefaultsNote(name, thumbnail, localization);
                 if (thumbnail == null && localization == null)
-                {
-                    plan.Note = $"{name} has no default thumbnail or localization file: it will be published without them.";
                     continue;
-                }
-
-                if (thumbnail == null)
-                    plan.Note = $"{name} has no default thumbnail: it will be published without it.";
-                if (localization == null)
-                    plan.Note = $"{name} has no default localization file: it will be published without it.";
 
                 if (thumbnail != null)
                 {
