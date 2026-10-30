@@ -255,7 +255,12 @@ one usable connection, which changes what a script that relied on the project's 
   Interactable is blocked; with `ECueHoverStyle.RimAndLabel` its feedback objects' label shows `labelKey`/`labelText`
   while hovered or selected. A cue with `tasks` (or on an object whose task elements name one) follows them: next
   target while any is to do or in progress, completed when all are completed or failed, again after a revert;
-  `blockInteractionWhenCompleted` blocks the Interactable while completed. The rim is drawn on copies of the object's
+  `blockInteractionWhenCompleted` blocks the Interactable while completed. Its inspector's **Add feedback objects**
+  puts `CueFeedback.prefab` under the cue (the label, a check and cross mark, a flash, a 2D audio source), which a
+  right or wrong action uses as `feedback` says (`ECueFeedback`: Rim, Mark, Flash, Sound); `showArrow` shows a "go
+  here" arrow above the next target (or at `arrowAnchor`), created the first time it shows. The inspector also says
+  what the cue cannot show (no settings, no renderer, Batching Static, a label without feedback objects) and the cost
+  of skinned cues. The rim is drawn on copies of the object's
   renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
   never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
   `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders

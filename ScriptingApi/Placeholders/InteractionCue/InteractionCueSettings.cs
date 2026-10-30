@@ -43,6 +43,19 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             "no arrow anchor.")]
         private float arrowHeight = 0.25f;
 
+        [Header("Feedback")]
+        [SerializeField, Tooltip("The feedback objects Add feedback objects puts under a cue: label, check and cross mark, " +
+            "flash, 2D audio source.")]
+        private GameObject feedbackPrefab;
+        [SerializeField, Tooltip("Played for a right action shown by a cue.")]
+        private AudioClip rightClip;
+        [SerializeField, Tooltip("Played for a wrong action shown by a cue.")]
+        private AudioClip wrongClip;
+        [SerializeField, Tooltip("Played when a task step is completed (procedures).")]
+        private AudioClip taskCompletedClip;
+        [SerializeField, Tooltip("Played when a procedure's summary shows.")]
+        private AudioClip summaryClip;
+
         public Material NextTargetPulse => nextTargetPulse;
         public Material NextTargetFixed => nextTargetFixed;
         public Material Hover => hover;
@@ -52,5 +65,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public Color Color => color;
         public GameObject ArrowPrefab => arrowPrefab;
         public float ArrowHeight => arrowHeight;
+        public GameObject FeedbackPrefab => feedbackPrefab;
+        public AudioClip RightClip => rightClip;
+        public AudioClip WrongClip => wrongClip;
+        public AudioClip TaskCompletedClip => taskCompletedClip;
+        public AudioClip SummaryClip => summaryClip;
     }
 }

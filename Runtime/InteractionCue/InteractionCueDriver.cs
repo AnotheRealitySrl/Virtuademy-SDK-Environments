@@ -39,6 +39,9 @@ namespace Virtuademy.SDK.Environments.InteractionCue
         private InteractablePlaceholder interactable;
         private int hoveringControllers;
         private InteractionCueTaskBinding taskBinding;
+        private InteractionCueFeedback feedback;
+        private List<Renderer> targets;
+        private System.Func<List<Renderer>> targetsProvider;
 
         // The Interactable block this cue holds while completed (Block Interaction When Completed). Only a flag this
         // cue set is cleared by it.
@@ -54,6 +57,8 @@ namespace Virtuademy.SDK.Environments.InteractionCue
         {
             cue = placeholder;
             cue.VisualChanged += Draw;
+            feedback = new InteractionCueFeedback(cue);
+            cue.ResultShown += feedback.OnResult;
             BindInteractable();
             taskBinding = InteractionCueTaskBinding.Create(cue);
             Draw();
@@ -150,6 +155,10 @@ namespace Virtuademy.SDK.Environments.InteractionCue
             if (cue != null)
             {
                 cue.VisualChanged -= Draw;
+                if (feedback != null)
+                {
+                    cue.ResultShown -= feedback.OnResult;
+                }
             }
             taskBinding?.Dispose();
             taskBinding = null;
@@ -177,6 +186,7 @@ namespace Virtuademy.SDK.Environments.InteractionCue
         {
             HoldCompletedBlock(cue.BlockInteractionWhenCompleted && cue.BaseState == EInteractionCueState.Completed);
             DrawLabel();
+            feedback.OnStateChanged(targetsProvider ??= Targets);
             Material material = MaterialFor(cue.RimState);
             if (material == shownMaterial)
             {
@@ -308,10 +318,14 @@ namespace Virtuademy.SDK.Environments.InteractionCue
 
         private static readonly int ColorId = Shader.PropertyToID("_Color");
 
-        private void BuildShells()
+        // The renderers that get the rim, collected once: the first time the rim or the arrow shows.
+        private List<Renderer> Targets()
         {
-            shellsBuilt = true;
-            List<Renderer> targets = new();
+            if (targets != null)
+            {
+                return targets;
+            }
+            targets = new List<Renderer>();
             if (cue.Renderers.Count > 0)
             {
                 foreach (Renderer r in cue.Renderers)
@@ -332,6 +346,13 @@ namespace Virtuademy.SDK.Environments.InteractionCue
                     }
                 }
             }
+            return targets;
+        }
+
+        private void BuildShells()
+        {
+            shellsBuilt = true;
+            List<Renderer> targets = Targets();
             Dictionary<LODGroup, List<(int lod, Renderer shell)>> lodAdditions = null;
             List<string> staticBatched = null;
             foreach (Renderer target in targets)
@@ -394,10 +415,16 @@ namespace Virtuademy.SDK.Environments.InteractionCue
             }
         }
 
-        // A renderer belongs to this cue unless it is a shell or sits under another cue nested in this one.
+        // A renderer belongs to this cue unless it is a shell, one of the cue's feedback objects or its arrow, or sits
+        // under another cue nested in this one.
         private bool Owns(Renderer r)
         {
-            if (r.name == ShellName && r.GetComponent<InteractionCueShell>() != null)
+            if (r.GetComponent<InteractionCueShell>() != null)
+            {
+                return false;
+            }
+            if ((cue.FeedbackRoot != null && r.transform.IsChildOf(cue.FeedbackRoot))
+                || (cue.Arrow != null && r.transform.IsChildOf(cue.Arrow)))
             {
                 return false;
             }

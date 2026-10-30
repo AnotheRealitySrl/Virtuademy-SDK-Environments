@@ -69,6 +69,21 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [SerializeField, Min(0.1f), Tooltip("How long a right or wrong action is shown, in seconds.")]
         private float feedbackSeconds = 1.5f;
 
+        [Header("Arrow and feedback objects")]
+        [SerializeField, Tooltip("Show a \"go here\" arrow above the object while it is the next target.")]
+        private bool showArrow = false;
+
+        [SerializeField, Tooltip("Where the arrow's tip goes. Empty: above the object's renderers, at the settings' arrow " +
+            "height, computed when the arrow first shows.")]
+        private Transform arrowAnchor;
+
+        [SerializeField, Tooltip("The arrow. Empty: created from the settings' arrow the first time it shows.")]
+        private Transform arrow;
+
+        [SerializeField, Tooltip("The cue's feedback objects (label, check and cross mark, flash, sound), added by Add " +
+            "feedback objects in this inspector. Empty: the cue shows the rim and plays its sounds only.")]
+        private Transform feedbackRoot;
+
         [SerializeField, Tooltip("The renderers that get the rim. Empty: every mesh and skinned mesh renderer under this " +
             "object, except those of other cues nested in it.")]
         private List<Renderer> renderers = new();
@@ -108,6 +123,15 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// <summary>The renderers that get the rim; empty means every renderer under this object. Read once, the first
         /// time the rim shows.</summary>
         public IReadOnlyList<Renderer> Renderers => renderers;
+
+        public bool ShowArrow { get => showArrow; set { showArrow = value; Refresh(); } }
+        public Transform ArrowAnchor { get => arrowAnchor; set => arrowAnchor = value; }
+
+        /// <summary>The arrow, when it exists: the one set in the inspector, or the one the cue created.</summary>
+        public Transform Arrow => arrow;
+
+        /// <summary>The cue's feedback objects, when it has them.</summary>
+        public Transform FeedbackRoot => feedbackRoot;
 
         public bool OverrideColor { get => overrideColor; set { overrideColor = value; Refresh(); } }
         public Color Color { get => color; set { color = value; Refresh(); } }
@@ -239,6 +263,13 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             (state == EInteractionCueState.Right || state == EInteractionCueState.Wrong) && (feedback & ECueFeedback.Rim) == 0
                 ? Resolve(false)
                 : state;
+
+        /// <summary>Whether the arrow shows: Show Arrow, a next target, not locked.</summary>
+        internal bool ArrowVisible => showArrow && baseState == EInteractionCueState.NextTarget
+            && state != EInteractionCueState.Locked;
+
+        /// <summary>The arrow the runtime created, kept so that it is created once.</summary>
+        internal void SetArrow(Transform created) => arrow = created;
 
         /// <summary>Whether the label shows: hovered or selected, Rim And Label, and a text to show.</summary>
         internal bool LabelVisible => hoverStyle == ECueHoverStyle.RimAndLabel
