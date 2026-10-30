@@ -2277,7 +2277,8 @@ namespace Virtuademy.SDK.Environments.Editor
                            "Press Fix in the banner at the top of the window (its Details opens Addressables settings, which lists what is wrong), then try again. Nothing was built.");
             if (EditorUtility.DisplayDialog($"{what} blocked",
                     "The project's build settings are not the ones the SDK needs, so a build would fail at the end. Nothing was built.\n\n" +
-                    "Fix them now? It resets the project's asset groups to a single default group. Then start again.",
+                    "Fix them now? It resets the project's asset groups to a single default group, kept empty.\n\n" +
+                    AddressablesSettingsWindow.GroupsRemovalMessage(settings) + "\n\nThen start again.",
                     "Fix build settings", "Cancel"))
             {
                 try

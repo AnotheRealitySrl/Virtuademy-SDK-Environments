@@ -250,6 +250,12 @@ a public `EnvironmentExperiencesService` (minor).
   up to four worlds at a time with the tenant list alongside, so a tenant with many worlds waits for the slowest batch
   instead of the sum. The index is built in the same order from the same answers: the "Published in" lines, the tooltip
   and the deploy previews do not change. No public member changes.
+- **"Fix build settings" lists what the fix removes**: the Addressables groups by name with their entry counts (a few names,
+  then "and N more") and the entries of the default group, and says that no asset file is deleted, only the groups and the
+  Addressable marking, because a scene takes what it uses with it at build. It is the one Fix dialog of the SDK, which
+  the Addressables settings window and the banner of Publish Environments open, and the build-blocked dialog of Publish
+  Environments says the same. `Apply` logs what it removed (`[PublishEnvironments]`). The behaviour is unchanged; the
+  package documentation now states the rule (one default group, kept empty). No public member changes.
 
 #### Fixed
 - **Reload Scene plays the current experience again, in the session's mode.** It started the experience again

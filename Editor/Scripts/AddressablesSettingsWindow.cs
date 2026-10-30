@@ -53,13 +53,14 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>
         /// Applies the build settings the SDK needs (<see cref="AddressablesConfiguration.Apply"/>), which resets the project's asset
-        /// groups to a single default group, after a confirmation. True when they were applied.
+        /// groups to a single default group, kept empty, after a confirmation that lists what it removes. The one Fix of the SDK:
+        /// this window's, and the one of the banner of Publish Environments. True when they were applied.
         /// </summary>
         internal static bool FixBuildSettings()
         {
             if (!EditorUtility.DisplayDialog("Fix build settings",
-                    "Apply the build settings the SDK needs? It resets the project's asset groups to a single default group " +
-                    "(the scenes are added again at the next build).", "Fix", "Cancel"))
+                    "Apply the build settings the SDK needs? It resets the project's asset groups to a single default group, " +
+                    "kept empty.\n\n" + GroupsRemovalMessage(AddressablesConfiguration.GetOrCreateSettings()), "Fix", "Cancel"))
                 return false;
 
             try
@@ -73,6 +74,21 @@ namespace Virtuademy.SDK.Environments.Editor
                 EditorUtility.DisplayDialog("Fix build settings", ex.Message, "OK");
                 return false;
             }
+        }
+
+        /// <summary>
+        /// What the Fix dialogs say about the groups: what <see cref="AddressablesConfiguration.Apply"/> removes, by name, and what
+        /// it does not touch. Publish Environments' build-blocked dialog says it too.
+        /// </summary>
+        internal static string GroupsRemovalMessage(AddressableAssetSettings settings)
+        {
+            AddressablesConfiguration.GroupsRemoval removal = AddressablesConfiguration.DescribeGroupsRemoval(settings);
+            if (removal == null)
+                return "No group or entry has to be removed.";
+
+            return "It removes:\n" + removal.Describe() +
+                   "\n\nNo asset file is deleted, only these groups and the Addressable marking of assets. " +
+                   "The build adds each scene itself, with everything it uses, so no asset needs to be marked.";
         }
 
         public void CreateGUI()
