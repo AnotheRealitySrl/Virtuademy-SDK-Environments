@@ -1,0 +1,8 @@
+/* The Virtuademy runtime theme: the SDK's PanelSettings use it. Unity's default runtime theme for the
+   controls, then the Virtuademy tokens, then the components built on them. Self-contained: nothing
+   here points into a project's Assets, so a creator project and the application load the same file.
+   Each SDK panel template also imports the tokens and the components itself, so it keeps its look
+   under PanelSettings that use another theme. */
+@import url("unity-theme://default");
+@import url("VirtuademyTokens.uss");
+@import url("VirtuademyComponents.uss");

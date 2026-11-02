@@ -1,0 +1,172 @@
+using UnityEngine;
+using UnityEngine.UIElements;
+
+using Virtuademy.Environments.ScriptingApi.Placeholders;
+using Virtuademy.SDK.Environments.Utilities;
+
+namespace Virtuademy.SDK.Environments.UIKit
+{
+    /// <summary>
+    /// Keeps a screen-space UI Toolkit panel clear of the screen zones the application keeps for its
+    /// own UI (<see cref="ReservedScreenZones"/>) and of the device's safe area (notch, rounded
+    /// corners, home indicator).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It insets one element, by default the first with the class <c>vd-safe-frame</c>, with inline
+    /// <c>left/right/top/bottom</c>: lay the panel's content out inside that element and it never
+    /// sits under the top bar, the bottom bar, the joystick or the task HUD. The insets are the
+    /// larger of the application's zones and the device's safe area, recomputed when either changes:
+    /// on <see cref="ReservedScreenZones.Changed"/> and on the document root's geometry change, which a
+    /// resize or an orientation change (and with it the safe area) raises. Nothing runs per frame.
+    /// </para>
+    /// <para>
+    /// World-space documents (and every document in VR) are left alone: they have no screen edge.
+    /// </para>
+    /// </remarks>
+    [RequireComponent(typeof(UIDocument))]
+    [DisallowMultipleComponent]
+    [AddComponentMenu("Virtuademy/UI/Safe Frame")]
+    public class SafeFrame : UIDocumentBinder
+    {
+        public enum EArea
+        {
+            /// <summary>Clear of every zone, the same width on both sides so it stays centred: on mobile a
+            /// centred column between the joystick and the jump button. For content in the middle: toasts,
+            /// dialogs.</summary>
+            Content = 0,
+
+            /// <summary>Up to the side edges, clear of the bars and of the corner controls. For a
+            /// panel anchored to an edge: the HUD.</summary>
+            Edges = 1,
+        }
+
+        public enum ETaskHud
+        {
+            /// <summary>Keep clear of the task HUD when the scene has a TaskUIPlaceholder.</summary>
+            Auto = 0,
+            Always = 1,
+            Never = 2,
+        }
+
+        [SerializeField, Tooltip("Name of the element to inset. Empty: the first element with the class vd-safe-frame.")]
+        private string targetElementName;
+
+        [SerializeField, Tooltip("Content: clear of every zone (a centred column on mobile). Edges: up to the " +
+            "side edges, clear of the bars and the corner controls (for a panel at an edge, like the HUD).")]
+        private EArea area = EArea.Content;
+
+        [SerializeField, Tooltip("Also keep clear of the task HUD on desktop and WebGL.")]
+        private ETaskHud taskHud = ETaskHud.Auto;
+
+        [SerializeField, Tooltip("Extra margin inside the frame, in reference pixels, on every side.")]
+        private float margin = 16f;
+
+        private VisualElement target;
+        private VisualElement root;
+
+        /// <summary>The insets in use, in panel pixels.</summary>
+        public ReservedScreenZones.Insets Current { get; private set; }
+
+        protected override bool BindTo(VisualElement root)
+        {
+            target = string.IsNullOrEmpty(targetElementName)
+                ? root.Q<VisualElement>(className: ThemeTokens.SafeFrameClass)
+                : root.Q<VisualElement>(targetElementName);
+            if (target == null)
+            {
+                Debug.LogWarning($"[{nameof(SafeFrame)}] '{name}': no element to inset (name '{targetElementName}', " +
+                    $"or the class {ThemeTokens.SafeFrameClass}).", this);
+                return false;
+            }
+            ReservedScreenZones.Changed += Apply;
+            // The screen's size (and with it the safe area): the root's geometry. The insets change the target's, not
+            // the root's, so this does not come back here.
+            this.root = root;
+            root.RegisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
+            WatchForRebuild(target);
+            Apply();
+            return true;
+        }
+
+        protected override void UnbindFromTree()
+        {
+            ReservedScreenZones.Changed -= Apply;
+            root?.UnregisterCallback<GeometryChangedEvent>(OnRootGeometryChanged);
+            root = null;
+            target = null;
+        }
+
+        private void OnRootGeometryChanged(GeometryChangedEvent e)
+        {
+            if (e.oldRect.size != e.newRect.size)
+            {
+                Apply();
+            }
+        }
+
+        private void Apply()
+        {
+            if (target == null || Document == null || Document.panelSettings == null)
+            {
+                return;
+            }
+            bool screenSpace = Document.panelSettings.renderMode == PanelRenderMode.ScreenSpaceOverlay;
+            if (!screenSpace || PanelEnvironment.IsVR || target.panel == null)
+            {
+                Current = default;
+                SetInsets(default);
+                return;
+            }
+
+            ReservedScreenZones.Insets reserved;
+            if (PanelEnvironment.IsMobile)
+            {
+                reserved = area == EArea.Edges ? ReservedScreenZones.MobileEdges : ReservedScreenZones.Mobile;
+            }
+            else
+            {
+                reserved = ReservedScreenZones.Desktop;
+                bool hud = taskHud == ETaskHud.Always
+                    || (taskHud == ETaskHud.Auto && FindFirstObjectByType<TaskUIPlaceholder>() != null);
+                if (hud)
+                {
+                    ReservedScreenZones.Insets add = ReservedScreenZones.DesktopTaskHud;
+                    reserved = new ReservedScreenZones.Insets(reserved.top + add.top, reserved.bottom + add.bottom,
+                        reserved.left + add.left, reserved.right + add.right);
+                }
+            }
+
+            // The device safe area, from screen pixels (origin bottom-left) to panel pixels (top-left).
+            IPanel panel = target.panel;
+            Rect safe = Screen.safeArea;
+            Vector2 topLeft = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(safe.xMin, Screen.height - safe.yMax));
+            Vector2 bottomRight = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(safe.xMax, Screen.height - safe.yMin));
+            Vector2 full = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(Screen.width, Screen.height));
+            var device = new ReservedScreenZones.Insets(topLeft.y, full.y - bottomRight.y, topLeft.x, full.x - bottomRight.x);
+
+            ReservedScreenZones.Insets insets = ReservedScreenZones.Insets.Max(reserved, device);
+            if (area == EArea.Content)
+            {
+                // Content is centred (toasts, dialogs, the procedure's summary): the same inset on both sides, the larger,
+                // so a zone on one side only (the task HUD on the left on desktop) narrows the frame without pushing its
+                // content off centre (2026-11-02, editor test: the summary and the hints sat over the inventory).
+                float side = Mathf.Max(insets.left, insets.right);
+                insets = new ReservedScreenZones.Insets(insets.top, insets.bottom, side, side);
+            }
+            insets = new ReservedScreenZones.Insets(insets.top + margin, insets.bottom + margin,
+                insets.left + margin, insets.right + margin);
+            Current = insets;
+            SetInsets(insets);
+        }
+
+        private void SetInsets(ReservedScreenZones.Insets insets)
+        {
+            target.style.position = Position.Absolute;
+            target.style.top = insets.top;
+            target.style.bottom = insets.bottom;
+            target.style.left = insets.left;
+            target.style.right = insets.right;
+        }
+    }
+}

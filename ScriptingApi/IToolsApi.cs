@@ -35,5 +35,24 @@ namespace Virtuademy.Environments.ScriptingApi
         /// <c>Virtuademy inventory: AddPickableToInventoryNode</c>.
         /// </remarks>
         bool AddPickableToInventory(GameObject pickable);
+
+        /// <summary>
+        /// The held tool's 3D model in the avatar's hand, on desktop and mobile in third person: where an effect of the
+        /// tool (a spray's jet) starts, aimed where the player points. Null in first person (start the effect from the
+        /// camera), when the tool shows no model in hand, and in VR (the tool is in the player's hand: use
+        /// <c>IPlayerApi.RightHand</c> or <c>LeftHand</c>). It changes when the view changes between first and third
+        /// person: read it when the effect starts, and while it lasts.
+        /// </summary>
+        Transform HeldToolModel { get; }
+
+        /// <summary>
+        /// A tool's use started, this player's or, in a multiplayer session, another player's (2026.7): a press of the
+        /// use key, or the start of a held use. For an effect every player sees: start it under <see cref="ToolUse.Aim"/>,
+        /// and act on the world only when <see cref="ToolUse.IsLocal"/>.
+        /// </summary>
+        event System.Action<ToolUse> ToolUseStarted;
+
+        /// <summary>The use ended: a held use's release, at once after a single press.</summary>
+        event System.Action<ToolUse> ToolUseEnded;
 }
 }

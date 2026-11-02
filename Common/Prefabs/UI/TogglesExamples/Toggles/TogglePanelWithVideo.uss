@@ -24,8 +24,8 @@
     padding: 0 16px;
     border-width: 0;
     border-radius: 22px;
-    background-color: rgb(56, 122, 255);
-    color: rgb(255, 255, 255);
+    background-color: var(--vd-color-action, rgb(0, 110, 245));
+    color: var(--vd-color-on-action, rgb(255, 255, 255));
     font-size: 18px;
     -unity-text-align: middle-center;
     /* Poppins Bold (.ttf, environments), like the panel title. */
@@ -35,9 +35,9 @@
 }
 
 .toggle-video-button:hover {
-    background-color: rgb(30, 98, 235);
+    background-color: var(--vd-color-action, rgb(0, 110, 245));
 }
 
 .toggle-video-button:active {
-    background-color: rgb(20, 80, 200);
+    background-color: var(--vd-color-action, rgb(0, 110, 245));
 }

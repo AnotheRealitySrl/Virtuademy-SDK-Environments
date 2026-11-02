@@ -63,7 +63,7 @@
 }
 
 .tp-disc {
-    background-color: rgb(58, 127, 255);
+    background-color: var(--vd-color-action, rgb(0, 110, 245));
     border-top-left-radius: 39px;
     border-top-right-radius: 39px;
     border-bottom-right-radius: 39px;
@@ -95,7 +95,7 @@
 }
 
 .tp-arrow-blue {
-    -unity-background-image-tint-color: rgb(58, 127, 255);
+    -unity-background-image-tint-color: var(--vd-color-action, rgb(0, 110, 245));
     scale: 0 0;
 }
 

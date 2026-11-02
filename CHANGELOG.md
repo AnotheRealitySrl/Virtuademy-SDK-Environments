@@ -1,6 +1,36 @@
 # Release notes
 
-## Unreleased
+## v10.1.0
+
+Platform 2026.7. Minor: backward compatible for published environments and for creator projects that use the
+placeholders and the scripting API, with two exceptions for editor code, noted where they are: the removal of
+`AddressablesBundleScriptableObject` (three editor types) and of the `SpawnableObjectEditor` inspector.
+**Requires Virtuademy-SDK-Core 0.4.0 and SPACS-Tasks 3.1.0.**
+
+In short:
+
+- **Interactions** (scripts and graphs): per-click interaction, hover and select events for scripts,
+  `InteractablePlaceholder.VRControllers` (ray, hands or both, replacing the Visual Scripting component's own
+  setting) and `IsBlocked`.
+- **Theme and UI Toolkit**: the Virtuademy theme as USS tokens, tenant colours applied at runtime, UI Toolkit panels for
+  environments (panel, choice, list, label, HUD, check mark), toasts and popups from scripts and graphs, `SafeFrame`
+  for the screen areas the application keeps, Poppins SemiBold, `IHelpApi.IsOpen`/`Opened`,
+  `IVirtuademyGameplay.Tablet`, `ILocalizationApi.TranslateOr` and a missing-translations check. In VR the panels
+  follow the player's body and let rays through wherever nothing is shown. Nothing runs per frame.
+- **Interaction cue**: highlight, mark and flash on the objects a task asks for, shown or not by the experience's
+  mode.
+- **Tasks**: procedures (guided and assessed runs, scoring, right and wrong feedback, hints, a summary), task
+  elements (item on target, tool on target, collect and others, with their targets and state), `ITasksApi`, the
+  task nodes Fail Task, Unlock Task, On Task Unlocked and On Task Failed, and the task panel placed per platform
+  (in the world, with the player, hidden), one panel with the player at a time.
+- **Tools and inventory**: tool use events and the held tool's model, `ToolItemPlaceholder.useMode`, the inventory
+  set up and changed during the experience (`InventoryPlaceholder`), equipment slots declared by the environment,
+  wearables with their slot and events, starting items, quantities per slot, item targets that refuse items once
+  done, the pickable's drag mode and a third-person hold preview.
+- **Publishing**: the Environment Details window, the experiences of an environment, thumbnails and localization
+  files per place, the scene's defaults and default files in Publish Environments, new scenes built for every
+  platform, the single-group rule with one Fix dialog, logins as named connections shared by the window and the
+  command line, and the menu regrouped.
 
 - **`AddressablesBundleScriptableObject` removed** (major: three public editor types go, `AddressablesBundleScriptableObject`,
   `EnvironmentAssetDefinition` and `AddressablesBundleScriptableObjectEditor`). The 2024 asset that set up the Addressables groups
@@ -37,7 +67,7 @@
   not on every repaint.
 
 The review fixes below warrant a minor bump: fixes, two values appended to `EnvironmentsBuildFailure`, the six per-module define-symbol
-classes kept as `[Obsolete]` shells. No public member removed or renamed. The connection commands add four
+classes kept as `[Obsolete]` shells. No public member removed or renamed by them. The 2026.7 entries below warrant a minor bump, except the removal of the editor type `SpawnableObjectEditor` (see Changed), which warrants a major one. The connection commands add four
 `EnvironmentsCli` commands, one option on every command and the exit codes 26 to 32 (minor; `ExitApiHostMismatch` stays defined and is no
 longer returned, and a `-vdExpectTenant` that names another tenant is now 30 instead of 24). The window's menu path
 (Publish Environments, was Addressables management) and `tenant-config`, which now writes the connection store and reports
@@ -50,6 +80,21 @@ The files commands add five `EnvironmentsCli` commands (`published`, `save-files
 and the exit codes 37 and 38; the Environment Details window and the scene row's default files are new editor UI (minor).
 
 #### Added
+- **Task elements: Completed By works** (`ElementPlaceholderBase.completedBy`, Any Player by default). Item On Target,
+  whose detector sees every player's items and tools, now tells them apart: Local Player Only ignores a teammate's item
+  (no completion, no wrong attempt) and is reported by the client of the player who acted; Any Player keeps today's
+  behaviour (a teammate's item counts; in a shared procedure the master reports it). The application says whose each
+  detector event is (`InventoryItemTriggerDetectorPlaceholder.LastActionByLocalPlayer`). The other elements (Target,
+  Choice, Distractor, Reach Zone, Collect, Watch, Question) only ever see this client's player, so both values behave
+  alike there; in a shared procedure a teammate completes the room's task from their own client either way. Until now
+  Item On Target logged a warning for Local Player Only and behaved as Any Player.
+- **Sample "Procedure: find the hazards"** (`Samples~/ProcedureHazards`) is listed in the package: import it from the
+  Package Manager.
+- **`QuestionElementPlaceholder.wrongBelow`** (Wrong Below, 0 to 1, default 0): below this normalised score the question
+  counts as answered wrong, so a procedure gives the wrong feedback, the error sound, a Mistake row and one error (the
+  summary's Errors, which Max Errors counts), and the step scores 0. At the default a question is wrong only when nothing scores, as before; 1 makes anything short of the whole
+  quiz wrong. Each answer scores when it is set right, picked or not, so one wrong answer picked of three scores 1/3
+  (Partial, the positive feedback) unless Wrong Below is above it.
 - **The Environment Details window** (minor). The `i` button at the end of a scene's row in Publish Environments opens `EnvironmentDetailsWindow`
   (title *Environment Details*, one window for the project, minimum 760 x 480; its size and the last scene it showed are kept per user in `EditorPrefs`)
   on that scene; **Virtuademy > Environment Details** (under Publish Environments) opens it on the scene it showed last. It reads every connection of the computer each time it opens, on **Refresh** and when the scene changes, each connection on its own (a
@@ -173,6 +218,290 @@ and the exit codes 37 and 38; the Environment Details window and the scene row's
   opens the Back Office in the browser on the first ticked world the access covers (`?world=<id>`), or on its home page,
   with no world parameter, when no such world is ticked (the tenant level alone included). An API that predates the
   route answers 404 or 405 and the group shows no button, with no message. The group's **Log out** button is red.
+- **Third-person hold preview** (2026.7, minor): the SpawnableObject inspector's "Preview third-person hold" button
+  shows a mannequin (Unity primitives, not saved) holding the item as desktop, web and mobile hold it in third person,
+  from its hold offset and right-hand pivot; "Hide preview" removes it. The inspector moved to the editor assembly
+  (`SpawnableObjectPlaceholderEditor`), with its hand-reference buttons as before.
+- **`SpawnableObjectPlaceholder.customThirdPersonHold` / `thirdPersonHoldOffset`** (2026.7, minor): on desktop, web
+  and mobile, in third person, an item held with the hand at its own offset from the avatar's chest instead of the
+  platform's default. Off by default.
+- **`PickablePlaceholder.dragMode`** (2026.7, minor): `Icon` (default) drags the item as its icon on desktop, web and
+  mobile, back where it was on release unless used on a target or dropped on the inventory, as every pickable was
+  dragged on desktop until now; `Model` drags the 3D object as a manipulable. A pickable serialized before the field
+  existed (every published environment) loads as `Icon`: no environment changes behaviour.
+- **`IToolsApi.ToolUseStarted` / `ToolUseEnded`, `ToolUse`** (2026.7, minor): every player's tool uses, this player's
+  (`IsLocal`) and, in a multiplayer session, the others', with the tool's name, the player and an `Aim` transform
+  (where the use starts, its forward; for another player at their avatar's right hand). An effect every player sees
+  (a spray's jet) starts under `Aim` and stops on `ToolUseEnded`; what the use does to the world is done only for
+  `IsLocal` uses.
+- **`InventoryPlaceholder.returnItemsToOriginOnLeave`** (2026.7, minor): in a multiplayer session the items a player
+  took from the scene for themselves go back into the room when they leave, near where they left (default) or where
+  each was at the start (on).
+- **Task panel placement per platform** (2026.7, minor): `TaskUIPlaceholder.desktopPlacement`, `mobilePlacement` and
+  `vrPlacement` (`ETaskPanelPlacement`: `InWorld`, `WithPlayer`) choose for each platform whether the panel stands in the
+  world, where the placeholder is, or goes with the player (on the screen on desktop and mobile; in VR on their
+  left beside the view, its top at about eye height, moving and turning with their body). Defaults keep today's
+  behaviour: desktop and mobile with the player, VR in the world. In the world, `worldPanelSize` (metres, 0.61 x 0.69
+  by default) times the placeholder's scale sets the panel's size; selecting the placeholder draws its outline in the Scene view.
+- **One task panel with the player at a time** (2026.7, minor): `TaskUIPlaceholder.ShowAsPersonalPanel()` (also from
+  Visual Scripting) makes that placeholder's panel the one shown with the player; the first created is shown until
+  then, the others wait hidden with their state. Panels in the world are unaffected.
+- **The inventory's item slots round up so the grid has no holes** (2026.7, minor): on the first page to whole columns
+  once a second column starts (whole rows in VR), past it to whole pages, with empty, usable slots;
+  `InventoryPlaceholder.inventorySlotsCount` follows (with `SlotCountsChanged`), as it does when an item that does not
+  fit adds a slot. The equipment's slots are declared, so its columns, rows and pages show empty, inert cells instead.
+- **`IToolsApi.HeldToolModel`** (2026.7, minor): the held tool's 3D model in the avatar's hand, on desktop and mobile in
+  third person, where an effect of the tool (a spray's jet) starts; null in first person, when the tool shows no model,
+  and in VR.
+- **`InventoryPlaceholder`** (`ScriptingApi/Placeholders/Pickable/`), one placeholder for the tools radial menu and the
+  inventory of pickable items, with the fields of `ToolInventoryPlaceholder` and `InventorySlotPlaceholder` (same names)
+  and a selector, `InventoryMode`: `None`, `Tools` or `Inventory`. At scene start the app initializes and shows only
+  the selected system; setting `InventoryMode` at runtime (or editing it in the inspector in Play mode) raises
+  `InventoryModeChanged(previous, current)`, on which the app hides the current system and initializes (the first
+  time) and shows the new one. In VR one controller button will open either UI, hence one system at a time. The
+  Inventory section also carries the VR panel's settings: `inventoryAction` (the input that opens and closes it) and
+  `inventoryZOffset`, `inventoryYOffset`, `inventoryOpenSpeed` (its placement in front of the camera and its opening
+  time), the counterparts of the tools' `action`, `zOffset`, `yOffset` and `openSpeed`. The two
+  old placeholders stay and keep working. Unlike `InventorySlotPlaceholder` it has no `IsNetworked`: the inventory is
+  per user, and the app's network bridge for it only called the same initialization. Warrants a minor bump.
+  It also carries `pickedToolsShared` (as on `ToolInventoryPlaceholder`) and `startingItems` (as on
+  `InventorySlotPlaceholder`). Without an `inventoryAction`, B/Y (the secondary button of either hand) opens the VR
+  panel.
+- **The inventory changes during the experience**, from scripts and Visual Scripting. `InventoryPlaceholder.SetSlotCounts(wearSlots,
+  inventorySlots)` gives it more slots (counts only grow; it raises `SlotCountsChanged`), beside the `InventoryMode`
+  setter. Two nodes: **Virtuademy Inventory: Set Mode** (`SetInventoryModeNode`) and **Virtuademy Inventory: Set Slot
+  Counts** (`SetInventorySlotCountsNode`). Additive; warrants a minor bump.
+- **`InventoryItemTriggerDetectorPlaceholder.activation`** (`EActivation`: `Contact`, the default and the behaviour
+  so far, or `Use`). In VR with the `InventoryPlaceholder`, the tools are used with the trigger: a `Contact` target
+  reacts as soon as the right tool touches it (its events and the right/wrong feedback, no use spent), a `Use` target
+  reacts when the tool touching it is used (the trigger; a Hold tool keeps acting while the trigger is held). Desktop
+  and mobile: the click with the tool, as before, for both. Additive; warrants a minor bump.
+- **Equipment slots declared by the environment.** `InventoryPlaceholder.equipmentSlots`: a list of
+  `EquipmentSlotDefinition` (type `Hand` or `Custom`, the custom slot's name as the wearables give it in `wearSlot`, an
+  optional icon shown on the slot in place of its name; the hand slot always shows the application's hand icon), shown from the start. A wearable whose slot is not declared adds it; with an empty list the wear
+  slots are counted by `wearSlotsCount`. The counts of this placeholder are where the inventory starts: an item that
+  does not fit adds a slot, so nothing is refused (the old placeholders keep their behaviour). At runtime `AddEquipmentSlot(type, name, icon)` (raises
+  `EquipmentSlotsChanged`) and the node **Virtuademy Inventory: Add Equipment Slot** (`AddEquipmentSlotNode`).
+  Additive; warrants a minor bump.
+- **An inventory slot shows the quantity of copies** (from 2 up; one copy shows no number), never the uses. Picked
+  copies stack in one slot, as before: `numberOfUses` stays a per-copy value for creators (a use spends the top copy's; a copy taken out keeps its
+  own), and "∞" is no longer shown. Behaviour change for items with more than one use: two picked copies of a
+  2-use item showed "4", they show "2". Warrants a minor bump.
+- **The Virtuademy theme** (`Common/Theme/`, `Runtime/UIKit/Theme/`). `VirtuademyTheme.asset` holds the colour
+  roles (`EThemeRole`: surface, raised surface, border, text, secondary text, action, text on action, success,
+  warning, error, info, scrim), the type scale, the three Poppins weights, radii and spacing. The action colour is
+  the Virtuademy blue `#006EF5`. `VirtuademyTokens.uss` carries them as `--vd-*` variables (generated by
+  `Virtuademy/UI/Generate theme tokens`), `VirtuademyComponents.uss` builds the panel classes on them (`vd-panel`,
+  `vd-button--primary`, `vd-toast`, `vd-list`, `vd-check`…, and `vd-bg-*`/`vd-text-*`/`vd-border-*` per role),
+  `Virtuademy.tss` is the theme of the SDK's two new PanelSettings (`VirtuademyScreenPanelSettings`, sorting order
+  -1, so environment overlays stay under the application's UI; `VirtuademyWorldPanelSettings`, one pixel per
+  millimetre). `ThemeColorRole` colours a uGUI graphic by role. Warrants a minor bump.
+- **Tenant colours at runtime.** `VirtuademyThemeRuntime.Publish` takes the palette the application publishes;
+  `ThemedDocument` (on every new SDK panel) and `ThemeColorRole` follow it, and roles left out keep the SDK value.
+- **UI Toolkit panels for environments** (`Common/Prefabs/UI/Toolkit/`), scene prefabs with the same functions as the
+  uGUI ones and callbacks for each: `VirtuademyPanel` and its `_Hint`, `_Warning`, `_Error`, `_Success`, `_Welcome`,
+  `_Confirm` variants (successors of the description, warning, wrong-answer, welcome and confirm canvases),
+  `VirtuademyListPanel` (list item canvas, checklist), `VirtuademyCheckMark` (check completed, and a cross),
+  `VirtuademyLabel` (hover description), `VirtuademyChoicePanel`, `VirtuademyHud` (counter, progress, hint: the
+  animated screen canvas; over the screen on desktop and mobile, a panel that follows the head in VR through
+  `OverlayPanelPlacement`) and `NotificationHost` (toasts and popup). Texts take a localization key and a
+  fallback. Warrants a minor bump.
+- **Toasts and popups for scripts and graphs.** `IVirtuademyGameplay.UI` (`IUIApi`): `ShowToast(text, severity,
+  duration)`, `ShowPopup(title, text, buttons, onClosed)` reporting the button pressed, `ClosePopup`,
+  `IsPopupOpen`, `GetThemeColor(role)` and `ThemeChanged`; nodes `Virtuademy UI: Show Toast`, `Show Popup`
+  (continues on Shown and on Closed with the button index), `Close Popup`, `Get Theme Color`. Drawn by the scene's
+  `NotificationHost` when it has one, by the application's otherwise. Adding a member to `IVirtuademyGameplay`
+  breaks any other implementation of it (the application's is the only one). Warrants a minor bump.
+  Popups and toasts fade in and out over the theme's `--vd-motion-fade` (0.2 s). A popup can close on a click or
+  tap outside it, reporting -1: `NotificationHost.closePopupOnOutsideClick` (off by default), the `ShowPopup`
+  overload with `closeOnOutsideClick`, and the node's Close On Outside Click input. The HUD's hint button shows its
+  `Hint On Request` text (a second press hides it); with that text empty it only raises On Hint Requested.
+  `SafeFrame.area`: `Content` (centred: the same inset on both sides, the larger, so a zone on one side such as the
+  desktop task HUD narrows it without pushing toasts and dialogs off centre) or `Edges` (to the side edges, clear of the bars and the
+  corner controls); the HUD uses Edges and sits at the top right of the frame.
+  Popups close by themselves without a timer of the creator's: `ShowPopup(..., closeOnOutsideClick, autoCloseSeconds)`
+  returns the popup's id, its timer belongs to that popup (it can never close a later one, which a delay followed by
+  `ClosePopup()` did), and `ClosePopup(int id)` closes only that popup; `NotificationHost.popupAutoCloseSeconds` is
+  the default (0: never). Nodes: Show Popup has Auto Close Seconds and a Popup Id output, Close Popup a Popup Id
+  input (0: whichever is open, as before).
+  In VR, `OverlayPanelPlacement` sizes the document's root to its VR size itself (the popup laid its text out one
+  letter per line and the HUD piled up its rows: the root had no size) and has a sideways offset: the HUD floats
+  0.9 m to the right and 0.55 m lower, the popups in front and centred. In VR an overlay's colliders are on only while
+  it has something to press (`OverlayPanelPlacement.BlocksRay`: the notification host while a popup is open, the HUD
+  while its hint button shows): the controller ray hits triggers on the UI layer, so the host's collider, 1.4 x 0.9 m
+  in front of the user, caught the ray meant for the application's tutorial panel behind it.
+  The switch also runs once on the root's scheduler after each layout: UI Toolkit makes the collider, on, in the frame
+  after the layout and a new one at each enable, so the switch at the layout found none and the host's collider stayed on
+  (Quest, 2026-11-02); the same for `PanelRayBlocking`. A collider that will not switch logs an error.
+- **`IHelpApi.IsOpen` and `IHelpApi.Opened`**, next to `Closed`, and the nodes `Virtuademy Tutorial: Is Tutorial Open`
+  and `On Tutorial Opened`. They follow the application's help (tutorial) state, which it opens by itself on a first
+  visit and which keeps the user from moving. In VR the HUD and the notification host hide, and let the ray through,
+  while it is open (`OverlayPanelPlacement.vrHideWhileHelpOpen`, on by default). The application's implementation
+  watches the state instead of the system's events, which it clears at every scene setup: `Closed` no longer goes
+  silent after the first environment.
+- **`IVirtuademyGameplay.Tablet` (`ITabletApi`)**: `IsAvailable`, `IsOpen`, `Opened`, `Closed` for the application's tablet
+  (desktop and VR; none on mobile), read-only, and the nodes `Virtuademy Tablet: Is Tablet Open`, `On Tablet Opened`
+  and `On Tablet Closed`. The SDK's overlays do not react to it. Adding a member to `IVirtuademyGameplay` breaks any
+  other implementation of it (the application's is the only one).
+- **`ILocalizationApi.TranslateOr(key, fallback)`** and the node `Virtuademy Localization: Translate Or`: the
+  fallback instead of the raw key when the Localization File has no translation.
+- **`SafeFrame`** keeps a screen panel clear of the application's reserved zones (`ReservedScreenZones`: top bar,
+  bottom bar and task HUD on desktop and WebGL, top bar and joystick on mobile, measured from the application's
+  code) and of the device's safe area.
+- **`Virtuademy/Advanced/Check missing translations`** lists the keys the open scenes use that the
+  Localization File does not translate, per language.
+- **Poppins SemiBold** (`Common/Fonts/Poppins-SemiBold.ttf`), and the developer menu
+  `Virtuademy/Advanced/Developer/Create Poppins font fallbacks` (enabled only where the package is embedded), which
+  creates dynamic TextMesh Pro assets for the three weights and sets them as fallback of the two static 211-glyph ones.
+  The fallback assets are not generated in this release yet: TextMesh Pro texts still show a box for an accented letter
+  outside those 211 glyphs (UI Toolkit panels use the font files and are not affected). The editor imports the TextMesh
+  Pro Essential Resources once when a project lacks them (not in batch mode), so the SDK's texts no longer render
+  magenta in a new creator project. `Virtuademy/Advanced/Developer/Generate theme tokens` is the same kind of
+  developer-only menu.
+- **`ToolItemPlaceholder.useMode`** (`EToolUseMode`: `None`, the default and the behaviour before 2026.7, `Click`,
+  `Hold`), **`onUseEnded`**, **`showModelInHand`** and **`pickupSharing`** (`EToolPickupSharing`: `AsInventory`, the
+  default, `PickerOnly`, `Everyone`) (2026.7, minor): how a tool is used (one press, or held with `onUseEnded` on
+  release), whether its 3D model shows in the hand on desktop, web and mobile, and who gets a tool picked up in a
+  multiplayer session.
+- **`WearablePlaceholder.wearSlot`, `onWorn` and `onRemoved`** (2026.7, minor): the equipment slot a wearable goes in
+  (empty: the wear inventory's own), and events when the player wears it and takes it off.
+- **`InventorySlotPlaceholder.startingItems`** and **`ToolInventoryPlaceholder.pickedToolsShared`** (2026.7, minor):
+  new fields on the existing placeholders, as on `InventoryPlaceholder`: items in the slot inventory at start, and
+  picked tools shared with every player.
+- **Interaction events for scripts** (2026.7, minor): `InteractablePlaceholder.OnHoverEnter`, `OnHoverExit`,
+  `OnSelectEnter`, `OnSelectExit` and `OnInteract`, C# events carrying `InteractionEventArgs` (the controller,
+  `EInteractionControllerType`: Mouse, Ray, Hand, Touch; and the hand, `EInteractionHand`), raised by the application
+  only. Every handler runs; a handler's exception is then thrown, not swallowed.
+- **`InteractablePlaceholder.VRControllers`** (`EVRInteractionControllers` flags: `Ray`, `Hands`; both by default)
+  (2026.7, minor): which VR controllers can hover, select and interact with the object.
+- **Procedures** (2026.7, minor): `ProcedurePlaceholder` on a task system's object turns it into a procedure: scored
+  tasks (each worth `maxScore x weight / total weight`, largest-remainder rounding), wrong attempts (`errorPenalty`),
+  hints (`hintsEnabled`, `hintPenalty`, `hintCharge`: OncePerTask, Never; a hint asked again on a task never costs again), errors (`maxErrors`), time
+  (`timeLimitSeconds`), fail conditions (`onFailCondition`: EndNow, ContinueAsFailed), failed tasks (`onTaskFailed`:
+  Continue, EndProcedure), out-of-order actions (`outOfOrderIsError`), pass percentage, timeline mode, retry mode.
+  Live state (`Score`, `MaxScore`, `PassingScore`, `Percent`, `Errors`, `HintsUsed`, `ElapsedSeconds`,
+  `RemainingSeconds`, `Outcome`, `Summary`), methods `RequestHint`, `Finish`, `Abort`, `Retry`, `Exit`, `ShowSummary`,
+  events `Attempted`, `HintUsed`, `ScoreChanged`, `Passed`, `Failed`, `Finished` (`ProcedureFinishedHandler`,
+  `ProcedureSummary` with task rows and timeline) and UnityEvents. `TaskStepPlaceholder` on a task's object: `weight`,
+  `scored` (`ETaskScored` Auto/Yes/No), `stepId`, `maxAttempts`, the resolved `HintText`, `RightFeedbackText`,
+  `WrongFeedbackText`, events `Unlocked`, `Attempted`, `Completed`, `TaskFailed`, `HintShown` and methods `Complete`,
+  `Attempt`, `Fail`, `Unlock`, `ShowHint`. `LocalizeTaskPlaceholder` gains `hintKey`, `rightFeedbackKey`,
+  `wrongFeedbackKey`. A task system without a Procedure placeholder works as before. Tasks completed by a step setter
+  (start from a later step, a restored room) are left out of the score. Feedback: in Guided mode the right/wrong texts
+  (the task's texts, else the reason, else a generic one) show as a toast or in the `successPanel`/`errorPanel`
+  (`feedbackPresentation`), in Assessed mode a neutral "Recorded" and no next-target highlight; the step-done and
+  wrong sounds of `sounds` (cue settings) play when no bound cue plays its own; a hint shows its text and highlights the
+  task's targets for a moment (`hintShowsTarget`); `sharedFeedback` gives a mark and flash to targets whose cue has no
+  feedback objects. Cues bound to tasks now show Wrong for a wrong result and Right for a completion, with or without a
+  procedure (not for steps a step setter skips).
+- **Task elements** (2026.7, minor): ready-made ways to detect an action and report it on a task, as placeholders
+  (`ElementPlaceholderBase`: `task`, `reportOnlyWhenTaskActive`, `completedBy`, `Report(TaskResult)`, `Reported`,
+  `onRight`/`onWrong`/`onReported`) and prefabs in `Runtime/Tasks/Prefabs/Elements` (element, Interactable, Visual
+  Scripting Interactable, interaction cue with feedback objects, a model to replace): **Target** (`ProcTarget`: interact
+  or select completes), **Choice** (`ProcChoice`: pick and confirm; `isCorrect`, `oneShot`, `wrongReason`),
+  **Distractor** (`ProcDistractor`: a wrong attempt; with a task, on that task (its error penalty and an error);
+  without one, `penaltyPoints` off the total and `countsAsError`), **Reach Zone**
+  (`ProcReachZone`: the local player entering the trigger: a collider under the player's root, or the moving body
+  that carries it, as the desktop and mobile character controller does), **Watch** (`ProcWatch`: a video ended, a POI closed, a panel
+  hidden), **Question** (`ProcQuestion`, `ProcQuestionPool`: a quiz's normalised score; `pool`, `drawCount`,
+  `shuffle`), **Item On Target** (beside an Inventory Item Trigger Detector: the right item or tool completes, a wrong
+  one is an attempt; the master reports in a shared procedure; the element's cue and the procedure show the feedback,
+  so the detector's own check or cross does not show too, `InventoryItemTriggerDetectorPlaceholder.ElementShowsFeedback`).
+  The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`) and carry a solid
+  BoxCollider, not listed on the Interactable, so a model the creator puts in its place brings its own collider. A
+  wrong action shows on the cue of the object that caused it (a decoy, a wrong choice), not on the task's other cues;
+  the procedure's shared mark is used only for a source without feedback objects, and hides by itself. The choice's
+  confirmation starts inactive and goes inactive again when it hides (hidden but active, its collider took the
+  clicks). Target, Choice and Distractor act on one click: they take the select state out of the Visual Scripting
+  interactable beside them (a Target that completes on select keeps it). A Question element shows each quiz's own
+  recap before the next quiz of its pool (Continue on every quiz but the last; the last recap ends the question). **Collect** (`ProcCollect`, `CollectElementPlaceholder`): the pickable collected
+  into the inventory completes the task (a Wearable on it goes to its Wear Slot). Without a task an element raises its events and shows
+  its cue. `TasksLogic_Procedure.prefab`: TasksLogic with a Procedure placeholder, its success and error panels,
+  shared cue feedback and a Task UI placeholder (`TaskPanel`, wired to its task system, default placements: the app's
+  task panel with the errors strip, timer and hint button; set a platform to Hidden to drop it); the legacy uGUI task
+  panel of TasksLogic (`MainUIWorldSpaceCanvas`) is off in it. **Summary**: `ProcedureSummary.prefab` (a Virtuademy panel on the screen, in front of the user in
+  VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
+  `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
+  `timelineMaxRows`), in a list that scrolls past 360 px (mm in a world panel), so the buttons always show, with a slim
+  themed scroller (`ProcedureSummary.uss`: a slim rounded thumb in the action colour, no track, no arrows, wider in VR); the
+  content scrolls by dragging it with the mouse, the VR ray or a finger, and with the wheel; in VR a 1 x 0.86 m panel whose list grows to 560 mm; Retry and Exit; on the screen it is centred and keeps clear of the
+  application's zones (Safe Frame on the panel's root, not the task HUD's, which the summary replaces). `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
+  **Analytics** (`sendAnalytics`): one run per procedure run, its key the prefix (`analyticsKeyPrefix`, else the scene's
+  name; letters and digits, at most 7) and 8 random characters, its experience id generated first (a new key after
+  10 s without one); ExpStart, a StepStart when a scored step starts, exactly one StepComplete per started step (0
+  against the step's own max and passing score, Fail, when the run ends first), one ExpComplete per run (Pass, Fail; ended early: Fail after a fail condition, else
+  NA with the score so far); sent in order, one at a time, a failed one again after 2, 4, 8, 16 then 30 s. Retry and
+  Exit wait for the queue (at most 8 s, the summary says so). ExpComplete is sent by the procedure's own logic only:
+  leaving the scene through the application (menu, home, disconnection) sends nothing and the run stays incomplete in
+  the analytics; an environment that needs a completed run calls `Finish` or `Abort`. Without the application the
+  statements are logged.
+  **Shared procedures** (a networked task system in multiplayer): every result, failure, hint, distractor and the time
+  running out reach every client (the sender applies it first), with the actor's name, so feedback and cues show on
+  everyone's screen and every client scores the same; the master keeps a snapshot in the room (counters, steps, run
+  key, analytics flags, question draws) that a client joining late, or after a master change, applies; the master runs
+  the time limit on the network clock. Analytics form one team run per room: the master mints the key and is the
+  sender of record (ExpStart, steps, ExpComplete, the latter flagged before it is sent so it goes out at most once);
+  every participant sends ExpJoin once per run; a new master sends what the room's flags say is missing. Retry in a
+  shared procedure is always in place and starts a new team run. `TaskSystemVirtuademy.SetProcedureNetwork` and
+  `IProcedureNetwork` (SDK runtime) are what the application implements.
+  Nodes ("Virtuademy Procedure"): Get Procedure State, Finish Procedure, Retry Procedure, Request Hint, On Procedure
+  Finished (Passed, Score, MaxScore), On Score Changed, On Hint Used; `ITasksApi.RequestHint(procedure)`. The Procedure
+  placeholder's inspector says what will not work as set (not on a task system, missing summary or feedback panels) and
+  warns when the scene's legacy ControlManager / ExperienceVerbManager graphs also send experience statements.
+- **`ITasksApi`** (`IVirtuademyGameplay.Current.Tasks`, namespace `Virtuademy.Environments.ScriptingApi.Tasks`) (2026.7,
+  minor): the tasks by their objects, for interpreted scripts: `GetTaskState`, `CompleteTask(task)`,
+  `CompleteTask(task, TaskResult)`, `ReportAttempt`, `FailTask(task, reason)`, `UnlockTask`, events `TaskStateChanged`
+  (`TaskStateChangedHandler`) and `TaskResultReported` (`TaskResultHandler`). `TaskResult` (class: `ETaskOutcome`
+  Right/Wrong/Partial, score 0..1, source, reason, data, `IsLocalActor`, `ActorName`), `ETaskState`. A script could not
+  call `Task.CompleteTask()` itself (CS0012: `Task` derives from a `SPACS.Graphs` type the script assembly does not
+  reference); these go through the object. Nodes: Complete Task With Result, Report Attempt, Get Task State, On Task
+  Attempt. A report on a completed, failed or locked task is ignored (logged once per task).
+- **Task nodes Fail Task, Unlock Task, On Task Unlocked, On Task Failed** (2026.7, minor) ("Virtuademy Tasks"); a node
+  without a task throws. On Task Failed is raised for failures only (On Task Completed still carries Completed false).
+- **`TaskUIPlaceholder.ETaskPanelPlacement.Hidden`** (2026.7, minor): no task panel on that platform.
+- **`TaskSystemVirtuademy.SetRpcManager`** and **`WhenRpcManagerReady`** (2026.7, minor): the application hands the task
+  system its RPC manager, and the tasks, the step setter and the revert callback wait for it on that call instead of
+  checking every frame.
+- **Interaction cue** (2026.7, minor): `InteractionCuePlaceholder` shows how an object can be used, with the look of the
+  Showcase highlight: a cyan rim that pulses on the next target (or is fixed, `ECueNextTargetStyle`), a rim on hover and
+  selection, green or red for a right or wrong action (`ShowRight`, `ShowWrong`, `ShowResult`, for `FeedbackSeconds`),
+  nothing when completed or locked. `State` (`EInteractionCueState`) resolves Locked > Right/Wrong > Completed >
+  Selected > Hover > base state (a completed object shows no hover or selection rim and no label, and stays clickable) (`SetBaseState`: Available, NextTarget, Completed); `SetLocked`, `SetHovered`, `SetSelected` act on this
+  client; `CueChanged` (`InteractionCueChangedHandler`) and UnityEvents. The cue follows the object's Interactable by
+  itself: hovered while any local controller hovers it (each VR ray and hand counts), selected, locked while the
+  Interactable is blocked; with `ECueHoverStyle.RimAndLabel` its feedback objects' label shows `labelKey`/`labelText`
+  while hovered or selected. A cue with `tasks` (or on an object whose task elements name one) follows them: next
+  target while any is to do or in progress, completed when all are completed or failed, again after a revert;
+  `blockInteractionWhenCompleted` blocks the Interactable while completed with a reason of its own,
+  `IInteractable.EBlockedState.BlockedByTaskCompletion`, the only one that also stops hover and clicks (interact,
+  select) on every platform; the other reasons behave as before. Its inspector's **Add feedback objects**
+  puts `CueFeedback.prefab` under the cue (the label, a check and cross mark, a flash, a 2D audio source), which a
+  right or wrong action uses as `feedback` says (`ECueFeedback`: Rim, Mark, Flash, Sound); `showArrow` shows a "go
+  here" arrow above the next target (or at `arrowAnchor`), created the first time it shows. The inspector also says
+  what the cue cannot show (no settings, no renderer, Batching Static, a label without feedback objects) and the cost
+  of skinned cues. In multiplayer a cue with Is Networked (the default) shows `ShowRight`/`ShowWrong` to every user
+  of the room (one message per action, never sent on). Nodes: Get Cue State, Set Cue State, Set Cue Locked, Show Cue
+  Feedback, On Cue Changed ("Virtuademy Interaction Cue"). The rim is drawn on copies of the object's
+  renderers (every sub-mesh, skinned meshes, LOD groups), created the first time it shows, so the object's materials are
+  never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
+  `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
+  `Virtuademy/InteractionCue/Rim` and `.../Arrow`. The rim has a minimum fill (`_RimMin`, 0.15 on every cue
+  material) so a flat face seen head-on still shows it, with the edges brighter. No per-frame code: the pulse (a cosine
+  ease) and the arrow's bob (0.1 m at 0.6 Hz) are in the shaders, their phase wrapped in float so they stay smooth on
+  mobile GPUs. The check mark and the label are drawn with `VirtuademyWorldDisplayPanelSettings` (no collider: they never
+  catch a ray or a click), and the mark sits on the flash's anchor; the label and the mark keep their size in the
+  world whatever the object's scale, the label at the settings' `labelScale` (2: body text 56 mm); the flash's soft Shadow disc is off in
+  `CueFeedback`.
+- **`InteractablePlaceholder.IsBlocked`** and **`OnBlockedChanged`** (`InteractableBlockedChangedHandler(bool blocked)`)
+  (2026.7, minor): whether the application blocks interaction with the object (selected or manipulated by another
+  user, edited, locked, blocked by a node), and an event when that changes from free to blocked or back.
+- **Scene panels from scripts** (2026.7, minor): `IUIApi.ShowPanel`, `HidePanel`, `SetPanelText`, `SetPanelVariant`,
+  `SetHudCount`, `SetHudHint`, `SetListItemDone`, `ShowCheckResult` and the event `PanelButtonPressed`, for the UI
+  Toolkit panels an environment places in its scene.
+- **`TaskUIPlaceholder.PersonalPanelRequest`** and **`PersonalPanelRequested`** (2026.7, minor): `ShowAsPersonalPanel()`
+  is kept until the panel exists, so a call made before it (On Start) is applied when it is created.
+- **`InventoryPlaceholder.InventoryModeChangedHandler`** (2026.7, minor): `InventoryModeChanged` is a named delegate
+  (previous mode, new mode), usable from interpreted scripts.
 
 #### Changed
 - **A new scene in the Publish Environments list is built for every platform: VR, WebGL and Mobile.** It was VR and
@@ -295,6 +624,40 @@ and the exit codes 37 and 38; the Environment Details window and the scene row's
   up to four worlds at a time with the tenant list alongside, so a tenant with many worlds waits for the slowest batch
   instead of the sum. The index is built in the same order from the same answers: the "Published in" lines, the tooltip
   and the deploy previews do not change. No public member changes.
+- **`VisualScriptingInteractablePlaceholder.VrVisualScriptingInteraction` is `[Obsolete]`** and its field hidden: the
+  VR controllers are set on the Interactable (`InteractablePlaceholder.VRControllers`). Opening a scene or prefab in the
+  editor moves an explicit Ray-only or Hands-only value over to the new field (and marks both components dirty); that
+  value used to restrict nothing and now restricts the VR controllers once the scene is saved and rebuilt. Published
+  environments are not affected (the migration runs in the editor only; the application reads the new field, which
+  defaults to both).
+- **Removed: `Virtuademy.SDK.Environments.SpawnableObjectEditor`**, the SpawnableObject inspector, replaced by
+  `SpawnableObjectPlaceholderEditor` in the editor assembly with the same hand-reference buttons and the hold preview.
+  An editor script that subclassed or named it no longer compiles: a major note.
+- **Show Popup's `Closed` runs from the popup's close callback** in a new flow of the graph, not from a coroutine that
+  waited frame by frame. A popup queued before its host was bound is answered with -1 when the host goes away.
+- **The Visual Scripting inventory nodes throw** (Set Inventory Mode, Set Inventory Slot Counts, Add Equipment Slot)
+  when they have no `InventoryPlaceholder`, instead of continuing without doing anything.
+- **A hidden world panel lets rays and clicks through**: `VirtuademyPanel`, `VirtuademyChoicePanel` and
+  `VirtuademyListPanel` catch rays and clicks in the world only while shown (`VirtuademyPanel`: while shown with a
+  button). UI Toolkit keeps a world document's collider while the panel is hidden, and in VR an overlay panel's
+  1.6 x 1 m collider stood in front of the user; now `OverlayPanelPlacement.BlocksRay` follows the panel, and a world
+  document without the placement switches its colliders (re-applied after each layout).
+- **SDK panels run nothing per frame**: `SafeFrame` applies its insets on screen and zone changes, `OverlayPanelPlacement`
+  in VR goes with the player's body by a constraint after being placed in front of them (its `followAngle` and
+  `followSpeed` are gone) and reads the help state from its events, `VirtuademyLabel` faces the camera with an
+  `AimConstraint`.
+- `InventoryPlaceholder.SetSlotCounts` documents what its wear count is: the wear inventory's generic cells, counted only
+  when no equipment slots are declared; with declared slots, `AddEquipmentSlot` adds a slot.
+- **The SDK's UI Toolkit stylesheets read the theme.** `WorldSpaceButtonPanel.uss`, `ButtonChoicePanel.uss`,
+  `Toggle.uss`, `TogglePanelWithVideo.uss` and the two 360 button sheets take their blue, the panel surface and
+  the text on buttons from `var(--vd-*)`, with the theme value as fallback, and `ButtonTheme.tss` imports the
+  tokens. The blue becomes the Virtuademy `#006EF5` (was `#387AFF` / `#3A7FFF`), and the hover and pressed colours
+  of the video toggle button no longer darken (hover scales, as on the other buttons). Environments rebuilt with
+  this version show it; published ones are unchanged.
+- **`ILocalizationApi` documents what the application does.** `LanguageChanged` passes the language in force before
+  the change (it said: the new one), `PreviousLanguage` is the language at world ready until a change (it said:
+  empty), `AvailableLanguages` is every language of the localization database and `SetLanguage` takes a language
+  name and does not check the tenant's set. Comments only: the behaviour is unchanged.
 - **"Fix build settings" lists what the fix removes**: the Addressables groups by name with their entry counts (a few names,
   then "and N more") and the entries of the default group, and says that no asset file is deleted, only the groups and the
   Addressable marking, because a scene takes what it uses with it at build. It is the one Fix dialog of the SDK, which
@@ -303,6 +666,17 @@ and the exit codes 37 and 38; the Environment Details window and the scene row's
   package documentation now states the rule (one default group, kept empty). No public member changes.
 
 #### Fixed
+
+- **The interaction cue's flash plays on every right action**, not only the first: the SDK's Flash destroys itself when
+  it ends; a cue's (and a procedure's shared) instance now stays and plays again. The Flash prefab is unchanged.
+
+- **On Task System Ready declares its input as a task system** (it was declared as a `Task` but read as a
+  `TaskSystemVirtuademy`).
+- **`TasksLogic.prefab` no longer carries an XRI `TrackedDeviceGraphicRaycaster`** on `MainUIWorldSpaceCanvas`: the
+  application adds the raycaster it needs at scene setup. Environments rebuilt from the prefab only.
+
+- **`Informative_Highlight.ResetMaterials` no longer throws with fewer than two highlight materials**: it removes
+  every highlight material it has instead of indexing the first two.
 - **Reload Scene plays the current experience again, in the session's mode.** It started the experience again
   single-player whatever the session was, so in a multiplayer session the player left the others, and it looked the
   experience up by the environment's name, which could open another experience of the same environment. It now calls
@@ -356,6 +730,16 @@ and the exit codes 37 and 38; the Environment Details window and the scene row's
 - The "On Owner Changed" event unit removes its graph instances from its static registries when they are
   uninstantiated. "On Language Changed" subscribes even when the localization system is not up yet; it never
   fired when the graph started first.
+- `Default_Canvas`, `CheckCompleted`, `Hover_DescriptionCanvas` and `AnimatedScreenCanvas` no longer serialize the
+  XR Interaction Toolkit's `TrackedDeviceGraphicRaycaster`, which the package does not depend on: it was a missing
+  script in creator projects. In VR the application adds it at scene setup to every world-space root canvas of the
+  environment (`VirtuademyEventManager.SetupEnvironmentCanvasesForXR`), as it already did for the canvases that
+  lacked it.
+- `AnimatedScreenCanvas`: its 36 objects on layer 0 are on layer 5 (UI), so a click on the HUD no longer reaches the
+  object behind it (the application's interaction gate ignores a 3D click only over UI on layer 5).
+- `TasksLogic` (and `TasksLogic_Procedure`, which nests it): the task panel's texts use the package's
+  Poppins-Regular SDF in place of TMP Essentials' LiberationSans, which lives in a project's `Assets` and not in a
+  package. With SPACS-Tasks 3.1.0 the prefab and everything it nests resolve to package assets only.
 
 ## v10.0.0
 

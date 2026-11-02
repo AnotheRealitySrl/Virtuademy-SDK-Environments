@@ -1,7 +1,7 @@
 {
   "name": "com.anotherealitysrl.virtuademy-sdk-environments",
   "displayName": "Virtuademy-SDK-Environments",
-  "version": "10.0.0",
+  "version": "10.1.0",
   "unity": "2020.1",
   "description": "Everything a world is authored with: placeholder bases and the placeholder set, the Visual Scripting nodes, the object spawner and interaction contracts, client models, the task and dialog adapters, the analytics contract, and the editor publish tooling. Formerly six packages (Core, Placeholders, VisualScripting, Tasks, Dialogs, Analytics), merged at 9.0.0.",
   "keywords": [
@@ -32,14 +32,19 @@
       "displayName": "Sample Task Scene",
       "description": "Contains a sample scene to show how to use the task system",
       "path": "TaskSampleScene~"
+    },
+    {
+      "displayName": "Procedure: find the hazards",
+      "description": "A guided procedure in a warehouse built from primitives: reach a zone, collect and wear the protective equipment, find the hazards among distractors, answer a question pool; scoring, hints, a time limit and the summary",
+      "path": "Samples~/ProcedureHazards"
     }
   ],
   "dependencies": {
     "com.anotherealitysrl.spacs-utility": "1.0.0",
     "com.anotherealitysrl.spacs-dialogs": "3.0.0",
     "com.anotherealitysrl.spacs-graphs": "3.0.0",
-    "com.anotherealitysrl.virtuademy-sdk-core": "0.3.0",
-    "com.anotherealitysrl.spacs-tasks": "3.0.0",
+    "com.anotherealitysrl.virtuademy-sdk-core": "0.4.0",
+    "com.anotherealitysrl.spacs-tasks": "3.1.0",
     "com.unity.addressables": "2.2.2",
     "com.unity.ai.navigation": "2.0.14",
     "com.unity.animation.rigging": "1.4.1",

@@ -1,0 +1,16 @@
+# Procedure sample: find the hazards
+
+The Showcase HSE warehouse procedure ("PilloleHSEmagazzino") rebuilt with the 2026.7 procedure manager, with primitives
+as models. Import it from the Package Manager: Virtuademy SDK Environments > Samples > "Procedure: find the hazards".
+
+- `TasksLogic_Procedure`: Guided, max 5 errors, hints on, 300 s time limit, summary with the timeline, analytics key
+  prefix `hazards`. Its task panel (`TaskPanel`) stands beside the path to the entrance: on the screen on desktop and
+  mobile, in the world there in VR.
+- Tasks: go to the entrance (Reach Zone), put on the protective equipment (3 Collect elements: helmet, gloves and vest
+  are collected into the inventory and worn in its Head, Hands and Body slots; parallel sub-tasks), find the 5
+  hazards (5 Targets, parallel sub-tasks; 3 Distractors cost 5 points each), answer the safety questions (Question
+  pool: 2 drawn from 4).
+- Every task is completed by an element: no task listener, no graph.
+
+Checked by a PlayMode run of the whole scene in a clean project (SDK 2026.7): passed 93/100 with one distractor and one
+hint.

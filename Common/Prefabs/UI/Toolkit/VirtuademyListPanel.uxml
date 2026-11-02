@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Theme/VirtuademyTokens.uss?fileID=7433441132597879392&amp;guid=2c158d41b539451e93fbbc82b1e1a638&amp;type=3#VirtuademyTokens" />
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Theme/VirtuademyComponents.uss?fileID=7433441132597879392&amp;guid=26245ff1b5e44829b3690bcbe38b57a8&amp;type=3#VirtuademyComponents" />
+    <!-- VirtuademyListPanel: a title and the list the component fills from its items. -->
+    <ui:VisualElement name="root" class="vd-root" picking-mode="Ignore" style="flex-grow: 1; align-items: center; justify-content: center;">
+        <ui:VisualElement name="panel" class="vd-panel vd-panel--m" picking-mode="Ignore">
+            <ui:Label name="title" text="Checklist" class="vd-title" picking-mode="Ignore" />
+            <ui:VisualElement name="list" class="vd-list" picking-mode="Ignore" style="margin-top: 16px;" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

@@ -62,8 +62,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             foreach (MeshRenderer meshRenderer in GetComponentsInChildren<MeshRenderer>(true))
             {
                 List<Material> materials = meshRenderer.sharedMaterials.ToList();
-                materials.Remove(highlightMaterial[0]);
-                materials.Remove(highlightMaterial[1]);
+                // Every highlight material, however many are set (indexing [0] and [1] threw with fewer than two).
+                foreach (Material highlight in highlightMaterial)
+                {
+                    materials.Remove(highlight);
+                }
                 meshRenderer.sharedMaterials = materials.ToArray();
             }
         }

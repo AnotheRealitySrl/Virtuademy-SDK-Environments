@@ -30,6 +30,15 @@ namespace Virtuademy.SDK.Environments
         [HideInInspector] public Transform rightHandPivot;
         //------------------
 
+        [Tooltip("Desktop, web and mobile, third person: hold this item with the hand at the offset below instead of the "
+                 + "platform's default.")]
+        public bool customThirdPersonHold = false;
+
+        [Tooltip("The holding hand's place from the avatar's chest, in metres for a 1.75 m avatar, proportioned to "
+                 + "each avatar's height (x to the side of the holding arm, y up, z forward). Used only "
+                 + "with Custom Third Person Hold.")]
+        public Vector3 thirdPersonHoldOffset = new Vector3(0.2f, 0.3f, 0.43f);
+
         [HideInInspector] public GameObject LeftHandReference;
         [HideInInspector] public GameObject RightHandReference;
 
@@ -350,30 +359,4 @@ namespace Virtuademy.SDK.Environments
 #endif
     }
 
-#if UNITY_EDITOR
-    [CustomEditor(typeof(SpawnableObjectPlaceholder))]
-    public class SpawnableObjectEditor : Editor
-    {
-        public override void OnInspectorGUI()
-        {
-            DrawDefaultInspector();
-
-            SpawnableObjectPlaceholder myScript = (SpawnableObjectPlaceholder)target;
-            string leftButtonLabel = myScript.LeftHandReference == null ? "Show Left Reference" : "Hide Left Reference";
-            string rigthButtonLabel = myScript.RightHandReference == null ? "Show Right Reference" : "Hide Right Reference";
-
-            myScript.SetPositionLeftHand();
-            //myScript.SetPositionRightHand();
-
-            if (GUILayout.Button(leftButtonLabel))
-            {
-                myScript.ShowHandReference(myScript.LeftHandReference, 0);
-            }
-            if (GUILayout.Button(rigthButtonLabel))
-            {
-                myScript.ShowHandReference(myScript.RightHandReference, 1);
-            }
-        }
-    }
-#endif
 }

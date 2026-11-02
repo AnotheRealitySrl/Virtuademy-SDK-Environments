@@ -1,0 +1,81 @@
+/* The procedure summary's scrolling list (ProcedureSummaryPanel): a slim rounded thumb in the theme's action colour on a
+   faint track of the same width, rounded at both ends - no arrow buttons, no borders, none of Unity's grey scroller. The selectors start from the
+   list's name (#proc-pages): an id outranks the default theme's longer class chains, which otherwise keep their
+   borders and margins. The colours are the theme's tokens, inherited from the panel's root. In VR the thumb is wider,
+   since the panel stands 1.6 m away (.vd-summary-list--vr, in millimetres). */
+
+#proc-pages .unity-scroller--vertical {
+    width: 6px;
+    min-width: 6px;
+    margin-left: 10px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+#proc-pages.vd-summary-list--vr .unity-scroller--vertical {
+    width: 12px;
+    min-width: 12px;
+    margin-left: 16px;
+}
+
+#proc-pages.vd-summary-list--vr .unity-scroller__slider {
+    width: 12px;
+    min-width: 12px;
+    max-width: 12px;
+}
+
+#proc-pages.vd-summary-list--vr .unity-base-slider__dragger {
+    width: 12px;
+}
+
+#proc-pages .unity-scroller__low-button,
+#proc-pages .unity-scroller__high-button {
+    display: none;
+}
+
+/* The default theme gives the slider a width of its own, wider than the bar: the thumb then overflowed it */
+#proc-pages .unity-scroller__slider {
+    width: 6px;
+    min-width: 6px;
+    max-width: 6px;
+    flex-grow: 1;
+    margin: 0;
+    padding: 0;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+#proc-pages .unity-base-slider__drag-container {
+    margin: 0;
+    padding: 0;
+}
+
+/* The track: as wide as the thumb, rounded at both ends, faint */
+#proc-pages .unity-base-slider__tracker {
+    left: 0;
+    right: 0;
+    margin: 0;
+    border-width: 0;
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+#proc-pages .unity-base-slider__dragger {
+    left: 0;
+    width: 6px;
+    min-height: 24px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 6px;
+    background-color: var(--vd-color-action);
+    opacity: 0.85;
+}
+
+#proc-pages .unity-base-slider__dragger:hover,
+#proc-pages .unity-base-slider__dragger:active {
+    opacity: 1;
+}
+
+#proc-pages .unity-base-slider__dragger-border {
+    display: none;
+}

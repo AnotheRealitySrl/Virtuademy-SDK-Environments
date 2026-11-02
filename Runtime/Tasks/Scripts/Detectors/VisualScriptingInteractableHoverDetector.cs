@@ -13,11 +13,11 @@ namespace Virtuademy.SDK.Environments.Tasks
         [HideInInspector]
         public InteractablePlaceholderObsolete interactablePlaceholder;
         public VisualScriptingInteractablePlaceholder visualscriptingPlaceholder;
-        [SerializeField]
+        [SerializeField, Tooltip("VR: a controller's ray hovers the object.")]
         private bool allowRay;
-        [SerializeField]
+        [SerializeField, Tooltip("VR: a hand touches the object.")]
         private bool allowHandDirect;
-        [SerializeField]
+        [SerializeField, Tooltip("Desktop: the mouse pointer hovers the object. Mobile: the finger that pressed the object is over it.")]
         private bool allowMouse;
 
         public UnityEvent OnHoverEnter = default;

@@ -1,6 +1,5 @@
 using Unity.VisualScripting;
 using SPACS.Tasks;
-using System.Collections;
 using UnityEngine;
 using static SPACS.Tasks.TaskNode;
 
@@ -23,19 +22,13 @@ namespace Virtuademy.SDK.Environments.Tasks
             taskSystem = GetComponentInParent<TaskSystemVirtuademy>();
             if (taskSystem.isNetworked)
             {
-                StartCoroutine(WaitForRPCManager());
+                taskSystem.WhenRpcManagerReady(OnRpcManagerReady);
             }
         }
 
-        IEnumerator WaitForRPCManager()
+        private void OnRpcManagerReady(ITasksRPCManager manager)
         {
-            if (taskSystem)
-                StartCoroutine(taskSystem.WaitForRPCManager());
-            while (rpcManagerInterface == null)
-            {
-                rpcManagerInterface = taskSystem.rpcManagerInterface;
-                yield return null;
-            }
+            rpcManagerInterface = manager;
             rpcManagerInterface.SetOnTaskCompleted(ForceTaskComplete);
             forceCompleted = false;
         }

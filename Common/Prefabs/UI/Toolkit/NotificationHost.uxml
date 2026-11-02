@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Theme/VirtuademyTokens.uss?fileID=7433441132597879392&amp;guid=2c158d41b539451e93fbbc82b1e1a638&amp;type=3#VirtuademyTokens" />
+    <Style src="project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Theme/VirtuademyComponents.uss?fileID=7433441132597879392&amp;guid=26245ff1b5e44829b3690bcbe38b57a8&amp;type=3#VirtuademyComponents" />
+    <!-- NotificationHost: toasts at the bottom of the safe frame, the popup over everything. -->
+    <ui:VisualElement name="root" class="vd-root" picking-mode="Ignore" style="position: absolute; left: 0; right: 0; top: 0; bottom: 0;">
+        <ui:VisualElement name="safe-frame" class="vd-safe-frame" picking-mode="Ignore">
+            <ui:VisualElement name="toast-stack" class="vd-toast-stack" picking-mode="Ignore" />
+        </ui:VisualElement>
+        <ui:VisualElement name="popup-layer" picking-mode="Ignore" style="position: absolute; left: 0; right: 0; top: 0; bottom: 0;" />
+    </ui:VisualElement>
+</ui:UXML>

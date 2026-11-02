@@ -16,6 +16,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders.Editor
             if (interactablePlaceholder.InteractWithColliders)
             {
                 EditorGUILayout.PropertyField(serializedObject.FindProperty("interactionColliders"));
+                EditorGUILayout.PropertyField(serializedObject.FindProperty("vrControllers"));
             }
             EditorGUILayout.PropertyField(serializedObject.FindProperty("lockHoverDuringInteraction"));
 

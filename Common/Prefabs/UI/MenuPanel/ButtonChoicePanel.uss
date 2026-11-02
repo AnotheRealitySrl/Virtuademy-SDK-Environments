@@ -72,7 +72,7 @@
 
 .bcp-card:hover {
     scale: 1.05 1.05;
-    border-color: rgb(56, 122, 255);
+    border-color: var(--vd-color-action, rgb(0, 110, 245));
     background-color: rgb(255, 255, 255);
 }
 
@@ -89,7 +89,7 @@
 }
 
 .bcp-tag {
-    color: rgb(56, 122, 255);
+    color: var(--vd-color-action, rgb(0, 110, 245));
     -unity-font-definition: url("project://database/Packages/com.anotherealitysrl.virtuademy-sdk-environments/Common/Fonts/Poppins-Bold.ttf?fileID=12800000&guid=e171a80107dfead489c1a91386e3118a&type=3#Poppins-Bold");
     -unity-font-style: normal;
     -unity-text-align: upper-left;

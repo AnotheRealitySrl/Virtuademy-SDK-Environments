@@ -2,11 +2,13 @@
 using SPACS.Tasks;
 using SPACS.Tasks.UI;
 
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
+using Virtuademy.Environments.ScriptingApi.Placeholders;
+using Virtuademy.Environments.ScriptingApi.Tasks;
 using Virtuademy.ScriptingApi;
 
 namespace Virtuademy.SDK.Environments.Tasks
@@ -59,6 +61,8 @@ namespace Virtuademy.SDK.Environments.Tasks
 
             initializedTaskDescriptions = 0;
 
+            ForwardStateChanges();
+
             /*if (isNetworked)
             {
                 Debug.Log(gameObject.GetComponent<ITasksRPCManager>());
@@ -68,7 +72,13 @@ namespace Virtuademy.SDK.Environments.Tasks
 
             if (isNetworked)
             {
-                StartCoroutine(AddRevertCallbacks());
+                // A manager already on the object (one baked into a prefab) is ready now; otherwise the application's
+                // bridge hands one over with SetRpcManager.
+                if (rpcManagerInterface == null && TryGetComponent(out ITasksRPCManager baked))
+                {
+                    SetRpcManager(baked);
+                }
+                WhenRpcManagerReady(manager => manager.SetOnRevert(base.Revert));
             }
 
             if (startImmediately)
@@ -77,25 +87,114 @@ namespace Virtuademy.SDK.Environments.Tasks
             }
         }
 
-        public IEnumerator WaitForRPCManager()
+        // Every task of this system tells ITasksApi.TaskStateChanged when its status changes, with the task's object.
+        private void ForwardStateChanges()
         {
-            if (rpcManagerInterface == null)
+            TasksApi.Instance.SystemAwake();
+            Dictionary<TaskNode, GameObject> objects = new();
+            foreach (Task task in GetComponentsInChildren<Task>(true))
             {
-                while (gameObject.GetComponent<ITasksRPCManager>() == null)
+                if (task.Node != null)
                 {
-                    yield return null;
+                    objects[task.Node] = task.gameObject;
                 }
-                rpcManagerInterface = gameObject.GetComponent<ITasksRPCManager>();
+            }
+            foreach (TaskNode node in Tasks)
+            {
+                if (objects.TryGetValue(node, out GameObject taskObject))
+                {
+                    Task task = taskObject.GetComponent<Task>();
+                    node.onStatusChanged.AddListener(previous => OnTaskStatusChanged(task, previous));
+                }
             }
         }
 
-        public IEnumerator AddRevertCallbacks()
+        // One listener per task, so the order is fixed: the step's events, the procedure, then ITasksApi.
+        private void OnTaskStatusChanged(Task task, TaskNode.TaskStatus previous)
         {
-            if (rpcManagerInterface == null)
+            TaskNode.TaskStatus status = task.Node.Status;
+            TaskResult result = status == TaskNode.TaskStatus.Completed ? TaskReports.TakePending(task) : null;
+            string failReason = status == TaskNode.TaskStatus.Failed ? TaskReports.TakeFailReason(task) : null;
+            if (task.TryGetComponent(out TaskStepPlaceholder step))
             {
-                yield return StartCoroutine(WaitForRPCManager());
+                if (status == TaskNode.TaskStatus.Todo)
+                {
+                    step.RaiseUnlocked();
+                }
+                else if (status == TaskNode.TaskStatus.Completed)
+                {
+                    step.RaiseCompleted(result ?? new TaskResult(ETaskOutcome.Right, 1f, task.gameObject, "", ""));
+                }
+                else if (status == TaskNode.TaskStatus.Failed)
+                {
+                    step.RaiseFailed(failReason ?? "");
+                }
             }
-            rpcManagerInterface.SetOnRevert(base.Revert);
+            Procedure?.OnTaskStatusChanged(task, previous, result, failReason);
+            TasksApi.Instance.RaiseStateChanged(task.gameObject, (ETaskState)previous, (ETaskState)status);
+        }
+
+        private TaskNetworkSync networkSync;
+
+        /// <summary>
+        /// The room, when this task system is shared (the application's procedure network, in multiplayer): every task
+        /// event (results, failures, hints, distractors) goes to the other clients and theirs come here, and a procedure
+        /// keeps its snapshot there.
+        /// </summary>
+        public void SetProcedureNetwork(IProcedureNetwork network)
+        {
+            networkSync?.Dispose();
+            networkSync = network == null ? null : new TaskNetworkSync(this, network);
+            if (networkSync != null && Procedure != null)
+            {
+                Procedure.BindNetwork(networkSync);
+            }
+        }
+
+        internal TaskNetworkSync NetworkSync => networkSync;
+
+        /// <summary>The procedure run of this task system, when it has a Procedure placeholder.</summary>
+        internal ProcedureRun Procedure { get; set; }
+
+        // With a procedure whose failed tasks continue, a failed task lets the flow go on as a completed one does.
+        protected override bool AdvancesFlow(TaskNode task) => task.Status == TaskNode.TaskStatus.Completed
+            || (task.Status == TaskNode.TaskStatus.Failed && Procedure != null && Procedure.FailedTasksAdvance);
+
+        protected virtual void OnDestroy()
+        {
+            networkSync?.Dispose();
+            TasksApi.Instance.SystemDestroyed();
+        }
+
+        private event Action<ITasksRPCManager> RpcManagerReady;
+
+        /// <summary>
+        /// Hands the task system its RPC manager (the application's task network bridge does, in multiplayer) and runs
+        /// what was waiting for it. Replaces polling for the component every frame.
+        /// </summary>
+        public void SetRpcManager(ITasksRPCManager manager)
+        {
+            if (manager == null || ReferenceEquals(rpcManagerInterface, manager))
+            {
+                return;
+            }
+            rpcManagerInterface = manager;
+            Action<ITasksRPCManager> waiting = RpcManagerReady;
+            RpcManagerReady = null;
+            waiting?.Invoke(manager);
+        }
+
+        /// <summary>Runs <paramref name="onReady"/> with the RPC manager: now if it is there, otherwise once it is set.</summary>
+        public void WhenRpcManagerReady(Action<ITasksRPCManager> onReady)
+        {
+            if (rpcManagerInterface != null)
+            {
+                onReady(rpcManagerInterface);
+            }
+            else
+            {
+                RpcManagerReady += onReady;
+            }
         }
 
         //function called when the descriptions on the tasks have been initialized in the localizeTaskBridge
@@ -119,6 +218,7 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         public override void Revert()
         {
+            Procedure?.OnSystemReverted();
             if (isNetworked)
             {
                 rpcManagerInterface.SendRPCTaskRevert();

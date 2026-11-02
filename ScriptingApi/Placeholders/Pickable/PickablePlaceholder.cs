@@ -8,6 +8,17 @@ using static Virtuademy.Environments.ScriptingApi.Interaction.IManipulable;
 
 namespace Virtuademy.Environments.ScriptingApi.Placeholders
 {
+    /// <summary>How a pickable is dragged on desktop, web and mobile before it is picked up.</summary>
+    public enum EPickableDragMode
+    {
+        /// <summary>The 3D object itself is moved, as a manipulable.</summary>
+        Model = 0,
+
+        /// <summary>The item becomes its icon while dragged; released, it goes back where it was, unless it is used on a
+        /// target or dropped on the inventory (the default, and how every pickable was dragged before 2026.7).</summary>
+        Icon = 1,
+    }
+
     [RequireComponent(typeof(InteractablePlaceholder), typeof(ManipulablePlaceholder))]
     public class PickablePlaceholder : SceneComponentPlaceholderNetwork
     {
@@ -27,6 +38,12 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [SerializeField] public PickablePlaceholder transformIntoPickable;
 
         public bool destroyOnUse = false;
+
+        // Icon by default (the user's decision, 2026-10-29): a pickable serialized before this field existed (every published
+        // environment) has no value for it and loads with this initializer, so it keeps dragging as its icon
+        [Tooltip("Desktop, web and mobile: dragged as its icon (default; it goes back where it was when released, unless "
+                 + "it is used on a target or dropped on the inventory), or as its 3D object.")]
+        public EPickableDragMode dragMode = EPickableDragMode.Icon;
 
         public UnityEvent onItemUsed;
         public UnityEvent onItemExpired;
@@ -52,7 +69,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             manipulablePlaceholder.GizmosDisabled = true;
             manipulablePlaceholder.IsFocusedInteractable = false;
             manipulablePlaceholder.AttachTransform = null;
-            manipulablePlaceholder.spriteDragMode = true;
+            manipulablePlaceholder.spriteDragMode = dragMode == EPickableDragMode.Icon;
             manipulablePlaceholder.spriteToDrag = icon;
         }
 
@@ -75,7 +92,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             manipulablePlaceholder.GizmosDisabled = true;
             manipulablePlaceholder.IsFocusedInteractable = false;
             manipulablePlaceholder.AttachTransform = null;
-            manipulablePlaceholder.spriteDragMode = true;
+            manipulablePlaceholder.spriteDragMode = dragMode == EPickableDragMode.Icon;
             manipulablePlaceholder.spriteToDrag = icon;
         }
 

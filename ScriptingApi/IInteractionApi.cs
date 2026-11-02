@@ -20,7 +20,17 @@ namespace Virtuademy.Environments.ScriptingApi
         /// selecting anything else.
         /// </summary>
         /// <remarks>
+        /// <para>
         /// Node: <c>Virtuademy Visual Scripting Interactable: On Selected Change</c>.
+        /// </para>
+        /// <para>
+        /// It is raised only when the selection changes, so it is not an event per click: a click
+        /// on the object already selected does not raise it, and neither does a click on an object
+        /// whose Visual Scripting Interactable does not allow the Selected state (that click
+        /// interacts without selecting). To hear every click on an object, subscribe to
+        /// <see cref="Placeholders.InteractablePlaceholder.OnInteract"/> and
+        /// <see cref="Placeholders.InteractablePlaceholder.OnSelectEnter"/> on its placeholder.
+        /// </para>
         /// </remarks>
         event Action<IVisualScriptingInteractable> SelectedChanged;
     }

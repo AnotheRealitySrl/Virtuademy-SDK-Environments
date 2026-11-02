@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: babb5eac42c4476f87302523bde48a09, type: 3}
+  m_Name: InteractionCueSettings
+  m_EditorClassIdentifier: 
+  nextTargetPulse: {fileID: 2100000, guid: 17f3cf4f5e314da1bcf70e34d2f16e25, type: 2}
+  nextTargetFixed: {fileID: 2100000, guid: fedec36f03314d108fe84eb69065c999, type: 2}
+  hover: {fileID: 2100000, guid: 4ca02e43295448b8afb33a8e0971bde4, type: 2}
+  selected: {fileID: 2100000, guid: b5d8d7f95acc477ca748daad6bba41ca, type: 2}
+  right: {fileID: 2100000, guid: 340bbd3c72c049499d6bef7166289799, type: 2}
+  wrong: {fileID: 2100000, guid: 235344497fa74d2084b6c1137565f878, type: 2}
+  color: {r: 0, g: 2.65, b: 4, a: 1}
+  arrowPrefab: {fileID: 4410000000000000001, guid: 4b9f898cb170424b83a25d2be3ee0d9e, type: 3}
+  arrowHeight: 0.25
+  labelScale: 2
+  feedbackPrefab: {fileID: 8407900295140853467, guid: 65a8a0b2dbabb8b42827c13363e03800, type: 3}
+  rightClip: {fileID: 8300000, guid: 6781aca6f7364970b36cf453b83a4bfe, type: 3}
+  wrongClip: {fileID: 8300000, guid: fd30f8f3611f46cdb995dfe22dfee27e, type: 3}
+  taskCompletedClip: {fileID: 8300000, guid: 1b90dd41387d4700861dba1ad5ef1e0f, type: 3}
+  summaryClip: {fileID: 8300000, guid: 9fb6ace638e041168f3c51ad74c68c12, type: 3}

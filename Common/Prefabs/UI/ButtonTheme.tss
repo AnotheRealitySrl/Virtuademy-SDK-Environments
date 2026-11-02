@@ -2,3 +2,5 @@
    reference into Assets/. Control defaults come from Unity's built-in runtime theme; the panel's
    own look is authored in WorldSpaceButtonPanel.uss. */
 @import url("unity-theme://default");
+/* The Virtuademy theme tokens: the var(--vd-*) colours of the panels resolve to them. */
+@import url("../../Theme/VirtuademyTokens.uss");

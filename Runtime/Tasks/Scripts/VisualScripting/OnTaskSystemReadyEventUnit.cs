@@ -21,7 +21,8 @@ namespace Virtuademy.SDK.Environments.Tasks
         protected override void Definition()
         {
             base.Definition();
-            TaskSystemReference = ValueInput<Task>(nameof(TaskSystemReference), null).NullMeansSelf();
+            // The task system, as GetEvent reads it (the port was declared as a Task).
+            TaskSystemReference = ValueInput<TaskSystemVirtuademy>(nameof(TaskSystemReference), null).NullMeansSelf();
         }
 
         public override EventHook GetHook(GraphReference reference)
