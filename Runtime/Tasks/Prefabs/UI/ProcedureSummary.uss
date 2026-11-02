@@ -1,5 +1,5 @@
-/* The procedure summary's scrolling list (ProcedureSummaryPanel): a slim rounded thumb in the theme's action colour and
-   nothing else - no track, no arrow buttons, no borders, none of Unity's grey scroller. The selectors start from the
+/* The procedure summary's scrolling list (ProcedureSummaryPanel): a slim rounded thumb in the theme's action colour on a
+   faint track of the same width, rounded at both ends - no arrow buttons, no borders, none of Unity's grey scroller. The selectors start from the
    list's name (#proc-pages): an id outranks the default theme's longer class chains, which otherwise keep their
    borders and margins. The colours are the theme's tokens, inherited from the panel's root. In VR the thumb is wider,
    since the panel stands 1.6 m away (.vd-summary-list--vr, in millimetres). */
@@ -50,12 +50,14 @@
     padding: 0;
 }
 
+/* The track: as wide as the thumb, rounded at both ends, faint */
 #proc-pages .unity-base-slider__tracker {
     left: 0;
     right: 0;
     margin: 0;
     border-width: 0;
-    background-color: rgba(0, 0, 0, 0);
+    border-radius: 6px;
+    background-color: rgba(255, 255, 255, 0.12);
 }
 
 #proc-pages .unity-base-slider__dragger {
