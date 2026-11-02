@@ -33,6 +33,7 @@ namespace Virtuademy.SDK.Environments.UIKit
             root = treeRoot;
             root.RegisterCallback<GeometryChangedEvent>(OnGeometryChanged);
             Apply();
+            root.schedule.Execute(Apply);
         }
 
         public void Unbind()
@@ -46,9 +47,16 @@ namespace Virtuademy.SDK.Environments.UIKit
         {
             on = blocks;
             Apply();
+            root?.schedule.Execute(Apply);
         }
 
-        private void OnGeometryChanged(GeometryChangedEvent e) => Apply();
+        // UI Toolkit makes the collider in the frame after the layout (and a new one each time the object is enabled):
+        // applied again on the root's scheduler, which runs after it (see OverlayPanelPlacement.ApplyCollidersOnceMade)
+        private void OnGeometryChanged(GeometryChangedEvent e)
+        {
+            Apply();
+            root?.schedule.Execute(Apply);
+        }
 
         private void Apply()
         {

@@ -153,12 +153,26 @@ namespace Virtuademy.SDK.Environments.UIKit
             ApplyRootSize();
             ApplyHelpVisibility();
             ApplyColliders();
+            ApplyCollidersOnceMade();
         }
 
         private void OnRootGeometryChanged(GeometryChangedEvent e)
         {
             ApplyRootSize();
             ApplyColliders();
+            ApplyCollidersOnceMade();
+        }
+
+        /// <summary>
+        /// UI Toolkit makes the document's collider, switched on, in the frame after the tree is laid out, and makes a
+        /// new one each time the object is enabled again: when the layout event (or <see cref="Rebind"/>) runs there is
+        /// none yet to switch. Measured on 6000.3.21f1 (2026-11-02): the notification host kept a collider on 1.4 m in
+        /// front of the player with no popup open, and took the VR ray. So the switch runs once more on the root's
+        /// scheduler, which runs after UI Toolkit has made it (one item per layout, nothing per frame).
+        /// </summary>
+        private void ApplyCollidersOnceMade()
+        {
+            root?.schedule.Execute(ApplyColliders);
         }
 
         private void OnHelpChanged()
@@ -215,6 +229,12 @@ namespace Virtuademy.SDK.Environments.UIKit
                 if (c.enabled != on)
                 {
                     c.enabled = on;
+                }
+                if (c.enabled != on)
+                {
+                    // Platform errors fail loudly: a collider that will not switch off would take the ray
+                    Debug.LogError($"[{nameof(OverlayPanelPlacement)}] '{name}': its collider {c.GetType().Name} did not switch " +
+                        (on ? "on" : "off") + ".", this);
                 }
             }
         }

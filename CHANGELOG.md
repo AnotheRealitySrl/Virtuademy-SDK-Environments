@@ -205,6 +205,9 @@ one usable connection, which changes what a script that relied on the project's 
   it has something to press (`OverlayPanelPlacement.BlocksRay`: the notification host while a popup is open, the HUD
   while its hint button shows): the controller ray hits triggers on the UI layer, so the host's collider, 1.4 x 0.9 m
   in front of the user, caught the ray meant for the application's tutorial panel behind it.
+  The switch also runs once on the root's scheduler after each layout: UI Toolkit makes the collider, on, in the frame
+  after the layout and a new one at each enable, so the switch at the layout found none and the host's collider stayed on
+  (Quest, 2026-11-02); the same for `PanelRayBlocking`. A collider that will not switch logs an error.
 - **`IHelpApi.IsOpen` and `IHelpApi.Opened`**, next to `Closed`, and the nodes `Virtuademy Tutorial: Is Tutorial Open`
   and `On Tutorial Opened`. They follow the application's help (tutorial) state, which it opens by itself on a first
   visit and which keeps the user from moving. In VR the HUD and the notification host hide, and let the ray through,
