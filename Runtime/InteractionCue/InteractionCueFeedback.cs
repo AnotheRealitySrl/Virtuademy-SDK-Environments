@@ -38,9 +38,24 @@ namespace Virtuademy.SDK.Environments.Cue
                 return;
             }
             mark = root.GetComponentInChildren<VirtuademyCheckMark>(true);
+            if (mark != null)
+            {
+                KeepWorldSize(mark.transform, 1f);
+            }
             flash = root.GetComponentInChildren<ParticleSystem>(true);
             MakeReplayable(flash);
             audio = root.GetComponentInChildren<AudioSource>(true);
+        }
+
+        /// <summary>
+        /// Gives a feedback object the world scale <paramref name="size"/> whatever its parents' (the cue's object is often
+        /// scaled: 2026-11-02, a label on a 0.3 m cube was a third of its size and unreadable). Once, when found.
+        /// </summary>
+        internal static void KeepWorldSize(Transform feedback, float size)
+        {
+            Vector3 parent = feedback.parent != null ? feedback.parent.lossyScale : Vector3.one;
+            static float Of(float axis) => Mathf.Abs(axis) < 1e-5f ? 1f : axis;
+            feedback.localScale = new Vector3(size / Of(parent.x), size / Of(parent.y), size / Of(parent.z));
         }
 
         /// <summary>

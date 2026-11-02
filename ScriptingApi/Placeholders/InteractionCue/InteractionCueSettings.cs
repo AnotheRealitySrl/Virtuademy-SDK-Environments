@@ -43,6 +43,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             "no arrow anchor.")]
         private float arrowHeight = 0.25f;
 
+        [SerializeField, Min(0.1f), Tooltip("The hover label's size: 1 is the Virtuademy label's own (body text 28 mm), 2 " +
+            "reads from a few metres on desktop and in VR. The label and the check mark keep their size in the world " +
+            "whatever the object's scale.")]
+        private float labelScale = 2f;
+
         [Header("Feedback")]
         [SerializeField, Tooltip("The feedback objects Add feedback objects puts under a cue: label, check and cross mark, " +
             "flash, 2D audio source.")]
@@ -65,6 +70,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public Color Color => color;
         public GameObject ArrowPrefab => arrowPrefab;
         public float ArrowHeight => arrowHeight;
+        public float LabelScale => labelScale;
         public GameObject FeedbackPrefab => feedbackPrefab;
         public AudioClip RightClip => rightClip;
         public AudioClip WrongClip => wrongClip;

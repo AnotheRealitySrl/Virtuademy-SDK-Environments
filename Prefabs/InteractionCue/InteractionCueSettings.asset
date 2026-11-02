@@ -21,6 +21,7 @@ MonoBehaviour:
   color: {r: 0, g: 2.65, b: 4, a: 1}
   arrowPrefab: {fileID: 4410000000000000001, guid: 4b9f898cb170424b83a25d2be3ee0d9e, type: 3}
   arrowHeight: 0.25
+  labelScale: 2
   feedbackPrefab: {fileID: 8407900295140853467, guid: 65a8a0b2dbabb8b42827c13363e03800, type: 3}
   rightClip: {fileID: 8300000, guid: 6781aca6f7364970b36cf453b83a4bfe, type: 3}
   wrongClip: {fileID: 8300000, guid: fd30f8f3611f46cdb995dfe22dfee27e, type: 3}

@@ -272,7 +272,8 @@ one usable connection, which changes what a script that relied on the project's 
   or select completes), **Choice** (`ProcChoice`: pick and confirm; `isCorrect`, `oneShot`, `wrongReason`),
   **Distractor** (`ProcDistractor`: a wrong attempt; with a task, on that task (its error penalty and an error);
   without one, `penaltyPoints` off the total and `countsAsError`), **Reach Zone**
-  (`ProcReachZone`: the local player entering the trigger), **Watch** (`ProcWatch`: a video ended, a POI closed, a panel
+  (`ProcReachZone`: the local player entering the trigger: a collider under the player's root, or the moving body
+  that carries it, as the desktop and mobile character controller does), **Watch** (`ProcWatch`: a video ended, a POI closed, a panel
   hidden), **Question** (`ProcQuestion`, `ProcQuestionPool`: a quiz's normalised score; `pool`, `drawCount`,
   `shuffle`), **Item On Target** (beside an Inventory Item Trigger Detector: the right item or tool completes, a wrong
   one is an attempt; the master reports in a shared procedure; the element's cue and the procedure show the feedback,
@@ -349,7 +350,8 @@ one usable connection, which changes what a script that relied on the project's 
   material) so a flat face seen head-on still shows it, with the edges brighter. No per-frame code: the pulse (a cosine
   ease) and the arrow's bob (0.1 m at 0.6 Hz) are in the shaders, their phase wrapped in float so they stay smooth on
   mobile GPUs. The check mark and the label are drawn with `VirtuademyWorldDisplayPanelSettings` (no collider: they never
-  catch a ray or a click), and the mark sits on the flash's anchor; the flash's soft Shadow disc is off in
+  catch a ray or a click), and the mark sits on the flash's anchor; the label and the mark keep their size in the
+  world whatever the object's scale, the label at the settings' `labelScale` (2: body text 56 mm); the flash's soft Shadow disc is off in
   `CueFeedback`.
 - **`InteractablePlaceholder.IsBlocked`** and **`OnBlockedChanged`** (`InteractableBlockedChangedHandler(bool blocked)`)
   (2026.7, minor): whether the application blocks interaction with the object (selected or manipulated by another

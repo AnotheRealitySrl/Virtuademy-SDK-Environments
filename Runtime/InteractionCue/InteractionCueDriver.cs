@@ -257,6 +257,9 @@ namespace Virtuademy.SDK.Environments.Cue
                     if (candidate.GetComponentInParent<InteractionCuePlaceholder>(true) == cue)
                     {
                         label = candidate;
+                        // Readable from a few metres, whatever the object's scale (the settings' Label Scale)
+                        InteractionCueFeedback.KeepWorldSize(label.transform,
+                            cue.Settings != null ? cue.Settings.LabelScale : 1f);
                         break;
                     }
                 }

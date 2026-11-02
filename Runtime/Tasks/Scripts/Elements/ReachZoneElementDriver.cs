@@ -39,7 +39,17 @@ namespace Virtuademy.SDK.Environments.Tasks
         {
             if (IVirtuademyGameplay.IsAvailable && IVirtuademyGameplay.Current.Player?.Root != null)
             {
-                return other.transform.IsChildOf(IVirtuademyGameplay.Current.Player.Root);
+                Transform root = IVirtuademyGameplay.Current.Player.Root;
+                if (other.transform.IsChildOf(root))
+                {
+                    return true;
+                }
+                // The body that moves can be the root's parent: on desktop and mobile the player's root is the avatar,
+                // a child of the character controller that carries the capsule and the rigidbody (2026-11-02: walking
+                // into the zone did nothing). Only a moving body counts, so a static collider above the player does not.
+                Transform body = other.attachedRigidbody != null ? other.attachedRigidbody.transform
+                    : other is CharacterController ? other.transform : null;
+                return body != null && root.IsChildOf(body);
             }
             return other.CompareTag("Player");
         }
