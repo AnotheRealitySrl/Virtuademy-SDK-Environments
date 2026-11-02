@@ -10,7 +10,7 @@ using Virtuademy.SDK.Environments.Tasks;
 
 using static SPACS.Tasks.TaskNode;
 
-namespace Virtuademy.SDK.Environments.InteractionCue
+namespace Virtuademy.SDK.Environments.Cue
 {
     /// <summary>
     /// Sets a cue's base state from the status of the tasks it is a target of: next target while any of them is to do

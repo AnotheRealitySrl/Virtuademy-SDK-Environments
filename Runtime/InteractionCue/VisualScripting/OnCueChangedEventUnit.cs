@@ -6,7 +6,7 @@ using Unity.VisualScripting;
 
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 
-namespace Virtuademy.SDK.Environments.InteractionCue
+namespace Virtuademy.SDK.Environments.Cue
 {
     /// <summary>Raised when a cue's state changes (<see cref="InteractionCuePlaceholder.CueChanged"/>).</summary>
     [UnitTitle("Virtuademy Interaction Cue: On Cue Changed")]

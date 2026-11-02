@@ -8,7 +8,7 @@ using Virtuademy.Environments.ScriptingApi;
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 using Virtuademy.Environments.ScriptingApi.Tasks;
 using Virtuademy.Environments.ScriptingApi.UI;
-using Virtuademy.SDK.Environments.InteractionCue;
+using Virtuademy.SDK.Environments.Cue;
 using Virtuademy.SDK.Environments.UIKit;
 
 namespace Virtuademy.SDK.Environments.Tasks

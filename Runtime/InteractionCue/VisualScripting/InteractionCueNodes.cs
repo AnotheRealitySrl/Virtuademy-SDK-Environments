@@ -2,7 +2,7 @@ using Unity.VisualScripting;
 
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 
-namespace Virtuademy.SDK.Environments.InteractionCue
+namespace Virtuademy.SDK.Environments.Cue
 {
     /// <summary>Resolves a node's cue input: no cue is the graph's error, not something to skip (review S8).</summary>
     internal static class InteractionCueNodeInput

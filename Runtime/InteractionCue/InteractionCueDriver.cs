@@ -7,7 +7,7 @@ using Virtuademy.Environments.ScriptingApi.Interaction;
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 using Virtuademy.SDK.Environments.UIKit;
 
-namespace Virtuademy.SDK.Environments.InteractionCue
+namespace Virtuademy.SDK.Environments.Cue
 {
     /// <summary>
     /// Draws an <see cref="InteractionCuePlaceholder"/>: added by the runtime to every cue

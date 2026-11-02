@@ -3,7 +3,7 @@ using UnityEngine;
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 using Virtuademy.SDK.Environments.UIKit;
 
-namespace Virtuademy.SDK.Environments.InteractionCue
+namespace Virtuademy.SDK.Environments.Cue
 {
     /// <summary>
     /// The feedback objects of a cue: the check and cross mark, the flash and the sound of a right or wrong action, and

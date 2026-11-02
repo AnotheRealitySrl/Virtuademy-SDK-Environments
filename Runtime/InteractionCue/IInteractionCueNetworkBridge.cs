@@ -1,4 +1,4 @@
-namespace Virtuademy.SDK.Environments.InteractionCue
+namespace Virtuademy.SDK.Environments.Cue
 {
     /// <summary>
     /// The application's network side of a networked interaction cue: sends a right or wrong action shown on this client

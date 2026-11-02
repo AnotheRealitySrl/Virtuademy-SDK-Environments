@@ -2,7 +2,7 @@ using UnityEngine;
 
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 
-namespace Virtuademy.SDK.Environments.InteractionCue
+namespace Virtuademy.SDK.Environments.Cue
 {
     /// <summary>
     /// Gives every <see cref="InteractionCuePlaceholder"/> its <see cref="InteractionCueDriver"/> when the placeholder

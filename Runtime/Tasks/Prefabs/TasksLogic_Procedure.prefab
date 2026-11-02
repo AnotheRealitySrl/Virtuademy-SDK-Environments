@@ -1,5 +1,74 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!1 &335484396019633509
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4296798735099825967}
+  - component: {fileID: 2265168976319978819}
+  - component: {fileID: 901922133543269294}
+  m_Layer: 0
+  m_Name: TaskPanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4296798735099825967
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 335484396019633509}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 1.5, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 3591662497796070261}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2265168976319978819
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 335484396019633509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66dff487dd3d86f45b8a5d06fd4d9a1c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.Environments.ScriptingApi::Virtuademy.Environments.ScriptingApi.Placeholders.SceneObjectId
+  uniqueID: 1881230106
+--- !u!114 &901922133543269294
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 335484396019633509}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1362b86d1e1ce94e8120b761c540e49, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Virtuademy.Environments.ScriptingApi::Virtuademy.Environments.ScriptingApi.Placeholders.TaskUIPlaceholder
+  automaticSetup: 1
+  desktopPlacement: 1
+  mobilePlacement: 1
+  vrPlacement: 0
+  worldPanelSize: {x: 0.61, y: 0.69}
+  taskSystem: {fileID: 1482361633723255127}
+  descriptionKey: 
+  showIntroductionAtAwake: 0
+  onDisplayIntro:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &1756192048451205553
 GameObject:
   m_ObjectHideFlags: 0
@@ -290,6 +359,9 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 4785474688076759952, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4296798735099825967}
     - targetCorrespondingSourceObject: {fileID: 775351414815367212, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4024208426537707768}
@@ -368,6 +440,11 @@ MonoBehaviour:
   onExit:
     m_PersistentCalls:
       m_Calls: []
+--- !u!4 &3591662497796070261 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4785474688076759952, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+  m_PrefabInstance: {fileID: 8336529996659710181}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &8751575841045018825 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 775351414815367212, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
