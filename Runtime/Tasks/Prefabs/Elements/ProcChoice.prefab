@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 4285901882041873579}
   - component: {fileID: 7968219879681002755}
   - component: {fileID: 3722974276653399635}
+  - component: {fileID: 8444284299771866266}
   m_Layer: 0
   m_Name: Model (replace)
   m_TagString: Untagged
@@ -90,6 +91,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &8444284299771866266
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1622892653128850686}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.99999994, y: 0.99999994, z: 0.99999994}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &7302011170365124294
 GameObject:
   m_ObjectHideFlags: 0
@@ -157,7 +179,8 @@ MonoBehaviour:
   automaticSetup: 1
   <IsNetworked>k__BackingField: 0
   interactWithColliders: 1
-  interactionColliders: []
+  interactionColliders:
+  - {fileID: 8444284299771866266}
   lockHoverDuringInteraction: 0
   vrControllers: -1
 --- !u!114 &7309970795177544997

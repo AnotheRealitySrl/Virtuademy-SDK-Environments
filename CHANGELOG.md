@@ -279,7 +279,9 @@ one usable connection, which changes what a script that relied on the project's 
   `shuffle`), **Item On Target** (beside an Inventory Item Trigger Detector: the right item or tool completes, a wrong
   one is an attempt; the master reports in a shared procedure; the element's cue and the procedure show the feedback,
   so the detector's own check or cross does not show too, `InventoryItemTriggerDetectorPlaceholder.ElementShowsFeedback`).
-  The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`). Target, Choice and Distractor act on one click: they take the select state out of the Visual Scripting
+  The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`) and carry a solid
+  BoxCollider, listed as the Interactable's (and the pickable's) collider: a model without one got the application's
+  trigger box, which VR rays ignore. Target, Choice and Distractor act on one click: they take the select state out of the Visual Scripting
   interactable beside them (a Target that completes on select keeps it). A Question element shows each quiz's own
   recap (Continue only) before the next quiz of its pool, and on desktop and mobile pans the camera to the quiz when
   its step comes (`panToQuiz`, on). **Collect** (`ProcCollect`, `CollectElementPlaceholder`): the pickable collected
