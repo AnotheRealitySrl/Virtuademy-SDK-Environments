@@ -191,8 +191,20 @@ namespace Virtuademy.SDK.Environments.Tasks
                 if (q != null)
                 {
                     q.onFinish?.RemoveListener(OnQuizFinished);
+                    q.onContinue?.RemoveListener(OnQuizContinued);
                 }
             }
+        }
+
+        private void OnQuizContinued()
+        {
+            QuizPlaceholder done = drawn[current - 1];
+            done.onContinue.RemoveListener(OnQuizContinued);
+            if (Question.Pool.Count > 0)
+            {
+                done.gameObject.SetActive(false);
+            }
+            ShowCurrent();
         }
 
         private void OnQuizFinished()
@@ -201,14 +213,17 @@ namespace Virtuademy.SDK.Environments.Tasks
             quiz.onFinish.RemoveListener(OnQuizFinished);
             float range = quiz.QuizInstanceAllGoodScore - quiz.QuizInstanceAllBadScore;
             scoreSum += range <= 0f ? 1f : Mathf.Clamp01((quiz.QuizInstanceScore - quiz.QuizInstanceAllBadScore) / range);
+            // The quiz's own recap (each answer right or wrong), with Continue only: Confirm alone shows nothing more
+            // (2026-11-02, editor test: the quizzes ended without it). The next quiz of a pool shows on Continue.
+            quiz.onContinue ??= new UnityEngine.Events.UnityEvent();
+            if (current + 1 < drawn.Count)
+            {
+                quiz.onContinue.AddListener(OnQuizContinued);
+            }
+            quiz.VSNode_GoToResults(false, false, true);
             current++;
             if (current < drawn.Count)
             {
-                if (Question.Pool.Count > 0)
-                {
-                    quiz.gameObject.SetActive(false);
-                }
-                ShowCurrent();
                 return;
             }
             float score = scoreSum / drawn.Count;

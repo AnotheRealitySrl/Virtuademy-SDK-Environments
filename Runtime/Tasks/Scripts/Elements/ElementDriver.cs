@@ -4,8 +4,10 @@ using UnityEngine;
 
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 using Virtuademy.Environments.ScriptingApi.Tasks;
+using Virtuademy.SDK.Environments.VisualScripting;
 
 using static SPACS.Tasks.TaskNode;
+using static Virtuademy.Environments.ScriptingApi.Interaction.IVisualScriptingInteractable;
 
 namespace Virtuademy.SDK.Environments.Tasks
 {
@@ -28,6 +30,27 @@ namespace Virtuademy.SDK.Environments.Tasks
 
         /// <summary>Subscribes to what the element detects.</summary>
         protected abstract void OnBind();
+
+        /// <summary>
+        /// One click acts (2026-11-02, editor test: the cubes needed two). With the Selected state allowed, the
+        /// application's first click only selects the object and the second interacts, so the Visual Scripting
+        /// interactable beside the element skips the select state; an element that reports on select keeps it. Called at
+        /// bind, before the application reads the allowed states.
+        /// </summary>
+        protected void UseOneClick(bool onSelect)
+        {
+            if (!TryGetComponent(out VisualScriptingInteractablePlaceholder states))
+            {
+                return;
+            }
+            states.DesktopAllowedStates = OneClick(states.DesktopAllowedStates, onSelect);
+            states.VRAllowedStates = OneClick(states.VRAllowedStates, onSelect);
+        }
+
+        private static EAllowedVisualScriptingInteractableState OneClick(EAllowedVisualScriptingInteractableState allowed,
+            bool onSelect)
+            => onSelect ? allowed | EAllowedVisualScriptingInteractableState.Selected
+                : (allowed | EAllowedVisualScriptingInteractableState.Interacting) & ~EAllowedVisualScriptingInteractableState.Selected;
 
         /// <summary>The element's task, when it has one.</summary>
         protected Task TaskOf() => Element.Task != null && Element.Task.TryGetComponent(out Task task) ? task : null;

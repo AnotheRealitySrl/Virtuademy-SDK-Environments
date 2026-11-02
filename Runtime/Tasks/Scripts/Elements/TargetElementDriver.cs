@@ -21,6 +21,7 @@ namespace Virtuademy.SDK.Environments.Tasks
                 Debug.LogWarning("[TargetElement] " + name + " needs an Interactable placeholder: nothing will complete it.", this);
                 return;
             }
+            UseOneClick(((TargetElementPlaceholder)Element).OnSelect);
             if (((TargetElementPlaceholder)Element).OnSelect)
             {
                 interactable.OnSelectEnter += OnAction;

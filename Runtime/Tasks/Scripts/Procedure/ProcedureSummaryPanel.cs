@@ -20,6 +20,9 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// <summary>The tallest the list of tasks or of events gets before it scrolls.</summary>
         private const float MaxListHeight = 360f;
 
+        [SerializeField, Tooltip("The list's scroller in the theme's look (ProcedureSummary.uss): thin, no arrow buttons.")]
+        private StyleSheet listStyle;
+
         private ProcedureRun run;
         private ProcedureSummary summary;
         private VisualElement panelRoot, content, tasksPage, timelinePage;
@@ -121,6 +124,11 @@ namespace Virtuademy.SDK.Environments.Tasks
             pages.style.maxHeight = MaxListHeight;
             pages.style.flexShrink = 1;
             pages.contentContainer.pickingMode = PickingMode.Ignore;
+            pages.AddToClassList("vd-summary-list");
+            if (listStyle != null)
+            {
+                pages.styleSheets.Add(listStyle);
+            }
             tasksPage = new VisualElement { pickingMode = PickingMode.Ignore };
             tasksPage.Add(Line(PanelEnvironment.Text("Procedure/Summary/Time", "Time") + " " + Time(summary.ElapsedSeconds)
                 + "   " + PanelEnvironment.Text("Procedure/Errors", "Errors") + " " + summary.Errors

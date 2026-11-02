@@ -278,15 +278,18 @@ one usable connection, which changes what a script that relied on the project's 
   `shuffle`), **Item On Target** (beside an Inventory Item Trigger Detector: the right item or tool completes, a wrong
   one is an attempt; the master reports in a shared procedure; the element's cue and the procedure show the feedback,
   so the detector's own check or cross does not show too, `InventoryItemTriggerDetectorPlaceholder.ElementShowsFeedback`).
-  The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`). Without a task an element raises its events and shows
+  The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`). Target, Choice and Distractor act on one click: they take the select state out of the Visual Scripting
+  interactable beside them (a Target that completes on select keeps it). A Question element shows each quiz's own
+  recap (Continue only) before the next quiz of its pool. Without a task an element raises its events and shows
   its cue. `TasksLogic_Procedure.prefab`: TasksLogic with a Procedure placeholder, its success and error panels,
   shared cue feedback and a Task UI placeholder (`TaskPanel`, wired to its task system, default placements: the app's
   task panel with the errors strip, timer and hint button; set a platform to Hidden to drop it); the legacy uGUI task
   panel of TasksLogic (`MainUIWorldSpaceCanvas`) is off in it. **Summary**: `ProcedureSummary.prefab` (a Virtuademy panel on the screen, in front of the user in
   VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
   `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
-  `timelineMaxRows`), in a list that scrolls past 360 px (mm in a world panel), so the buttons always show; Retry and
-  Exit; on the screen it keeps clear of the application's zones (Safe Frame on the panel's root). `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
+  `timelineMaxRows`), in a list that scrolls past 360 px (mm in a world panel), so the buttons always show, with a thin
+  themed scroller (`ProcedureSummary.uss`); Retry and Exit; on the screen it is centred and keeps clear of the
+  application's zones (Safe Frame on the panel's root, not the task HUD's, which the summary replaces). `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
   **Analytics** (`sendAnalytics`): one run per procedure run, its key the prefix (`analyticsKeyPrefix`, else the scene's
   name; letters and digits, at most 7) and 8 random characters, its experience id generated first (a new key after
   10 s without one); ExpStart, a StepStart when a scored step starts, exactly one StepComplete per started step (0

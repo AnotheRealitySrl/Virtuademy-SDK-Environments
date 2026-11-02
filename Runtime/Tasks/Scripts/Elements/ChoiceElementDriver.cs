@@ -26,6 +26,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             }
             else
             {
+                UseOneClick(false);
                 interactable.OnInteract += OnPick;
             }
             if (Choice.ConfirmPanel != null && Choice.ConfirmPanel.TryGetComponent(out confirm))

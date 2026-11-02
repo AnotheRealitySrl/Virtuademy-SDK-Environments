@@ -87,7 +87,7 @@ MonoBehaviour:
   document: {fileID: 4355352960480183581}
   targetElementName: root
   area: 0
-  taskHud: 0
+  taskHud: 2
   margin: 16
 --- !u!114 &2965198324651595248
 MonoBehaviour:
@@ -122,3 +122,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.Tasks.ProcedureSummaryPanel
   document: {fileID: 0}
+  listStyle: {fileID: 7433441132597879392, guid: 246556a1e0ae49c9a09d82b6ffc881bf, type: 3}

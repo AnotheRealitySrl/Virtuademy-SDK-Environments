@@ -1,0 +1,39 @@
+/* The procedure summary's scrolling list (ProcedureSummaryPanel): a thin track and thumb in the theme's colours, no
+   arrow buttons. The colours are the theme's tokens, inherited from the panel's root. */
+
+.vd-summary-list .unity-scroller--vertical {
+    width: 10px;
+    margin-left: 8px;
+    border-width: 0;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.vd-summary-list .unity-scroller__low-button,
+.vd-summary-list .unity-scroller__high-button {
+    display: none;
+}
+
+.vd-summary-list .unity-scroller--vertical > .unity-scroller__slider {
+    margin: 0;
+}
+
+.vd-summary-list .unity-scroller--vertical .unity-base-slider__tracker {
+    left: 0;
+    right: 0;
+    border-width: 0;
+    border-radius: 5px;
+    background-color: var(--vd-color-border);
+}
+
+.vd-summary-list .unity-scroller--vertical .unity-base-slider__dragger {
+    left: 0;
+    width: 10px;
+    margin: 0;
+    border-width: 0;
+    border-radius: 5px;
+    background-color: var(--vd-color-text-secondary);
+}
+
+.vd-summary-list .unity-scroller--vertical .unity-base-slider__dragger-border {
+    display: none;
+}

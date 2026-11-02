@@ -26,6 +26,7 @@ namespace Virtuademy.SDK.Environments.Tasks
                 Debug.LogWarning("[DistractorElement] " + name + " needs an Interactable placeholder.", this);
                 return;
             }
+            UseOneClick(false);
             interactable.OnInteract += OnAction;
         }
 
