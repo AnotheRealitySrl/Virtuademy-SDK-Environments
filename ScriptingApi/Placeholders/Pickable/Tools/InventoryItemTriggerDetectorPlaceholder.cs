@@ -44,6 +44,13 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         public bool ElementShowsFeedback { get; internal set; }
 
         /// <summary>
+        /// Whether the last item event (<see cref="OnItemTriggerEnter"/>, <see cref="OnWrongItemTriggerEnter"/>) came
+        /// from this client's player: false when a teammate's item or tool reached the target (it reaches it on every
+        /// client of the room). Set by the application right before it raises the event; true without one.
+        /// </summary>
+        public bool LastActionByLocalPlayer { get; internal set; } = true;
+
+        /// <summary>
         /// True while this target takes no item (2026.7): an Item On Target element whose task is completed, failed or
         /// locked. The application then asks before it spends anything: the item keeps its use and stays in the
         /// inventory, and neither the right nor the wrong events and feedback fire. Without it, a counted key used again

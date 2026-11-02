@@ -32,6 +32,11 @@
       "displayName": "Sample Task Scene",
       "description": "Contains a sample scene to show how to use the task system",
       "path": "TaskSampleScene~"
+    },
+    {
+      "displayName": "Procedure: find the hazards",
+      "description": "A guided procedure in a warehouse built from primitives: reach a zone, collect and wear the protective equipment, find the hazards among distractors, answer a question pool; scoring, hints, a time limit and the summary",
+      "path": "Samples~/ProcedureHazards"
     }
   ],
   "dependencies": {

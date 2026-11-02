@@ -80,6 +80,16 @@ The files commands add five `EnvironmentsCli` commands (`published`, `save-files
 and the exit codes 37 and 38; the Environment Details window and the scene row's default files are new editor UI (minor).
 
 #### Added
+- **Task elements: Completed By works** (`ElementPlaceholderBase.completedBy`, Any Player by default). Item On Target,
+  whose detector sees every player's items and tools, now tells them apart: Local Player Only ignores a teammate's item
+  (no completion, no wrong attempt) and is reported by the client of the player who acted; Any Player keeps today's
+  behaviour (a teammate's item counts; in a shared procedure the master reports it). The application says whose each
+  detector event is (`InventoryItemTriggerDetectorPlaceholder.LastActionByLocalPlayer`). The other elements (Target,
+  Choice, Distractor, Reach Zone, Collect, Watch, Question) only ever see this client's player, so both values behave
+  alike there; in a shared procedure a teammate completes the room's task from their own client either way. Until now
+  Item On Target logged a warning for Local Player Only and behaved as Any Player.
+- **Sample "Procedure: find the hazards"** (`Samples~/ProcedureHazards`) is listed in the package: import it from the
+  Package Manager.
 - **`QuestionElementPlaceholder.wrongBelow`** (Wrong Below, 0 to 1, default 0): below this normalised score the question
   counts as answered wrong, so a procedure gives the wrong feedback, the error sound, a Mistake row and one error (the
   summary's Errors, which Max Errors counts), and the step scores 0. At the default a question is wrong only when nothing scores, as before; 1 makes anything short of the whole

@@ -1,7 +1,7 @@
 # Procedure sample: find the hazards
 
 The Showcase HSE warehouse procedure ("PilloleHSEmagazzino") rebuilt with the 2026.7 procedure manager, with primitives
-as models. Not registered in `package.json` yet (workstream G).
+as models. Import it from the Package Manager: Virtuademy SDK Environments > Samples > "Procedure: find the hazards".
 
 - `TasksLogic_Procedure`: Guided, max 5 errors, hints on, 300 s time limit, summary with the timeline, analytics key
   prefix `hazards`. Its task panel (`TaskPanel`) stands beside the path to the entrance: on the screen on desktop and

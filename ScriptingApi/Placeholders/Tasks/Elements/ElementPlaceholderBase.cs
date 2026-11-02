@@ -8,12 +8,20 @@ using Virtuademy.Environments.ScriptingApi.Tasks;
 
 namespace Virtuademy.Environments.ScriptingApi.Placeholders
 {
-    /// <summary>Who may complete a task element in a shared procedure.</summary>
+    /// <summary>
+    /// Whose action completes a task element in a multiplayer room. It matters only for an element that a teammate's
+    /// action can reach on this client: Item On Target, whose detector sees every player's items and tools. The other
+    /// elements see only this client's player (their clicks, their body, their inventory, their quiz, their video), so
+    /// both values behave alike there. In a shared procedure the tasks are the room's: a teammate's own action, reported
+    /// by their client, completes them for everyone with either value.
+    /// </summary>
     public enum EElementCompleter
     {
-        /// <summary>Any player: the action of a teammate counts for the whole room.</summary>
+        /// <summary>Any player: a teammate's item on this client's target counts too (in a shared procedure the master
+        /// reports it, once).</summary>
         AnyPlayer = 0,
-        /// <summary>Only this client's player (for detectors that cannot tell who acted, the master reports for now).</summary>
+        /// <summary>Only this client's player: a teammate's item on the target is ignored here; in a shared procedure the
+        /// client of the player who acted reports it.</summary>
         LocalPlayerOnly = 1,
     }
 
@@ -43,8 +51,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             "(unless the procedure counts out-of-order actions as errors).")]
         private bool reportOnlyWhenTaskActive = true;
 
-        [SerializeField, Tooltip("In a shared procedure: whether any player's action completes the element, or only this " +
-            "client's player's.")]
+        [SerializeField, Tooltip("In a multiplayer room: whether a teammate's action completes the element on this client " +
+            "(Any Player) or only this client's player's (Local Player Only). It changes Item On Target, whose detector " +
+            "sees every player's items and tools; the other elements see only this client's player, so both behave alike. " +
+            "In a shared procedure a teammate completes the room's task from their own client either way.")]
         private EElementCompleter completedBy = EElementCompleter.AnyPlayer;
 
         [Header("Events")]

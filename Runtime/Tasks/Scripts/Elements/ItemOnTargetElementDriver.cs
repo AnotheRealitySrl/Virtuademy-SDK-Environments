@@ -7,13 +7,15 @@ using Virtuademy.ScriptingApi;
 namespace Virtuademy.SDK.Environments.Tasks
 {
     /// <summary>Item On Target element: the detector's right item completes the task, a wrong one is a wrong attempt.
-    /// In a shared procedure only the master reports (an item does not say who holds it).</summary>
+    /// The detector fires on every client of the room. Any Player: in a shared procedure the master reports (once), in
+    /// a procedure of this client's own every item counts. Local Player Only: only this client's player's items and tools
+    /// (the application says whose each event was, <see cref="InventoryItemTriggerDetectorPlaceholder.LastActionByLocalPlayer"/>),
+    /// reported by this client.</summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("")]
     public class ItemOnTargetElementDriver : ElementDriver
     {
         private InventoryItemTriggerDetectorPlaceholder detector;
-        private bool warnedLocalOnly;
 
         private ItemOnTargetElementPlaceholder Item => (ItemOnTargetElementPlaceholder)Element;
 
@@ -74,14 +76,13 @@ namespace Virtuademy.SDK.Environments.Tasks
             }
         }
 
-        // The detector fires on every client of the room: in a shared procedure the master reports, once.
+        // The detector fires on every client of the room. Local Player Only: the client whose player acted reports. Any
+        // Player: in a shared procedure the master reports, once; in this client's own procedure, every event counts.
         private bool Reports()
         {
-            if (Element.CompletedBy == EElementCompleter.LocalPlayerOnly && !warnedLocalOnly)
+            if (Element.CompletedBy == EElementCompleter.LocalPlayerOnly)
             {
-                warnedLocalOnly = true;
-                Debug.LogWarning("[ItemOnTargetElement] " + name + ": Local Player Only needs items that say who holds them; " +
-                    "it behaves as Any Player for now.", this);
+                return detector.LastActionByLocalPlayer;
             }
             TaskSystemVirtuademy system = TaskOf() != null ? TaskOf().GetComponentInParent<TaskSystemVirtuademy>(true) : null;
             bool shared = system != null && system.isNetworked;
