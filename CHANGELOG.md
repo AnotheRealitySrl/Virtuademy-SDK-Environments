@@ -270,7 +270,8 @@ one usable connection, which changes what a script that relied on the project's 
   `onRight`/`onWrong`/`onReported`) and prefabs in `Runtime/Tasks/Prefabs/Elements` (element, Interactable, Visual
   Scripting Interactable, interaction cue with feedback objects, a model to replace): **Target** (`ProcTarget`: interact
   or select completes), **Choice** (`ProcChoice`: pick and confirm; `isCorrect`, `oneShot`, `wrongReason`),
-  **Distractor** (`ProcDistractor`: a wrong attempt, `penaltyPoints` off the total, `countsAsError`), **Reach Zone**
+  **Distractor** (`ProcDistractor`: a wrong attempt; with a task, on that task (its error penalty and an error);
+  without one, `penaltyPoints` off the total and `countsAsError`), **Reach Zone**
   (`ProcReachZone`: the local player entering the trigger), **Watch** (`ProcWatch`: a video ended, a POI closed, a panel
   hidden), **Question** (`ProcQuestion`, `ProcQuestionPool`: a quiz's normalised score; `pool`, `drawCount`,
   `shuffle`), **Item On Target** (beside an Inventory Item Trigger Detector: the right item or tool completes, a wrong
@@ -283,11 +284,12 @@ one usable connection, which changes what a script that relied on the project's 
   panel of TasksLogic (`MainUIWorldSpaceCanvas`) is off in it. **Summary**: `ProcedureSummary.prefab` (a Virtuademy panel on the screen, in front of the user in
   VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
   `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
-  `timelineMaxRows`); Retry and Exit. `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
+  `timelineMaxRows`), in a list that scrolls past 360 px (mm in a world panel), so the buttons always show; Retry and
+  Exit; on the screen it keeps clear of the application's zones (Safe Frame on the panel's root). `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
   **Analytics** (`sendAnalytics`): one run per procedure run, its key the prefix (`analyticsKeyPrefix`, else the scene's
   name; letters and digits, at most 7) and 8 random characters, its experience id generated first (a new key after
-  10 s without one); ExpStart, a StepStart when a scored step starts, exactly one StepComplete per started step (0,
-  Fail when the run ends first), one ExpComplete per run (Pass, Fail; ended early: Fail after a fail condition, else
+  10 s without one); ExpStart, a StepStart when a scored step starts, exactly one StepComplete per started step (0
+  against the step's own max and passing score, Fail, when the run ends first), one ExpComplete per run (Pass, Fail; ended early: Fail after a fail condition, else
   NA with the score so far); sent in order, one at a time, a failed one again after 2, 4, 8, 16 then 30 s. Retry and
   Exit wait for the queue (at most 8 s, the summary says so). ExpComplete is sent by the procedure's own logic only:
   leaving the scene through the application (menu, home, disconnection) sends nothing and the run stays incomplete in

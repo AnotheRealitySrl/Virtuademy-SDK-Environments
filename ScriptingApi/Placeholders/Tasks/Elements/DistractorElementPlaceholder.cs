@@ -3,18 +3,22 @@ using UnityEngine;
 namespace Virtuademy.Environments.ScriptingApi.Placeholders
 {
     /// <summary>
-    /// Task element: an object that should not be used. Interacting with it is a wrong attempt with a reason: an error
-    /// for the procedure (Counts As Error) and <see cref="PenaltyPoints"/> off the total. Never completes anything. The
-    /// task is optional (the procedure is then the one set here, or the one of the task system it is under).
+    /// Task element: an object that should not be used. Interacting with it is a wrong attempt with a reason, and never
+    /// completes anything. With a task it is a wrong attempt on that task, as a wrong tool is: the task loses the
+    /// procedure's error penalty and the procedure counts an error. Without a task (the procedure is then the one set
+    /// here, or the one of the task system it is under) it takes <see cref="PenaltyPoints"/> off the total and, with
+    /// Counts As Error, is an error.
     /// </summary>
     [DisallowMultipleComponent]
     public class DistractorElementPlaceholder : ElementPlaceholderBase
     {
         [Header("Distractor")]
-        [SerializeField, Min(0f), Tooltip("Points taken off the procedure's total (of its max score).")]
+        [SerializeField, Min(0f), Tooltip("Without a task: points taken off the procedure's total (of its max score). With " +
+            "a task the task loses the procedure's error penalty instead.")]
         private float penaltyPoints = 5f;
 
-        [SerializeField, Tooltip("Whether using it counts as an error (towards Max Errors).")]
+        [SerializeField, Tooltip("Without a task: whether using it counts as an error (towards Max Errors). With a task " +
+            "it always does.")]
         private bool countsAsError = true;
 
         [SerializeField, Tooltip("Why it is wrong, for the feedback and the summary.")]

@@ -201,6 +201,17 @@ namespace Virtuademy.SDK.Environments.Analytics
                 }
                 run.SetFlag("ec");
             }
+            // A started step without a result when the run ends: 0 against its real maximum and passing score (the
+            // analytics' own fallback sends 0/0, which the Back Office shows as a step worth nothing)
+            foreach (ProcedureRun.Step step in run.Steps)
+            {
+                if (step.Scored && step.Started && step.Score != null && !step.Score.Done)
+                {
+                    int max = step.Score.MaxPoints;
+                    analytics.StepCompleted(step.StepId, 0, max, Mathf.RoundToInt(max * run.Procedure.PassPercent / 100f),
+                        EExperienceOutcome.Fail);
+                }
+            }
             EExperienceOutcome outcome = summary.Outcome switch
             {
                 EProcedureOutcome.Passed => EExperienceOutcome.Pass,

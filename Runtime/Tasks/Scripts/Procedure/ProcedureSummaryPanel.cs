@@ -17,6 +17,9 @@ namespace Virtuademy.SDK.Environments.Tasks
     [AddComponentMenu("")]
     public class ProcedureSummaryPanel : UIDocumentBinder
     {
+        /// <summary>The tallest the list of tasks or of events gets before it scrolls.</summary>
+        private const float MaxListHeight = 360f;
+
         private ProcedureRun run;
         private ProcedureSummary summary;
         private VisualElement panelRoot, content, tasksPage, timelinePage;
@@ -109,7 +112,15 @@ namespace Virtuademy.SDK.Environments.Tasks
 
             // Page 1: the numbers and one row per scored task. Page 2: the timeline.
             content.Q<VisualElement>("proc-pages")?.RemoveFromHierarchy();
-            VisualElement pages = new() { name = "proc-pages", pickingMode = PickingMode.Ignore };
+            // A list that scrolls past MaxListHeight, so a long timeline never pushes the buttons off the panel (editor
+            // round 8: 19 rows covered What happened, Exit and Retry). On the screen that is reference pixels, in a world
+            // panel millimetres.
+            ScrollView pages = new(ScrollViewMode.Vertical) { name = "proc-pages" };
+            pages.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
+            pages.touchScrollBehavior = ScrollView.TouchScrollBehavior.Clamped;
+            pages.style.maxHeight = MaxListHeight;
+            pages.style.flexShrink = 1;
+            pages.contentContainer.pickingMode = PickingMode.Ignore;
             tasksPage = new VisualElement { pickingMode = PickingMode.Ignore };
             tasksPage.Add(Line(PanelEnvironment.Text("Procedure/Summary/Time", "Time") + " " + Time(summary.ElapsedSeconds)
                 + "   " + PanelEnvironment.Text("Procedure/Errors", "Errors") + " " + summary.Errors

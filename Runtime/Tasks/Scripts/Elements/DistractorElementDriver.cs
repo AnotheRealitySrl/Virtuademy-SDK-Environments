@@ -8,7 +8,8 @@ using Virtuademy.Environments.ScriptingApi.Tasks;
 
 namespace Virtuademy.SDK.Environments.Tasks
 {
-    /// <summary>Distractor element: an interaction is a wrong attempt that costs points and, if set, an error.</summary>
+    /// <summary>Distractor element: an interaction is a wrong attempt, on its task when it has one (the task's error
+    /// penalty and an error), else on the procedure (Penalty Points and, if set, an error).</summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("")]
     public class DistractorElementDriver : ElementDriver
@@ -47,10 +48,15 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 return;
             }
-            ProcedureRun procedure = task != null ? ProcedureOf(task) : ProcedureForNoTask();
-            TaskReports.Distractor(task, procedure, result, Distractor.PenaltyPoints, Distractor.CountsAsError);
-            if (task == null)
+            if (task != null)
             {
+                // A wrong attempt on its task, as a wrong tool is (user decision, 2026-11-02): the task's error penalty
+                // and a procedure error; Penalty Points are for a distractor without a task
+                TaskReports.Attempt(task, result);
+            }
+            else
+            {
+                TaskReports.Distractor(null, ProcedureForNoTask(), result, Distractor.PenaltyPoints, Distractor.CountsAsError);
                 ShowOnOwnCue(false);
             }
             Element.RaiseReported(result);

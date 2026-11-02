@@ -85,8 +85,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.UIKit.SafeFrame
   document: {fileID: 4355352960480183581}
-  targetElementName: 
-  area: 1
+  targetElementName: root
+  area: 0
   taskHud: 0
   margin: 16
 --- !u!114 &2965198324651595248
