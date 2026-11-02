@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.AddressableAssets;
@@ -26,7 +27,9 @@ namespace Virtuademy.SDK.Environments.Editor
     /// <b><see cref="Apply"/> resets the Addressables groups</b>: it removes every group but the
     /// default one and every entry of that group, and sets the default group's schema to the SDK's
     /// values. The build adds the scenes it publishes itself, so a creator's own groups and entries
-    /// are not part of the flow, but nothing here asks before deleting them.
+    /// are not part of the flow, but nothing here asks before deleting them: a caller that can ask
+    /// lists them first with <see cref="DescribeGroupsRemoval"/>, and <see cref="Apply"/> logs them.
+    /// Only the groups and the entries (the Addressable marking) go, never an asset file.
     /// </para>
     /// </remarks>
     public static class AddressablesConfiguration
@@ -146,6 +149,68 @@ namespace Virtuademy.SDK.Environments.Editor
 
         internal static bool IsConfiguredFor(AddressableAssetSettings settings) =>
             IsSettingsConfigured(settings) && IsProfileConfigured(settings) && AreGroupsConfigured(settings);
+
+        /// <summary>
+        /// What <see cref="Apply"/> removes from the groups: the other groups, by name with their entry counts,
+        /// and the entries of the default group. Only the Addressable marking goes, no asset file.
+        /// </summary>
+        internal sealed class GroupsRemoval
+        {
+            internal GroupsRemoval(IReadOnlyList<(string Name, int Entries)> otherGroups, int defaultGroupEntries)
+            {
+                OtherGroups = otherGroups;
+                DefaultGroupEntries = defaultGroupEntries;
+            }
+
+            /// <summary>The groups other than the default one, with the number of entries each holds.</summary>
+            internal IReadOnlyList<(string Name, int Entries)> OtherGroups { get; }
+
+            /// <summary>The number of entries in the default group.</summary>
+            internal int DefaultGroupEntries { get; }
+
+            /// <summary>
+            /// One line for each group removed, at most <paramref name="maxGroups"/> of them and then "and N more
+            /// groups", and one for the entries of the default group.
+            /// </summary>
+            internal string Describe(int maxGroups = 4)
+            {
+                List<string> lines = OtherGroups
+                    .Take(maxGroups)
+                    .Select(group => $"- Group \"{group.Name}\" ({Count(group.Entries, "entry", "entries")})")
+                    .ToList();
+
+                if (OtherGroups.Count > maxGroups)
+                    lines.Add($"- and {Count(OtherGroups.Count - maxGroups, "more group", "more groups")}");
+
+                if (DefaultGroupEntries > 0)
+                    lines.Add($"- {Count(DefaultGroupEntries, "entry", "entries")} in the default group");
+
+                return string.Join("\n", lines);
+            }
+
+            private static string Count(int count, string one, string many) => count + " " + (count == 1 ? one : many);
+        }
+
+        /// <summary>
+        /// What <see cref="Apply"/> would remove from the groups, or null when there is nothing to remove (or the
+        /// project has no default group). Does not change anything.
+        /// </summary>
+        internal static GroupsRemoval DescribeGroupsRemoval(AddressableAssetSettings settings)
+        {
+            AddressableAssetGroup defaultGroup = settings != null ? settings.DefaultGroup : null;
+            if (defaultGroup == null)
+                return null;
+
+            var otherGroups = settings.groups
+                .Where(group => group != null && group != defaultGroup)
+                .Select(group => (Name: group.Name, Entries: group.entries.Count))
+                .ToList();
+
+            if (otherGroups.Count == 0 && defaultGroup.entries.Count == 0)
+                return null;
+
+            return new GroupsRemoval(otherGroups, defaultGroup.entries.Count);
+        }
 
         #region Top-level settings
 
@@ -301,6 +366,8 @@ namespace Virtuademy.SDK.Environments.Editor
             if (defaultGroup == null)
                 throw new InvalidOperationException("The project's Addressables settings have no default group to configure.");
 
+            GroupsRemoval removal = DescribeGroupsRemoval(settings);
+
             var groupsToDelete = settings.groups.Where(group => group != defaultGroup).ToList();
             foreach (var group in groupsToDelete)
                 settings.RemoveGroup(group);
@@ -339,6 +406,10 @@ namespace Virtuademy.SDK.Environments.Editor
             SaveAsset(settings);
             SaveAsset(defaultGroup);
             SaveAsset(settings);
+
+            if (removal != null)
+                UnityEngine.Debug.Log("[PublishEnvironments] Fix build settings removed these Addressables groups and entries " +
+                                      $"(no asset file was deleted):\n{removal.Describe(int.MaxValue)}");
         }
 
         #endregion

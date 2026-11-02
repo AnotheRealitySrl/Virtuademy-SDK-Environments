@@ -118,6 +118,13 @@ namespace Virtuademy.SDK.Environments.Editor
 
         /// <summary>Set when the deploy was stopped before the scene's link step, which was left undone.</summary>
         public string NotLinkedBecause;
+
+        /// <summary>
+        /// What was done with the scene's default thumbnail and localization file, for a scene that was new at this place and has some:
+        /// sent, not valid, or not sent because the environment was not ready in time (the scene is published either way, and this is
+        /// not a deploy problem). Null when the scene was not new there or has no defaults.
+        /// </summary>
+        public string DefaultFiles;
     }
 
     /// <summary>What happened to one interpreted assembly at one world.</summary>
@@ -493,6 +500,9 @@ namespace Virtuademy.SDK.Environments.Editor
 
                     List<string> importedScenes = new();
 
+                    // Which scenes are new here, read before the import: only those get their default files afterwards.
+                    EnvironmentFilesService.ExistingKeys existingBefore = await EnvironmentFilesService.ExistingKeysAsync(connectionKey, worldId, scenes);
+
                     for (int s = 0; s < scenes.Count; s++)
                     {
                         string scene = scenes[s];
@@ -558,6 +568,11 @@ namespace Virtuademy.SDK.Environments.Editor
                     }
 
                     await LinkDeclaredAssembliesAsync(connectionKey, applicationApiUrl, worldLabel, worldId, importedScenes, target, Fail, StopBefore);
+
+                    if (report.Stopped == null)
+                        await EnvironmentFilesService.ApplyDefaultsAfterImportAsync(connectionKey, worldId, $"world \"{worldLabel}\"", existingBefore, target.Scenes,
+                                                                                    () => observer?.StopReason?.Invoke(),
+                                                                                    message => observer?.Progress?.Invoke(progressPrefix, message, (float)(w + 1) / totalWorlds));
 
                     if (report.Stopped != null)
                     {
@@ -654,6 +669,9 @@ namespace Virtuademy.SDK.Environments.Editor
                     }
                 }
 
+                // Which scenes are new at the tenant level, read before the import: only those get their default files afterwards.
+                EnvironmentFilesService.ExistingKeys existingBefore = await EnvironmentFilesService.ExistingKeysAsync(connectionKey, null, scenes);
+
                 for (int s = 0; s < scenes.Count; s++)
                 {
                     string scene = scenes[s];
@@ -704,6 +722,11 @@ namespace Virtuademy.SDK.Environments.Editor
                         Fail($"Tenant: import failed for \"{scene}\". Check the console for details.");
                     }
                 }
+
+                if (report.Stopped == null)
+                    await EnvironmentFilesService.ApplyDefaultsAfterImportAsync(connectionKey, null, "the tenant level", existingBefore, target.Scenes,
+                                                                                () => observer?.StopReason?.Invoke(),
+                                                                                message => observer?.Progress?.Invoke("Deploy to Tenant", message, 1f));
             }
             finally
             {

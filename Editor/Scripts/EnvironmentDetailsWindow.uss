@@ -1,0 +1,646 @@
+/*
+ * The Environment Details window. Loaded after AddressablesConfigurationWindow.uss, whose .section, .section-header, .section-title,
+ * .section-note, .section-bar, .bar-text, .banner, .banner-text, .chip, .chip-sandbox, .chip-preproduction, .chip-danger, .dot and .muted it reuses.
+ *
+ * Colours are variables set on the window's root, one set for each editor skin (the window adds vd-dark or vd-light): the dark set is the one
+ * of the other windows, the light set keeps the same meanings readable on a light background.
+ */
+
+.vd-details {
+    flex-grow: 1;
+    --vd-muted: rgb(139, 139, 139);
+    --vd-strong: rgb(226, 226, 226);
+    --vd-border: rgba(0, 0, 0, 0.35);
+    --vd-field: rgb(42, 42, 42);
+    --vd-hover: rgba(255, 255, 255, 0.07);
+    --vd-head: rgba(255, 255, 255, 0.04);
+    --vd-sel: rgb(44, 93, 135);
+    --vd-sel-text: rgb(255, 255, 255);
+    --vd-ok: rgb(127, 201, 143);
+    --vd-warn: rgb(230, 160, 70);
+    --vd-err: rgb(240, 150, 150);
+    --vd-warn-bg: rgba(230, 160, 40, 0.16);
+    --vd-err-bg: rgba(220, 70, 70, 0.16);
+    --vd-info-bg: rgba(80, 140, 230, 0.14);
+    --vd-badge-info: rgb(58, 121, 187);
+    --vd-badge-warn: rgb(201, 138, 30);
+    --vd-badge-err: rgb(208, 69, 58);
+    --vd-accent: rgb(75, 155, 255);
+}
+
+.vd-details.vd-light {
+    --vd-muted: rgb(85, 85, 85);
+    --vd-strong: rgb(0, 0, 0);
+    --vd-border: rgba(0, 0, 0, 0.2);
+    --vd-field: rgb(240, 240, 240);
+    --vd-hover: rgba(0, 0, 0, 0.09);
+    --vd-head: rgba(0, 0, 0, 0.05);
+    --vd-sel: rgb(58, 114, 176);
+    --vd-ok: rgb(29, 107, 49);
+    --vd-warn: rgb(138, 82, 0);
+    --vd-err: rgb(163, 34, 26);
+    --vd-warn-bg: rgba(230, 160, 40, 0.25);
+    --vd-err-bg: rgba(220, 70, 70, 0.18);
+    --vd-info-bg: rgba(60, 120, 210, 0.15);
+    --vd-accent: rgb(0, 110, 245);
+}
+
+/* The shared chips and the muted text, readable on the light skin too. */
+.vd-light .chip {
+    background-color: rgba(0, 0, 0, 0.08);
+    color: rgb(51, 51, 51);
+}
+
+.vd-light .chip-sandbox {
+    background-color: rgba(60, 140, 230, 0.3);
+    color: rgb(14, 62, 120);
+}
+
+.vd-light .chip-preproduction {
+    background-color: rgba(235, 135, 35, 0.35);
+    color: rgb(107, 53, 0);
+}
+
+.vd-light .chip-danger {
+    background-color: rgba(220, 70, 70, 0.2);
+    color: rgb(163, 34, 26);
+}
+
+.vd-details .muted,
+.vd-muted {
+    color: var(--vd-muted);
+    font-size: 11px;
+}
+
+.vd-strong {
+    color: var(--vd-strong);
+    -unity-font-style: bold;
+}
+
+.vd-small {
+    font-size: 11px;
+    white-space: normal;
+}
+
+.vd-ok {
+    color: var(--vd-ok);
+}
+
+.vd-warn {
+    color: var(--vd-warn);
+}
+
+.vd-err {
+    color: var(--vd-err);
+}
+
+.vd-wrap {
+    white-space: normal;
+    flex-shrink: 1;
+}
+
+.vd-row {
+    flex-direction: row;
+    align-items: center;
+}
+
+.vd-grow {
+    flex-grow: 1;
+    flex-shrink: 1;
+}
+
+.vd-link {
+    color: var(--vd-accent);
+}
+
+/* Scene bar and defaults strip. */
+.vd-scene-bar {
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 8px 6px 8px;
+}
+
+.vd-scene-bar > Label,
+.vd-scene-bar > .unity-base-popup-field {
+    margin-right: 8px;
+}
+
+.vd-scene-bar .unity-base-popup-field {
+    min-width: 200px;
+    margin-left: 0;
+}
+
+.vd-defaults {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 5px 8px;
+    border-top-width: 1px;
+    border-top-color: var(--vd-border);
+    background-color: var(--vd-head);
+}
+
+.vd-defaults-title {
+    -unity-font-style: bold;
+    color: var(--vd-strong);
+    font-size: 11px;
+    margin-right: 10px;
+}
+
+.vd-defaults > .unity-object-field {
+    width: 200px;
+    margin: 0 10px 0 4px;
+}
+
+.vd-defaults-note {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 160px;
+    white-space: normal;
+}
+
+.vd-defaults-refusal {
+    color: var(--vd-warn);
+    font-size: 11px;
+    margin-left: 8px;
+    white-space: normal;
+}
+
+/* Body: the list and the pane. */
+.vd-body {
+    flex-grow: 1;
+    flex-direction: row;
+    border-top-width: 1px;
+    border-top-color: var(--vd-border);
+}
+
+.vd-left {
+    width: 270px;
+    flex-shrink: 0;
+    border-right-width: 1px;
+    border-right-color: var(--vd-border);
+}
+
+.vd-right {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.vd-full {
+    flex-grow: 1;
+}
+
+.vd-pane {
+    padding-bottom: 8px;
+}
+
+/* The left list. */
+.vd-li {
+    flex-direction: row;
+    align-items: center;
+    padding: 3px 8px 3px 26px;
+    min-height: 22px;
+}
+
+.vd-li:hover {
+    background-color: var(--vd-hover);
+}
+
+.vd-li--sel,
+.vd-li--sel:hover {
+    background-color: var(--vd-sel);
+}
+
+.vd-li--sel Label,
+.vd-details .vd-li--sel .muted {
+    color: var(--vd-sel-text);
+}
+
+.vd-li--all {
+    padding-left: 8px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--vd-border);
+    -unity-font-style: bold;
+}
+
+.vd-li-name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vd-li-tenant {
+    -unity-font-style: italic;
+}
+
+.vd-li-lock {
+    width: 12px;
+    height: 12px;
+    margin: 0 4px;
+    flex-shrink: 0;
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: var(--vd-muted);
+}
+
+.vd-li--sel .vd-li-lock {
+    -unity-background-image-tint-color: var(--vd-sel-text);
+}
+
+.vd-li-count {
+    width: 40px;
+    flex-shrink: 0;
+    -unity-text-align: middle-right;
+}
+
+.vd-ind {
+    flex-direction: row;
+    align-items: center;
+    margin: 0 6px;
+    flex-shrink: 0;
+}
+
+.vd-ind-sq {
+    width: 8px;
+    height: 8px;
+    margin-left: 3px;
+    border-width: 1px;
+    border-radius: 2px;
+    border-color: var(--vd-muted);
+}
+
+.vd-ind-sq--yes {
+    background-color: var(--vd-ok);
+    border-color: var(--vd-ok);
+}
+
+.vd-ind-sq--online {
+    border-width: 2px;
+    border-color: var(--vd-warn);
+}
+
+.vd-group-head {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px 0 8px;
+}
+
+.vd-group-account {
+    padding: 0 8px 2px 22px;
+    white-space: normal;
+}
+
+.vd-group-msg {
+    padding: 2px 8px 6px 26px;
+    white-space: normal;
+}
+
+.vd-group-msg > Label {
+    white-space: normal;
+}
+
+.vd-group-msg Button {
+    align-self: flex-start;
+    margin: 4px 0 0 0;
+}
+
+.vd-dot--grey {
+    background-color: rgb(128, 128, 128);
+}
+
+.vd-dot--blue {
+    background-color: rgb(89, 153, 242);
+}
+
+.vd-dot--green {
+    background-color: rgb(77, 199, 89);
+}
+
+.vd-dot--amber {
+    background-color: rgb(235, 173, 51);
+}
+
+/* The pane. */
+.vd-pane-title {
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 8px 2px 8px;
+}
+
+.vd-pane-title-name {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: var(--vd-strong);
+    margin-right: 6px;
+}
+
+.vd-pane-title-where {
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal;
+    margin-right: 6px;
+}
+
+.vd-banner {
+    flex-direction: row;
+    align-items: center;
+    padding: 5px 7px;
+    margin: 6px;
+    border-radius: 3px;
+}
+
+.vd-banner--info {
+    background-color: var(--vd-info-bg);
+}
+
+.vd-banner--warn {
+    background-color: var(--vd-warn-bg);
+}
+
+.vd-banner--err {
+    background-color: var(--vd-err-bg);
+}
+
+.vd-banner-text {
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal;
+    margin: 0 6px 0 6px;
+}
+
+.vd-banner > Button {
+    flex-shrink: 0;
+}
+
+.vd-badge {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 1px;
+    border-radius: 7px;
+    font-size: 10px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(255, 255, 255);
+    padding: 0;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.vd-badge--info {
+    background-color: var(--vd-badge-info);
+}
+
+.vd-badge--warn {
+    background-color: var(--vd-badge-warn);
+}
+
+.vd-badge--err {
+    background-color: var(--vd-badge-err);
+}
+
+.vd-primary {
+    background-color: rgb(58, 121, 187);
+    border-color: rgb(42, 93, 147);
+    color: rgb(255, 255, 255);
+}
+
+.vd-primary:hover {
+    background-color: rgb(70, 135, 205);
+}
+
+.vd-primary:disabled {
+    opacity: 0.45;
+}
+
+.vd-section-lines > Label {
+    margin: 1px 0;
+}
+
+.vd-thumb {
+    flex-shrink: 0;
+    border-radius: 2px;
+    background-color: var(--vd-field);
+}
+
+.vd-thumb--none {
+    border-width: 1px;
+    border-color: var(--vd-border);
+}
+
+.vd-thumb-row {
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.vd-thumb-side {
+    flex-direction: column;
+    flex-grow: 1;
+    flex-shrink: 1;
+    margin-left: 10px;
+    min-width: 0;
+}
+
+.vd-thumb-side > * {
+    margin-bottom: 4px;
+}
+
+.vd-proj-line {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.vd-proj-line > Label {
+    margin-right: 6px;
+}
+
+.vd-proj-line Button {
+    margin-left: 0;
+}
+
+.vd-kv {
+    flex-direction: row;
+    align-items: center;
+    margin: 1px 0;
+}
+
+.vd-kv > .vd-kv-key {
+    width: 110px;
+    flex-shrink: 0;
+}
+
+.vd-counts {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.vd-counts > Label {
+    margin-right: 14px;
+}
+
+.vd-exp-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.vd-exp-row .unity-base-popup-field {
+    width: 110px;
+    flex-grow: 0;
+    flex-shrink: 0;
+    margin: 0 0 0 8px;
+}
+
+.vd-exp-you {
+    width: 28px;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.vd-exp-err {
+    color: var(--vd-err);
+    -unity-font-style: bold;
+    margin-left: 6px;
+}
+
+/* The inline strip that confirms a replace in one place. */
+.vd-strip {
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 7px;
+    margin: 8px 0 0 0;
+    border-radius: 3px;
+    background-color: var(--vd-info-bg);
+}
+
+.vd-strip-text {
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal;
+    margin-right: 8px;
+}
+
+.vd-strip-arrow {
+    margin: 0 6px;
+    color: var(--vd-muted);
+}
+
+.vd-strip > Button {
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+
+.vd-problems {
+    margin-top: 2px;
+    white-space: normal;
+}
+
+.vd-problems > Label {
+    white-space: normal;
+    margin-left: 4px;
+}
+
+/* All places. */
+.vd-filepick {
+    flex-direction: row;
+    align-items: center;
+    margin: 3px 0;
+}
+
+.vd-filepick > .vd-filepick-label {
+    width: 118px;
+    flex-shrink: 0;
+}
+
+.vd-filepick > .unity-object-field {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 120px;
+    margin: 0 8px 0 0;
+}
+
+.vd-filepick-info {
+    width: 150px;
+    flex-shrink: 0;
+    white-space: normal;
+}
+
+.vd-pv-head,
+.vd-pv-row {
+    flex-direction: row;
+    align-items: center;
+    padding: 3px 6px;
+    border-bottom-width: 1px;
+    border-bottom-color: var(--vd-border);
+}
+
+.vd-pv-head Label {
+    color: var(--vd-muted);
+    font-size: 11px;
+    -unity-font-style: bold;
+}
+
+.vd-pv-row--off {
+    opacity: 0.6;
+}
+
+.vd-pv-tick {
+    width: 22px;
+    flex-shrink: 0;
+}
+
+.vd-pv-place {
+    width: 28%;
+    min-width: 120px;
+    flex-shrink: 1;
+    white-space: normal;
+}
+
+.vd-pv-thumb {
+    width: 120px;
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.vd-pv-loc {
+    width: 20%;
+    min-width: 100px;
+    flex-shrink: 1;
+    white-space: normal;
+}
+
+.vd-pv-result {
+    flex-grow: 1;
+    flex-shrink: 1;
+    white-space: normal;
+}
+
+/* Loading: skeletons and the spinner. */
+.vd-skel {
+    height: 10px;
+    margin: 4px 0;
+    border-radius: 2px;
+    background-color: var(--vd-hover);
+    transition-property: opacity;
+    transition-duration: 0.7s;
+}
+
+.vd-skel--dim {
+    opacity: 0.35;
+}
+
+.vd-spinner {
+    width: 12px;
+    height: 12px;
+    margin: 0 4px;
+    flex-shrink: 0;
+    border-width: 2px;
+    border-radius: 6px;
+    border-color: var(--vd-muted);
+    border-top-color: var(--vd-accent);
+}

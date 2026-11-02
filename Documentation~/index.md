@@ -57,6 +57,14 @@ Unity -batchmode -nographics -projectPath <project> -logFile -
 | `build [-vdScenes a,b] [-vdConnection <connection>]` | verifies the interpreted scripts on the connection's platform (the computer's only usable one when none is named), builds every platform each included scene needs, zips into `ServerData` |
 | `preview (-vdWorlds <ids> \| -vdTenant) [-vdConnection <connection>] [-vdExpectTenant <label>] [-vdScenes a,b]` | what a deploy there would add and update; checks the tenant label when given |
 | `deploy (-vdWorlds <ids> \| -vdTenant) [-vdConnection <connection>] -vdExpectTenant <label> [-vdBuild] [-vdDryRun] [-vdScenes a,b]` | uploads and imports the built zips (and the interpreted assembly, to worlds); `-vdExpectTenant` is the tenant label of the connection it acts on (`whoami` shows it) and is mandatory (exit 24 when missing, 30 when it is another tenant's); `-vdBuild` builds first, `-vdDryRun` sends nothing |
+| `experiences -vdWorlds <ids> [-vdScenes a,b] [-vdConnection <connection>] [-vdExpectTenant <label>]` | for each scene (the ones ticked **Include in build**, or `-vdScenes`'s) in each world: the environment's id there, or that it is not published there; how many experiences use it, by type and state; the Core experiences the login is shown (state, `isMine`, `canChangeStatus`); `canCreateCore`; and `coreHiddenDrafts`, the Core drafts of other authors it is not shown. Read-only |
+| `create-core -vdWorlds <ids> -vdScenes a,b [-vdLabel <text>] [-vdPublished] [-vdDryRun] [-vdConnection <connection>] [-vdExpectTenant <label>]` | makes sure each scene's environment has a Core experience in each world, creating one only where none exists (of any author and state): a draft, or already in the catalog with `-vdPublished`. Idempotent: the second run reports `alreadyExisted` and changes nothing. `-vdLabel` (1 to 100 characters, the environment's label when absent) needs exactly one scene. `-vdDryRun` reads only and reports `wouldCreate` |
+| `experience-status -vdWorlds <one id> -vdExperience <id> -vdStatus Draft\|Published [-vdConnection <connection>] [-vdExpectTenant <label>]` | sets one experience's publication state (`Published` is in the catalog). Setting the state it has changes nothing (`changed: false`). Only the experience's author and the world's Owner may; anyone else gets exit 33 |
+| `published [-vdScenes a,b] [-vdConnection <connection>]` | every scene of the scene list (included in the build or not): where it is published and the thumbnail and localization file each place holds (address, SHA-256, whether the project's `Assets/Virtuademy/Editor/PublishFiles/` holds the same file, `canWrite`); whether the tenant can receive files from the SDK. Read-only, any tenant |
+| `save-files [-vdScenes a,b] [-vdWorlds <ids> \| -vdTenant] [-vdBackupFolder <path>] [-vdDryRun] [-vdConnection <connection>]` | saves those files into `PublishFiles/` (never twice the same file) and writes a manifest for `restore`; `-vdBackupFolder` writes a full copy and its manifest to that folder instead |
+| `set-files -vdExpectTenant <label> -vdScenes <one> [-vdThumbnail <asset>] [-vdLocalization <asset>] (-vdWorlds <ids> \| -vdAllWorlds \| -vdTenant) [-vdExcludeWorlds <ids>] [-vdDryRun] [-vdConnection <connection>]` | replaces the files at those places with project assets (under `Assets/`); an image goes online as a JPEG of at most 2560 x 1440 (converted into `PublishFiles/` when it is not one already), the files the places hold now are saved to the project first, a place with the same file is `unchanged`; a file the platform would refuse is exit 37, a place not changed is exit 38 |
+| `restore -vdExpectTenant <label> -vdManifest <path> [-vdScenes a,b] [-vdWorlds <ids> \| -vdTenant] [-vdDryRun] [-vdConnection <connection>]` | puts back what a `save-files` manifest recorded, for the same connection, at the same environments |
+| `scene-files -vdScenes <one> [-vdThumbnail <asset>] [-vdLocalization <asset>] [-vdClear]` | the scene's default thumbnail and localization file, in the scene list (needs no network; without options it shows them). A deploy sends them when it makes the scene's environment in a place, and never again: `deploy.targets[].scenes[].defaultFiles` says what it did, `-vdDryRun` reports it in `defaultFiles` |
 
 A connection is one tenant of one Configuration-API instance (ADR 0037). It is named by its key (the instance's base URL, `#`,
 the tenant key), its tenant key, its tenant label or `app/env`; a name that fits none or several is exit 26. The connections live
@@ -85,12 +93,75 @@ mismatch (`-vdExpectTenant` is not the tenant of the connection the command acts
 `deploy` to a tenant whose platform version has another year or release than the one the project was set up from, or reports
 none; a project set up from `develop` is not checked), 32 platform mismatch (the connection's app is not a CreatorKit app: `worlds`,
 `preview`, `deploy` and `build` on it, a `login` or `tenant-config` with a key of another platform; the remedy is the CreatorKit
-configuration file). 25 (API host not matching the logged-in tenant) is no longer
+configuration file), 33 not allowed (`experiences`, `create-core` or `experience-status`: the login may not do it in that world), 34 the tenant
+does not offer it (its API has no route for it, so the SDK cannot show or change the experiences there; the Back Office can), 35 the environment is not
+published in that world, or the experience was not found there, 36 the world has no session capacity set (`create-core`), 37 a thumbnail or localization file would be refused by the platform (nothing was sent), 38 one or more places
+were not changed (`set-files`, `restore`: not allowed, the tenant's platform cannot receive files yet, not published there, or an error; the
+others may have changed). 25 (API host not matching the logged-in tenant) is no longer
 returned and stays reserved, and so does 23 (configuration file not ignored by git, up to 2026.6: `tenant-config` writes
-nothing to the project any more). Arguments are strict (a misspelt, duplicated or stray option is exit 10). A timeout during
+nothing to the project any more). Arguments are strict (a misspelt, duplicated or stray option is exit 10). `experiences`, `create-core` and `experience-status` act on one target
+for each scene and world, and report each in the REPORT's `targets` (`experience-status`: `experienceStatus`) with its own `status` and `message`; the
+exit code is the most telling outcome of them, in this order: 11, then 20 (the platform answered an error), 34, 33, 36, 35, then 0.
+They check the connection as `preview` does (exit 26, 32), not the version rule (the routes are the server's), and renew the session silently (exit 11 when they cannot). A timeout during
 a deploy lets the step in flight finish and reports what was and was not done. Batch mode never starts an interactive login on its own: log in once with `login` (or from the connection's group in **Virtuademy > Publish Environments**), and the
 commands renew the session silently. The scenes to publish are the ones ticked **Include in build** in the window's list
 (`Assets/Virtuademy/Editor/Settings/AddressablesSceneList.asset`). Details: the class's XML documentation.
+
+## Environment Details window
+
+Where a scene is published, what its thumbnail and localization file are in each place, and the experiences that use it: the **i** button at the end of
+a scene's row in **Virtuademy > Publish Environments** opens the **Environment Details** window on that scene, and **Virtuademy > Environment Details** opens it on the scene it showed last (one window for the project, reused when it is
+open; it is not compiled in the application, like Publish Environments). It is the window's counterpart of the `published`, `save-files`, `set-files`,
+`restore`, `scene-files`, `experiences`, `create-core` and `experience-status` commands, and uses the same services. A *place* is a world, or a tenant's tenant
+level, where the scene's environment exists online, on one connection; the tenant level is one environment shared by its worlds.
+
+**In the scene row.** After the scene's name: a 32 x 18 preview of the scene's default thumbnail (a dashed slot with a plus when it has none) and a
+**Localization** chip (dim when it has no default file). The defaults are what a deploy sends the first time it makes the scene's environment in a
+place; later deploys never touch a place's files. Drop an image asset of the project (PNG or JPEG) on the slot, or a `.csv` on the chip, to set one;
+a click on either opens the details. The platform toggles (VR, WebGL, Mobile) are filled when the scene is built for them and outlined when it is not. A new
+scene is built for all three. The line under the scene says in how many places and on how many connections it is published; its tooltip has the text of
+each connection. In the deploy preview, a scene that is new in a world and has no default thumbnail or localization file is said under that world's `New` line.
+
+**The window.** The scene bar chooses the scene of the scene list and has **Refresh**; the defaults strip under it edits the scene's two defaults (local,
+no request). The window reads each connection on its own when it opens, on Refresh and when the scene changes; a connection that is not logged in says so
+with **Log in**, one that could not be read says why with **Retry**. The left list groups the places by connection, as Publish Environments groups its
+targets, with two squares for each place: thumbnail and localization file, green when the project holds the same file (same SHA-256), amber when the file
+is online only, empty when there is none. When every connection was read and the scene is in one place, the list goes away.
+
+**A place** shows its thumbnail and localization file, whether the project holds the same file, and its experiences (worlds only). **Save to project**
+keeps the online file in `Assets/Virtuademy/Editor/PublishFiles/`, unless a project file already has the same hash. **Replace in this world only...** (**Replace...** at
+tenant level) picks a project asset with Unity's object picker, checks it on this computer (an image decodes as PNG or JPEG; a localization file follows the
+platform's rules), says when an image will be converted to a JPEG of at most 2560 x 1440 in the publish folder, and sends it after **Replace**; the file the
+place holds now is saved to the project first. A tenant on a platform that cannot receive files yet, and an account that may not change a place, are said
+once in a banner and the buttons are disabled with the reason in their tooltips. The Core experiences of the world are listed with a popup that sets each one's
+state (Published or Draft) at once; when there is none, **Create Core experience** makes it (as a draft).
+
+**All places** holds what acts on many places: **Save** the online files the project lacks, **Replace in all places** (two asset fields and **Use the defaults**;
+**Preview changes** lists each place with what would change, which ones are skipped and why; **Apply** sends, place by place, and nothing is rolled back when one
+fails: the result says which, and **Retry failed** sends again to them only), and **Create Core experiences** in the worlds that have none.
+
+The window remembers its size and the last scene per user (`EditorPrefs`); the files it downloads for previews are in `Library/Virtuademy/EnvironmentDetails/`,
+outside git. It writes in `Assets/` only on **Save to project** (and **Save N files** in All places, which writes one file for each online file the project
+lacks: many at once), on the save of a place's previous file before a replace, and on the conversion of an image before an upload. Setting a default, in the
+defaults strip or by a drop on a scene's row, writes the scene list asset (`AddressablesSceneList.asset`) and saves it at once (one undo step).
+
+## Addressables groups
+
+A project that publishes environments has one Addressables group, the default one, and keeps it
+empty. The build adds each scene to it alone, builds it once for every target platform, then takes
+it out again: everything the scene uses goes into its bundle as a dependency, so no asset has to be
+marked Addressable, and one that is would be packed into the download of every scene. Nothing in
+the SDK loads an environment's own Addressables entries, and the interpreted scripts may not use
+the Addressables assemblies.
+
+**Fix build settings**, in **Virtuademy > Advanced > Addressables settings** and in the banner of
+**Virtuademy > Publish Environments** when the settings are not the SDK's (and the `addressables` step of the
+setup command line), puts the project in that state: it removes every other group and every entry
+of the default group, and sets the default group's schema to the SDK's values. Only the groups and
+the marking are removed, never an asset file; the dialog lists them first and the Console logs them
+after. Addressables identifies entries by GUID, so assets with the same name in different folders
+do not clash. Scenes do: two scene names that become the same once lower-cased and reduced to
+`a-z` and `0-9` are refused by the build.
 
 ## Folders
 

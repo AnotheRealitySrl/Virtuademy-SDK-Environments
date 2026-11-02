@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **`AddressablesBundleScriptableObject` removed** (major: three public editor types go, `AddressablesBundleScriptableObject`,
+  `EnvironmentAssetDefinition` and `AddressablesBundleScriptableObjectEditor`). The 2024 asset that set up the Addressables groups
+  per bundle had been read by nothing since 2025-04 (its loader menu went in `436784d`), and its thumbnail field had been obsolete
+  since 2024-11: thumbnails are set in the Back Office. Its **Configure Addressables Bundle** button still worked, and rewrote the
+  Default, Environments and Thumbnails groups after the 2024 model, emptying the default group but for the localization file, which
+  goes against the single-group rule of today's build. The *Create ▸ Virtuademy ▸ SDK-Environments ▸ AddressablesBundle* menu goes
+  with it. Projects from 2024 may keep `AddressablesBundle-*.asset` files (under `Assets/Virtuademy/Settings/Editor/AddressablesConfigurations`
+  after the folder update routine, `Assets/ReflectisSettings/...` before it): they now show a missing script and can be deleted.
+  Nothing is migrated from them: the thumbnails they hold are older than the ones set in the Back Office since.
+
 - **The Virtuademy menu is grouped and ordered** (minor): **Setup project**, **Publish Environments** and **Readme** first, then
   **Update routines** (newest first), then **Advanced**, with a separator before each submenu (menu priorities). **Update VS Library** is
   now **Advanced ▸ Update Visual Scripting library**: the setup updates the library itself, and does it again when the library lacks
@@ -34,8 +44,78 @@ longer returned, and a `-vdExpectTenant` that names another tenant is now 30 ins
 connections instead of a file, change for a script that drives them: that warrants a major bump at the release cut. Every
 environment project now uses every connection of the computer and a command that names none works only on a computer with
 one usable connection, which changes what a script that relied on the project's list gets.
+The experiences commands add three `EnvironmentsCli` commands, four options (`-vdLabel`, `-vdPublished`, `-vdExperience`, `-vdStatus`) and the exit codes 33 to 36, and
+a public `EnvironmentExperiencesService` (minor).
+The files commands add five `EnvironmentsCli` commands (`published`, `save-files`, `set-files`, `restore`, `scene-files`), their options
+and the exit codes 37 and 38; the Environment Details window and the scene row's default files are new editor UI (minor).
 
 #### Added
+- **The Environment Details window** (minor). The `i` button at the end of a scene's row in Publish Environments opens `EnvironmentDetailsWindow`
+  (title *Environment Details*, one window for the project, minimum 760 x 480; its size and the last scene it showed are kept per user in `EditorPrefs`)
+  on that scene; **Virtuademy > Environment Details** (under Publish Environments) opens it on the scene it showed last. It reads every connection of the computer each time it opens, on **Refresh** and when the scene changes, each connection on its own (a
+  slow tenant does not hold the others), and shows where the scene's environment is published: the tenant level and every world the account can see.
+  *The left list* has one group per connection, drawn as in Publish Environments (dot, tenant, environment chip, platform version, account), with a
+  row for each place: two squares for the thumbnail and the localization file (green: the same file is in the project; amber: online only; empty:
+  none), a padlock when the account can see the place and not change it, and the number of experiences. A connection that is not logged in says so
+  with **Log in**, one that could not be read says why with **Retry**. When every connection was read and the scene is in one place, the list goes away
+  and the window shows that place; when it is in none, it says to publish it from Publish Environments. *The pane of a place* shows its thumbnail
+  (192 x 108 preview, size and format) and its localization file (keys and languages), whether the project holds the same file (**Show**, or **Save to
+  project**, which keeps the online file in `Assets/Virtuademy/Editor/PublishFiles/` unless the project already holds it), **Replace in this world
+  only...** (an object picker on the project's images or `.csv` files, a check of the file before anything is sent, a note when an image will be
+  converted to a JPEG, then **Replace**; the file the place holds now is saved to the project first), its **Experiences** (counts, the Core
+  experiences with a popup to set each one's state, **Create Core experience** when there is none) and **Back Office**. It tells a tenant that cannot
+  receive files yet, a place the account cannot change and experiences it cannot see apart, in words that never name a version. *All places* saves
+  every online file the project lacks, **Replace in all places** (two asset fields, **Use the defaults**, a local check, then a preview table of what
+  changes in each place, ticks, and a result per place with **Retry failed**; nothing is rolled back) and **Create Core experiences** for the worlds
+  that have none. The strip under the scene bar holds the scene's default thumbnail and localization file, which a deploy sends the first time it
+  makes the scene's environment in a place. Everything it does also exists on the command line; the window is only a client of
+  `EnvironmentFilesService` and `EnvironmentExperiencesService`, plus two members the window needed on the first (`EnsureCachedAsync`, which downloads
+  into `Library/Virtuademy/EnvironmentDetails/` a file whose hash the platform said, so it can be previewed, and `MissingDefaultsNote`). The Back Office
+  link and the read of the account's Back Office access moved from Publish Environments to `EnvironmentBackoffice`, which both windows use; that
+  window behaves as before. The Environment Details window is not compiled in the application (`VIRTUADEMY_APPLICATION`), like Publish Environments.
+- **Scene rows in Publish Environments show the scene's defaults** (minor). After the scene's name, a 32 x 18 preview of the default thumbnail (a
+  dashed slot with a plus when there is none) and a **Localization** chip (dim when there is none): a drop of an image asset on the slot, or of a `.csv`
+  on the chip, sets the default (one undo step), a click opens the Environment Details window. The platform toggles are outlined when off, with the normal
+  text colour, so they read as buttons; their tooltips say what a click does. The line under a scene is one sentence, `Published in 4 places on 2
+  connections` or `Not published yet`, with the text of each connection in its tooltip. The deploy preview says, under each world's `New (n)` line, which
+  new scene lacks a default thumbnail or localization file and will be published without it (computed from the scene list: no request).
+- **`EnvironmentsCli` commands `experiences`, `create-core` and `experience-status`, and `EnvironmentExperiencesService`**: for an environment
+  published in a world, which experiences use it and how many (by type and state, with the Core experiences the login is shown, whether it may change
+  their state and whether it may create one), creating its Core experience when none exists, and setting an experience's publication state. The
+  commands are `experiences -vdWorlds <ids> [-vdScenes a,b]`, `create-core -vdWorlds <ids> -vdScenes a,b [-vdLabel <text>] [-vdPublished] [-vdDryRun]`
+  (idempotent: it creates only where no Core experience exists, of any author and state) and `experience-status -vdWorlds <id> -vdExperience <id>
+  -vdStatus Draft|Published`; each takes `-vdConnection` and `-vdExpectTenant`, does not apply the version rule (a tenant without the routes answers exit 34), and reports every scene and
+  world it tried. They ask the platform, which decides per world who may: a login that may not gets exit 33 and a message that says so, and a tenant
+  whose API has no such routes yet gets exit 34 ("cannot show or change the experiences of an environment from the SDK yet: use the Back Office"). New exit
+  codes: 33 not allowed, 34 the tenant does not offer it, 35 the environment is not published in that world or the experience was not found, 36 the world has no session
+  capacity set; with several targets the exit code is the most telling outcome (11, 20, 34, 33, 36, 35), and the REPORT has each one. The service
+  (`Editor/Scripts/EnvironmentExperiencesService.cs`) is what the Publish Environments window will use: async methods that take a connection key and answer
+  with a status (`Ok`, `NotAllowed`, `NotSupportedByTenant`, `NotPublishedInWorld`, `ExperienceNotFound`, `WorldHasNoCapacity`, `LoginRequired`,
+  `Unreachable`, `Failed`), the data and a message. `EnvironmentsCli` is now `partial`; the three commands are in `EnvironmentsCli.Experiences.cs`.
+- **A scene's thumbnail and localization file, per place, from the SDK** (minor). `EnvironmentsCli` gets `published` (where each scene of the
+  scene list is published, with the thumbnail and localization file each place holds: address, SHA-256, `canWrite`, and whether the project's
+  `Assets/Virtuademy/Editor/PublishFiles/` holds the same file), `save-files` (saves those files into the project, never writing a file the project
+  already holds, and a manifest; `-vdBackupFolder` writes a full copy elsewhere), `set-files` (replaces them at some places with project assets, after
+  saving the current ones to the project; a place that already holds the same file is `unchanged`; `-vdDryRun`), `restore -vdManifest` (puts back what
+  a `save-files` manifest recorded) and `scene-files` (the scene's default files). New exit codes: 37 a file would be refused by the platform (nothing is
+  sent), 38 one or more places were not changed (not allowed, the tenant cannot receive files yet, or an error). An image is prepared before it goes
+  online: a JPEG of at most 2560 x 1440, never upscaled, transparency flattened on white, quality 85. The platform keeps an upload byte for byte only
+  when it is a plain baseline JPEG: before its scan only SOI, APP0 JFIF, DQT, DHT, DRI and one SOF0 (8 bits, 1 or 3 components), in the scan only
+  entropy-coded bytes, FF D9 as the last two bytes and nothing after, within 2560 x 1440 (no EXIF, XMP, ICC, comment or progressive scan). The SDK sends such a
+  file unchanged (after decoding it once to catch corrupt data); anything else is converted into a new JPEG in the publish folder, written only right before it is
+  sent, and a file the project already holds anywhere under `Assets/` (same SHA-256) is reused, never copied again. An image over 50 megapixels is refused (exit 37);
+  a JPEG Unity cannot read is sent as it is with a warning. A localization file is checked against the platform's rules, which are those of the player's I2 reader
+  (message for message, with a port of that reader that compares what it reads with the rules): UTF-8 (a BOM is dropped), the header is the first line, no empty line
+  after it, no row of only commas, a line end or a lone CR ends a row, a quote only at the start of a quoted cell (`""` inside; no quote elsewhere, no empty `""`, no text
+  after a closing quote), `Key` exactly, `Type` and `Desc` only in columns 2 and 3, language names without brackets or a leading `$` and, in columns 2 and 3, without
+  "type" or "desc", language codes like `it` or `pt-BR` once each, keys of letters, digits, `/`, `_` and `-` that are unique also once the slashes are removed,
+  at most 2 MB; and against the tenant's languages (a missing language says which one its users will see; no language in common is exit 37). The
+  command line and the service (`EnvironmentFilesService`) read a file's hash from the platform, or download and hash it where the platform does not say.
+  Writes need a tenant whose platform has the routes; for the others the SDK says so and reads still work. Downloads are anonymous and never carry the session's token.
+- **A scene's default files** (minor): `SceneConfiguration` has a default thumbnail (an image asset) and a default localization file (a `.csv`
+  asset), kept in the scene list (`scene-files`). When a deploy makes the scene's environment in a place, it waits (up to three minutes) for the environment
+  to show up in the place's list and sends them, and says what it did in `deploy.targets[].scenes[].defaultFiles`; a later deploy never touches a place's
+  files. `deploy -vdDryRun` reports them in `defaultFiles`.
 - **`EnvironmentsCli` commands `login`, `logout`, `connections` and `whoami`** (meta-repo ADR 0037, first slice), over the
   per-user connection store of `Virtuademy-SDK-Core`. `login [-vdConnection <connection> | -vdApp <app> [-vdEnv <key>]]
   [-vdNoBrowser] [-vdLoginTimeoutSeconds <n>]` logs in to a connection of the store, or to the one of a configuration file
@@ -379,6 +459,10 @@ one usable connection, which changes what a script that relied on the project's 
   (previous mode, new mode), usable from interpreted scripts.
 
 #### Changed
+- **A new scene in the Publish Environments list is built for every platform: VR, WebGL and Mobile.** It was VR and
+  WebGL. A platform turned off is saved with the scene's entry, as before, so it stays off. Entries saved earlier keep
+  their platforms: an entry with VR and WebGL cannot tell the old default from a choice. Mobile builds for Android and
+  iOS, so the iOS build module is needed, as the setup already checks.
 - **Publish Environments takes its header from `Virtuademy-SDK-Core`** (`VirtuademyWindowHeader`): the same logo and
   window name as the SDK's other windows and the setup window. The two logo images and `Editor/Icons/` moved there with
   their GUIDs; nothing else referenced them.
@@ -529,6 +613,12 @@ one usable connection, which changes what a script that relied on the project's 
   the change (it said: the new one), `PreviousLanguage` is the language at world ready until a change (it said:
   empty), `AvailableLanguages` is every language of the localization database and `SetLanguage` takes a language
   name and does not check the tenant's set. Comments only: the behaviour is unchanged.
+- **"Fix build settings" lists what the fix removes**: the Addressables groups by name with their entry counts (a few names,
+  then "and N more") and the entries of the default group, and says that no asset file is deleted, only the groups and the
+  Addressable marking, because a scene takes what it uses with it at build. It is the one Fix dialog of the SDK, which
+  the Addressables settings window and the banner of Publish Environments open, and the build-blocked dialog of Publish
+  Environments says the same. `Apply` logs what it removed (`[PublishEnvironments]`). The behaviour is unchanged; the
+  package documentation now states the rule (one default group, kept empty). No public member changes.
 
 #### Fixed
 
