@@ -114,10 +114,10 @@ one usable connection, which changes what a script that relied on the project's 
   each was at the start (on).
 - **Task panel placement per platform** (2026.7, minor): `TaskUIPlaceholder.desktopPlacement`, `mobilePlacement` and
   `vrPlacement` (`ETaskPanelPlacement`: `InWorld`, `WithPlayer`) choose for each platform whether the panel stands in the
-  world, where the placeholder is, or goes with the player (on the screen on desktop and mobile; in VR low on their
-  left, moving and turning with their body). Defaults keep today's behaviour: desktop and mobile with the player, VR in
-  the world. In the world, `worldPanelSize` (metres, 0.61 x 0.69 by default) times the placeholder's scale sets the
-  panel's size; selecting the placeholder draws its outline in the Scene view.
+  world, where the placeholder is, or goes with the player (on the screen on desktop and mobile; in VR on their
+  left beside the view, its top at about eye height, moving and turning with their body). Defaults keep today's
+  behaviour: desktop and mobile with the player, VR in the world. In the world, `worldPanelSize` (metres, 0.61 x 0.69
+  by default) times the placeholder's scale sets the panel's size; selecting the placeholder draws its outline in the Scene view.
 - **One task panel with the player at a time** (2026.7, minor): `TaskUIPlaceholder.ShowAsPersonalPanel()` (also from
   Visual Scripting) makes that placeholder's panel the one shown with the player; the first created is shown until
   then, the others wait hidden with their state. Panels in the world are unaffected.

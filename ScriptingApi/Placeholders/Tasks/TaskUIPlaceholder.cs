@@ -31,8 +31,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [Tooltip("Mobile: the panel on the screen (With Player), in the world, where this placeholder is, or none (Hidden).")]
         public ETaskPanelPlacement mobilePlacement = ETaskPanelPlacement.WithPlayer;
 
-        [Tooltip("VR: the panel in the world, where this placeholder is, with the player, low on their left, or none "
-            + "(Hidden).")]
+        [Tooltip("VR: the panel in the world, where this placeholder is, with the player, on their left beside the view, "
+            + "or none (Hidden).")]
         public ETaskPanelPlacement vrPlacement = ETaskPanelPlacement.InWorld;
 
         [Tooltip("In the world: the panel's width and height, in metres, multiplied by this placeholder's scale on each "
