@@ -126,8 +126,23 @@ namespace Virtuademy.SDK.Environments.Tasks
                 return;
             }
             Transform target = null;
+            // The source's own cue first: with feedback objects it shows the result itself (one mark, not two: 2026-11-02,
+            // a decoy showed its own mark and the shared one, which stayed); without, the shared ones go above it
+            InteractionCuePlaceholder sourceCue = source != null ? source.GetComponentInParent<InteractionCuePlaceholder>(true) : null;
+            if (sourceCue != null)
+            {
+                if (sourceCue.FeedbackRoot != null)
+                {
+                    return;
+                }
+                target = sourceCue.transform;
+            }
             foreach (InteractionCuePlaceholder cue in cues)
             {
+                if (target != null)
+                {
+                    break;
+                }
                 if (cue.FeedbackRoot == null)
                 {
                     target = cue.transform;

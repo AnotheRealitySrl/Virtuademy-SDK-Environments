@@ -179,8 +179,7 @@ MonoBehaviour:
   automaticSetup: 1
   <IsNetworked>k__BackingField: 0
   interactWithColliders: 1
-  interactionColliders:
-  - {fileID: 8444284299771866266}
+  interactionColliders: []
   lockHoverDuringInteraction: 0
   vrControllers: -1
 --- !u!114 &7309970795177544997
@@ -393,6 +392,10 @@ PrefabInstance:
     - target: {fileID: 9222160065061306838, guid: 36201a95459f4e77802d38c0a20b8195, type: 3}
       propertyPath: m_Name
       value: Confirm
+      objectReference: {fileID: 0}
+    - target: {fileID: 9222160065061306838, guid: 36201a95459f4e77802d38c0a20b8195, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

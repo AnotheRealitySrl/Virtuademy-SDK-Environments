@@ -60,11 +60,14 @@ namespace Virtuademy.SDK.Environments.Tasks
             confirm.Show();
         }
 
+        // Hidden and inactive: a hidden panel that stays active keeps its document's collider over the choice, which
+        // took the clicks meant for it (2026-11-02, E3 on web)
         private void Cancel()
         {
             if (confirm != null)
             {
                 confirm.Hide();
+                confirm.gameObject.SetActive(false);
             }
         }
 

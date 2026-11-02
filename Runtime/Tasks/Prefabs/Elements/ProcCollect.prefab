@@ -244,8 +244,7 @@ MonoBehaviour:
   automaticSetup: 1
   <IsNetworked>k__BackingField: 0
   interactWithColliders: 1
-  interactionColliders:
-  - {fileID: 5765954486564452374}
+  interactionColliders: []
   lockHoverDuringInteraction: 0
   vrControllers: -1
 --- !u!114 &4639061867926881112
@@ -347,8 +346,7 @@ MonoBehaviour:
   itemName: Item
   numberOfUses: -1
   icon: {fileID: 0}
-  interactingColliders:
-  - {fileID: 5765954486564452374}
+  interactingColliders: []
   transformable: 0
   transformIntoPickable: {fileID: 0}
   destroyOnUse: 0

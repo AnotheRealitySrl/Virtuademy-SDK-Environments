@@ -143,11 +143,20 @@ namespace Virtuademy.SDK.Environments.Cue
                 return;
             }
             lastResultWrong = result.Outcome == ETaskOutcome.Wrong;
-            if (lastResultWrong)
+            // A wrong action shows on the object that caused it, when that object has a cue of its own (a decoy, a
+            // wrong choice); on every cue of the task otherwise. 2026-11-02: a decoy's wrong showed on the real target too.
+            if (lastResultWrong && (!CausedByAnotherCue(result.Source) || IsSourceOf(result.Source)))
             {
                 cue.ShowResultLocally(false);
             }
         }
+
+        private bool IsSourceOf(GameObject source) =>
+            source != null && source.GetComponentInParent<InteractionCuePlaceholder>(true) == cue;
+
+        // The source is an object with a cue of its own, which shows the result itself.
+        private static bool CausedByAnotherCue(GameObject source) =>
+            source != null && source.GetComponentInParent<InteractionCuePlaceholder>(true) != null;
 
         /// <summary>The base state the tasks give, applied to the cue.</summary>
         public void Apply()

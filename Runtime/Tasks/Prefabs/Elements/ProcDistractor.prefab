@@ -66,8 +66,7 @@ MonoBehaviour:
   automaticSetup: 1
   <IsNetworked>k__BackingField: 0
   interactWithColliders: 1
-  interactionColliders:
-  - {fileID: 1321728333535722923}
+  interactionColliders: []
   lockHoverDuringInteraction: 0
   vrControllers: -1
 --- !u!114 &6443036631323477381

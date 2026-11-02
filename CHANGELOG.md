@@ -280,11 +280,13 @@ one usable connection, which changes what a script that relied on the project's 
   one is an attempt; the master reports in a shared procedure; the element's cue and the procedure show the feedback,
   so the detector's own check or cross does not show too, `InventoryItemTriggerDetectorPlaceholder.ElementShowsFeedback`).
   The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`) and carry a solid
-  BoxCollider, listed as the Interactable's (and the pickable's) collider: a model without one got the application's
-  trigger box, which VR rays ignore. Target, Choice and Distractor act on one click: they take the select state out of the Visual Scripting
+  BoxCollider, not listed on the Interactable, so a model the creator puts in its place brings its own collider. A
+  wrong action shows on the cue of the object that caused it (a decoy, a wrong choice), not on the task's other cues;
+  the procedure's shared mark is used only for a source without feedback objects, and hides by itself. The choice's
+  confirmation starts inactive and goes inactive again when it hides (hidden but active, its collider took the
+  clicks). Target, Choice and Distractor act on one click: they take the select state out of the Visual Scripting
   interactable beside them (a Target that completes on select keeps it). A Question element shows each quiz's own
-  recap (Continue only) before the next quiz of its pool, and on desktop and mobile pans the camera to the quiz when
-  its step comes (`panToQuiz`, on). **Collect** (`ProcCollect`, `CollectElementPlaceholder`): the pickable collected
+  recap before the next quiz of its pool (Continue on every quiz but the last; the last recap ends the question). **Collect** (`ProcCollect`, `CollectElementPlaceholder`): the pickable collected
   into the inventory completes the task (a Wearable on it goes to its Wear Slot). Without a task an element raises its events and shows
   its cue. `TasksLogic_Procedure.prefab`: TasksLogic with a Procedure placeholder, its success and error panels,
   shared cue feedback and a Task UI placeholder (`TaskPanel`, wired to its task system, default placements: the app's
