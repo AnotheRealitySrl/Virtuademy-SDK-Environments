@@ -295,8 +295,8 @@ one usable connection, which changes what a script that relied on the project's 
   VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
   `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
   `timelineMaxRows`), in a list that scrolls past 360 px (mm in a world panel), so the buttons always show, with a slim
-  themed scroller (`ProcedureSummary.uss`: a rounded thumb in the action colour on a faint rounded track, no arrows); in VR a 1 x 0.86 m panel whose list grows to 560 mm, with Up and Down
-  buttons beside it while it overflows (the ray presses buttons but does not drag a list); Retry and Exit; on the screen it is centred and keeps clear of the
+  themed scroller (`ProcedureSummary.uss`: a slim rounded thumb in the action colour, no track, no arrows, wider in VR); the
+  content scrolls by dragging it with the mouse, the VR ray or a finger, and with the wheel; in VR a 1 x 0.86 m panel whose list grows to 560 mm; Retry and Exit; on the screen it is centred and keeps clear of the
   application's zones (Safe Frame on the panel's root, not the task HUD's, which the summary replaces). `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
   **Analytics** (`sendAnalytics`): one run per procedure run, its key the prefix (`analyticsKeyPrefix`, else the scene's
   name; letters and digits, at most 7) and 8 random characters, its experience id generated first (a new key after

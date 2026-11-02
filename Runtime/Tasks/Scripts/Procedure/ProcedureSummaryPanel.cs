@@ -23,7 +23,7 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// <summary>In VR (millimetres): taller, the panel stands 1.6 m away (2026-11-02, Quest: too short to read).</summary>
         private const float MaxListHeightVR = 560f;
 
-        [SerializeField, Tooltip("The list's scroller in the theme's look (ProcedureSummary.uss): thin, no arrow buttons.")]
+        [SerializeField, Tooltip("The list's scroller in the theme's look (ProcedureSummary.uss): a slim rounded thumb, no track, no arrow buttons.")]
         private StyleSheet listStyle;
 
         private ProcedureRun run;
@@ -133,6 +133,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             pages.style.minHeight = 0;
             pages.contentContainer.pickingMode = PickingMode.Ignore;
             pages.AddToClassList("vd-summary-list");
+            pages.EnableInClassList("vd-summary-list--vr", vr);
             if (listStyle != null)
             {
                 pages.styleSheets.Add(listStyle);
@@ -164,10 +165,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             list.style.flexShrink = 1;
             list.style.minHeight = 0;
             list.Add(pages);
-            if (vr)
-            {
-                list.Add(PageButtons(pages));
-            }
+            DragToScroll(pages);
             content.Add(list);
             ShowPage();
 
@@ -184,44 +182,56 @@ namespace Virtuademy.SDK.Environments.Tasks
         }
 
         /// <summary>
-        /// VR: page up and page down beside the list. The XR ray clicks buttons, but it does not drag a list's content
-        /// (UI Toolkit scrolls that on touch) and rarely hits the thin scroller (2026-11-02, Quest: the list did not
-        /// scroll). Shown only while the list is longer than its view.
+        /// The list scrolls when its content is dragged with the mouse or the VR ray, as it does under a finger. UI Toolkit
+        /// drags a list's content on touch only, and the XR ray reaches a world panel as a tracked pointer that presses,
+        /// moves and releases, with no wheel: on a Quest the list did not scroll, and its scroller was too thin to hit
+        /// (2026-11-02). Touch is left to the ScrollView (<see cref="ScrollView.TouchScrollBehavior.Clamped"/>); the mouse
+        /// wheel still works. Nothing runs per frame: the drag follows the pointer's own move events while it is captured.
         /// </summary>
-        private static VisualElement PageButtons(ScrollView pages)
+        private static void DragToScroll(ScrollView pages)
         {
-            VisualElement column = new() { name = "proc-page-buttons", pickingMode = PickingMode.Ignore };
-            column.style.justifyContent = Justify.SpaceBetween;
-            column.style.marginLeft = 12;
-            Button up = new(() => Page(pages, -1)) { name = "proc-page-up", text = PanelEnvironment.Text("Procedure/Summary/PageUp", "Up") };
-            Button down = new(() => Page(pages, 1)) { name = "proc-page-down", text = PanelEnvironment.Text("Procedure/Summary/PageDown", "Down") };
-            foreach (Button b in new[] { up, down })
+            int pointer = PointerId.invalidPointerId;
+            float startY = 0f, startOffset = 0f;
+            pages.RegisterCallback<PointerDownEvent>(e =>
             {
-                b.AddToClassList("vd-button");
-                b.AddToClassList("vd-button--secondary");
-                column.Add(b);
-            }
-            void Fit(GeometryChangedEvent _)
-            {
-                bool overflows = pages.contentContainer.layout.height > pages.contentViewport.layout.height + 1f;
-                DisplayStyle wanted = overflows ? DisplayStyle.Flex : DisplayStyle.None;
-                if (column.style.display != wanted)
+                // The thumb drags itself
+                if (e.pointerType == UnityEngine.UIElements.PointerType.touch || e.button != 0 || pointer != PointerId.invalidPointerId
+                    || (e.target is VisualElement hit && pages.verticalScroller.Contains(hit)))
                 {
-                    column.style.display = wanted;
+                    return;
                 }
+                pointer = e.pointerId;
+                startY = e.position.y;
+                startOffset = pages.scrollOffset.y;
+                pages.CapturePointer(pointer);
+                e.StopPropagation();
+            }, TrickleDown.TrickleDown);
+            pages.RegisterCallback<PointerMoveEvent>(e =>
+            {
+                if (e.pointerId != pointer)
+                {
+                    return;
+                }
+                float max = Mathf.Max(0f, pages.contentContainer.layout.height - pages.contentViewport.layout.height);
+                float y = Mathf.Clamp(startOffset + (startY - e.position.y), 0f, max);
+                pages.scrollOffset = new Vector2(pages.scrollOffset.x, y);
+                e.StopPropagation();
+            }, TrickleDown.TrickleDown);
+            void End(int id)
+            {
+                if (id != pointer)
+                {
+                    return;
+                }
+                if (pages.HasPointerCapture(pointer))
+                {
+                    pages.ReleasePointer(pointer);
+                }
+                pointer = PointerId.invalidPointerId;
             }
-            pages.contentContainer.RegisterCallback<GeometryChangedEvent>(Fit);
-            pages.contentViewport.RegisterCallback<GeometryChangedEvent>(Fit);
-            return column;
-        }
-
-        // Scrolls by most of a view, so a line stays in sight across pages
-        private static void Page(ScrollView pages, int direction)
-        {
-            float view = pages.contentViewport.layout.height;
-            float max = Mathf.Max(0f, pages.contentContainer.layout.height - view);
-            float y = Mathf.Clamp(pages.scrollOffset.y + direction * view * 0.8f, 0f, max);
-            pages.scrollOffset = new Vector2(pages.scrollOffset.x, y);
+            pages.RegisterCallback<PointerUpEvent>(e => End(e.pointerId), TrickleDown.TrickleDown);
+            pages.RegisterCallback<PointerCancelEvent>(e => End(e.pointerId), TrickleDown.TrickleDown);
+            pages.RegisterCallback<PointerCaptureOutEvent>(e => End(e.pointerId));
         }
 
         private void ShowPage()
