@@ -43,6 +43,16 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         /// </summary>
         public bool ElementShowsFeedback { get; internal set; }
 
+        /// <summary>
+        /// True while this target takes no item (2026.7): an Item On Target element whose task is completed, failed or
+        /// locked. The application then asks before it spends anything: the item keeps its use and stays in the
+        /// inventory, and neither the right nor the wrong events and feedback fire. Without it, a counted key used again
+        /// on a door already open lost a use and could leave a later task impossible (Quest test, 2026-11-02).
+        /// </summary>
+        public bool RefusesItems => refusesItems != null && refusesItems();
+
+        internal System.Func<bool> refusesItems;
+
         public UnityEvent OnItemTriggerEnter;
         public UnityEvent OnWrongItemTriggerEnter;
         public UnityEvent OnItemTriggerExit;

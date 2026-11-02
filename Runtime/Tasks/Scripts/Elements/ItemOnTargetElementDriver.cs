@@ -31,6 +31,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             detector.OnWrongItemTriggerEnter.AddListener(OnWrongItem);
             // The element's cue and the procedure show the feedback: the tool's own check or cross would be a second one
             detector.ElementShowsFeedback = true;
+            detector.refusesItems = RefusesItems;
         }
 
         private void OnDestroy()
@@ -38,9 +39,23 @@ namespace Virtuademy.SDK.Environments.Tasks
             if (detector != null)
             {
                 detector.ElementShowsFeedback = false;
+                detector.refusesItems = null;
                 detector.OnItemTriggerEnter?.RemoveListener(OnRightItem);
                 detector.OnWrongItemTriggerEnter?.RemoveListener(OnWrongItem);
             }
+        }
+
+        // The target takes an item only while its task is to do or in progress: a completed (or failed) target would spend
+        // a use for nothing, and a locked one would spend it before its turn. Without a task it always takes one.
+        private bool RefusesItems()
+        {
+            var task = TaskOf();
+            if (task == null)
+            {
+                return false;
+            }
+            SPACS.Tasks.TaskNode.TaskStatus status = task.Node.Status;
+            return status != SPACS.Tasks.TaskNode.TaskStatus.Todo && status != SPACS.Tasks.TaskNode.TaskStatus.InProgress;
         }
 
         private void OnRightItem()
