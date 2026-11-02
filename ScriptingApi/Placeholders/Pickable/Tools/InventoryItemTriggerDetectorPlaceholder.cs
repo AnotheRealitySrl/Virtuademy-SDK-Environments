@@ -37,6 +37,12 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
 
         public Transform feedbackCheckPosition;
 
+        /// <summary>
+        /// True when an Item On Target element reports this detector's results (2026.7): the element's cue and the
+        /// procedure show the right or wrong feedback, so the application shows none of its own here (it showed both).
+        /// </summary>
+        public bool ElementShowsFeedback { get; internal set; }
+
         public UnityEvent OnItemTriggerEnter;
         public UnityEvent OnWrongItemTriggerEnter;
         public UnityEvent OnItemTriggerExit;

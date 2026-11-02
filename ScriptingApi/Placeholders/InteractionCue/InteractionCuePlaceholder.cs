@@ -16,8 +16,10 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
     /// The cue only signals: it detects nothing and decides nothing. Its <see cref="State"/> is the first that applies
     /// in this order: <see cref="EInteractionCueState.Locked"/>, <see cref="EInteractionCueState.Right"/> or
     /// <see cref="EInteractionCueState.Wrong"/> (for <see cref="FeedbackSeconds"/>),
-    /// <see cref="EInteractionCueState.Selected"/>, <see cref="EInteractionCueState.Hover"/>, and last the base state
-    /// set by <see cref="SetBaseState"/> (<see cref="EInteractionCueState.Available"/> by default).
+    /// <see cref="EInteractionCueState.Completed"/>, <see cref="EInteractionCueState.Selected"/>,
+    /// <see cref="EInteractionCueState.Hover"/>, and last the base state set by <see cref="SetBaseState"/>
+    /// (<see cref="EInteractionCueState.Available"/> by default). A completed object therefore shows no hover or
+    /// selection rim (nor its label); it stays clickable unless <see cref="BlockInteractionWhenCompleted"/> is on.
     /// </para>
     /// <para>
     /// The rim is drawn on copies of the object's renderers, created the first time the rim shows: the object's own
@@ -41,8 +43,8 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             "done. Empty: the task of the task elements on this object, if any.")]
         private List<GameObject> tasks = new();
 
-        [SerializeField, Tooltip("Block the object's Interactable while the cue is completed (no hover, no clicks), and " +
-            "unblock it when it is not any more.")]
+        [SerializeField, Tooltip("Block the object's Interactable while the cue is completed (no clicks either), and " +
+            "unblock it when it is not any more. Off: a completed object shows no rim on hover but can still be clicked.")]
         private bool blockInteractionWhenCompleted = false;
 
         [Header("Look")]
@@ -411,6 +413,11 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             {
                 return transient;
             }
+            // Done is done: no hover or selection rim on a completed object, which stays clickable
+            if (baseState == EInteractionCueState.Completed)
+            {
+                return EInteractionCueState.Completed;
+            }
             if (IsSelected)
             {
                 return EInteractionCueState.Selected;
@@ -419,7 +426,7 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
             {
                 return EInteractionCueState.Hover;
             }
-            return hintTarget && baseState != EInteractionCueState.Completed ? EInteractionCueState.NextTarget : baseState;
+            return hintTarget ? EInteractionCueState.NextTarget : baseState;
         }
 
         private void Refresh()

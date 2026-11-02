@@ -29,12 +29,15 @@ namespace Virtuademy.SDK.Environments.Tasks
             detector.OnWrongItemTriggerEnter ??= new UnityEngine.Events.UnityEvent();
             detector.OnItemTriggerEnter.AddListener(OnRightItem);
             detector.OnWrongItemTriggerEnter.AddListener(OnWrongItem);
+            // The element's cue and the procedure show the feedback: the tool's own check or cross would be a second one
+            detector.ElementShowsFeedback = true;
         }
 
         private void OnDestroy()
         {
             if (detector != null)
             {
+                detector.ElementShowsFeedback = false;
                 detector.OnItemTriggerEnter?.RemoveListener(OnRightItem);
                 detector.OnWrongItemTriggerEnter?.RemoveListener(OnWrongItem);
             }

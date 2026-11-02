@@ -312,6 +312,18 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 457431289708591085, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      propertyPath: taskUIManager
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 2270071529767751058, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 2270071529767751058, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 2907678079161795303, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
       propertyPath: m_Name
       value: TasksLogic_Procedure
@@ -354,6 +366,22 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4785474688076759952, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5903335021419582843, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5903335021419582843, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5903335021419582843, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6498891750391142266, guid: 3d913dd2c306ac042a119532ebf5082a, type: 3}
+      propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []

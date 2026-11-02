@@ -274,10 +274,13 @@ one usable connection, which changes what a script that relied on the project's 
   (`ProcReachZone`: the local player entering the trigger), **Watch** (`ProcWatch`: a video ended, a POI closed, a panel
   hidden), **Question** (`ProcQuestion`, `ProcQuestionPool`: a quiz's normalised score; `pool`, `drawCount`,
   `shuffle`), **Item On Target** (beside an Inventory Item Trigger Detector: the right item or tool completes, a wrong
-  one is an attempt; the master reports in a shared procedure). Without a task an element raises its events and shows
+  one is an attempt; the master reports in a shared procedure; the element's cue and the procedure show the feedback,
+  so the detector's own check or cross does not show too, `InventoryItemTriggerDetectorPlaceholder.ElementShowsFeedback`).
+  The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`). Without a task an element raises its events and shows
   its cue. `TasksLogic_Procedure.prefab`: TasksLogic with a Procedure placeholder, its success and error panels,
   shared cue feedback and a Task UI placeholder (`TaskPanel`, wired to its task system, default placements: the app's
-  task panel with the errors strip, timer and hint button; set a platform to Hidden to drop it). **Summary**: `ProcedureSummary.prefab` (a Virtuademy panel on the screen, in front of the user in
+  task panel with the errors strip, timer and hint button; set a platform to Hidden to drop it); the legacy uGUI task
+  panel of TasksLogic (`MainUIWorldSpaceCanvas`) is off in it. **Summary**: `ProcedureSummary.prefab` (a Virtuademy panel on the screen, in front of the user in
   VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
   `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
   `timelineMaxRows`); Retry and Exit. `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
@@ -320,8 +323,8 @@ one usable connection, which changes what a script that relied on the project's 
 - **Interaction cue** (2026.7, minor): `InteractionCuePlaceholder` shows how an object can be used, with the look of the
   Showcase highlight: a cyan rim that pulses on the next target (or is fixed, `ECueNextTargetStyle`), a rim on hover and
   selection, green or red for a right or wrong action (`ShowRight`, `ShowWrong`, `ShowResult`, for `FeedbackSeconds`),
-  nothing when completed or locked. `State` (`EInteractionCueState`) resolves Locked > Right/Wrong > Selected > Hover >
-  base state (`SetBaseState`: Available, NextTarget, Completed); `SetLocked`, `SetHovered`, `SetSelected` act on this
+  nothing when completed or locked. `State` (`EInteractionCueState`) resolves Locked > Right/Wrong > Completed >
+  Selected > Hover > base state (a completed object shows no hover or selection rim and no label, and stays clickable) (`SetBaseState`: Available, NextTarget, Completed); `SetLocked`, `SetHovered`, `SetSelected` act on this
   client; `CueChanged` (`InteractionCueChangedHandler`) and UnityEvents. The cue follows the object's Interactable by
   itself: hovered while any local controller hovers it (each VR ray and hand counts), selected, locked while the
   Interactable is blocked; with `ECueHoverStyle.RimAndLabel` its feedback objects' label shows `labelKey`/`labelText`
@@ -341,8 +344,11 @@ one usable connection, which changes what a script that relied on the project's 
   never changed; a static-batched renderer gets no rim and a warning. Look, colour and arrow come from an
   `InteractionCueSettings` asset (the SDK's default in `Prefabs/InteractionCue/`), shaders
   `Virtuademy/InteractionCue/Rim` and `.../Arrow`. The rim has a minimum fill (`_RimMin`, 0.15 on every cue
-  material) so a flat face seen head-on still shows it, with the edges brighter. No per-frame code: the pulse is in
-  the shader.
+  material) so a flat face seen head-on still shows it, with the edges brighter. No per-frame code: the pulse (a cosine
+  ease) and the arrow's bob (0.1 m at 0.6 Hz) are in the shaders, their phase wrapped in float so they stay smooth on
+  mobile GPUs. The check mark and the label are drawn with `VirtuademyWorldDisplayPanelSettings` (no collider: they never
+  catch a ray or a click), and the mark sits on the flash's anchor; the flash's soft Shadow disc is off in
+  `CueFeedback`.
 - **`InteractablePlaceholder.IsBlocked`** and **`OnBlockedChanged`** (`InteractableBlockedChangedHandler(bool blocked)`)
   (2026.7, minor): whether the application blocks interaction with the object (selected or manipulated by another
   user, edited, locked, blocked by a node), and an event when that changes from free to blocked or back.

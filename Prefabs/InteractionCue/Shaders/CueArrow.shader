@@ -1,6 +1,6 @@
-// "Go here" arrow of the interaction cue. Unlit and opaque; it bobs 0.25 m up and down once per second
-// (0.5 m peak to peak, as in Showcase) and its colour blinks, both computed here from _Time, so the arrow costs no
-// script time. The arrow mesh's bounds include the bob, so it is not culled at the top of the motion.
+// "Go here" arrow of the interaction cue. Unlit and opaque; it bobs 0.1 m up and down at 0.6 Hz and its colour
+// blinks, both computed here from _Time (the phase wrapped in float, so the motion stays smooth on mobile GPUs), so the
+// arrow costs no script time. The arrow mesh's bounds include the bob, so it is not culled at the top of the motion.
 // SRP Batcher compatible and single-pass instanced stereo.
 Shader "Virtuademy/InteractionCue/Arrow"
 {
@@ -8,8 +8,8 @@ Shader "Virtuademy/InteractionCue/Arrow"
     {
         [HDR] _Color ("Color", Color) = (0, 2.65, 4, 1)
         _Intensity ("Intensity", Float) = 1
-        _BobHeight ("Bob height (m)", Float) = 0.25
-        _BobSpeed ("Bob and blink speed (Hz)", Float) = 1
+        _BobHeight ("Bob height (m)", Float) = 0.1
+        _BobSpeed ("Bob and blink speed (Hz)", Float) = 0.6
         _PulseMin ("Blink minimum", Range(0, 1)) = 0.6
     }
     SubShader
@@ -58,7 +58,7 @@ Shader "Virtuademy/InteractionCue/Arrow"
                 UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
-                positionWS.y += _BobHeight * sin(TWO_PI * _BobSpeed * _Time.y);
+                positionWS.y += _BobHeight * sin(TWO_PI * frac(_BobSpeed * _Time.y));
                 output.positionCS = TransformWorldToHClip(positionWS);
                 // A fixed light from above keeps the arrow's shape readable without lighting.
                 float3 normalWS = TransformObjectToWorldNormal(input.normalOS);
@@ -70,7 +70,8 @@ Shader "Virtuademy/InteractionCue/Arrow"
             {
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
-                half wave = 0.5h + 0.5h * sin(TWO_PI * _BobSpeed * _Time.y);
+                float phase = frac(_BobSpeed * _Time.y);
+                half wave = 0.5h + 0.5h * sin(TWO_PI * phase);
                 half blink = lerp(_PulseMin, 1.0h, wave);
                 return half4(_Color.rgb * (_Intensity * blink * input.shade), 1);
             }
@@ -117,7 +118,7 @@ Shader "Virtuademy/InteractionCue/Arrow"
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
-                positionWS.y += _BobHeight * sin(TWO_PI * _BobSpeed * _Time.y);
+                positionWS.y += _BobHeight * sin(TWO_PI * frac(_BobSpeed * _Time.y));
                 output.positionCS = TransformWorldToHClip(positionWS);
                 return output;
             }

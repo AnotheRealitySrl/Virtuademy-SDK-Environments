@@ -1,7 +1,8 @@
 // Rim of the interaction cue (InteractionCuePlaceholder), drawn on shell renderers that copy the target's mesh.
 // The look of Showcase's Highlight.mat: a cyan Fresnel rim, transparent and additive, with a minimum fill so flat
 // faces (a cube, per-face normals) still show it. The pulse is computed here
-// from _Time, so a pulsing cue costs no script time. URP unlit, no texture, no keyword; SRP Batcher compatible
+// from _Time, so a pulsing cue costs no script time: a smooth cosine ease, its phase wrapped in float (in half, as
+// mobile GPUs run it, sin(speed * _Time.y) loses the phase as time grows and the pulse steps). URP unlit, no texture, no keyword; SRP Batcher compatible
 // (one UnityPerMaterial buffer) and single-pass instanced stereo (instance id and stereo output in the structs).
 Shader "Virtuademy/InteractionCue/Rim"
 {
@@ -79,7 +80,8 @@ Shader "Virtuademy/InteractionCue/Rim"
                 half facing = saturate(dot(normalize(input.normalWS), normalize(input.viewDirWS)));
                 // A minimum fill: a flat face seen head-on (facing 1) still glows faintly, the edges stay brighter.
                 half rim = lerp(_RimMin, 1.0h, pow(1.0h - facing, _FresnelPower));
-                half wave = 0.5h + 0.5h * sin(TWO_PI * _PulseSpeed * _Time.y);
+                float phase = frac((float)_PulseSpeed * _Time.y);
+                half wave = 0.5h - 0.5h * cos(TWO_PI * phase);
                 half pulse = _PulseSpeed > 0 ? lerp(_PulseMin, 1.0h, wave) : 1.0h;
                 return half4(_Color.rgb * (_Intensity * rim * pulse * _Alpha), 0);
             }
