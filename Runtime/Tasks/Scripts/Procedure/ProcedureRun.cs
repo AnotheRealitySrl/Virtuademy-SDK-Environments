@@ -420,6 +420,11 @@ namespace Virtuademy.SDK.Environments.Tasks
                 {
                     // Completed without a reported result (a Complete Task node, a task listener): a right completion.
                     result ??= new TaskResult(ETaskOutcome.Right, 1f, task.gameObject, "", "");
+                    if (result.CountsAsError)
+                    {
+                        // A question answered below its Wrong Below: one error, as a wrong attempt is (user, 2026-11-02)
+                        errors++;
+                    }
                     step.Score.Done = true;
                     step.Score.ResultScore = result.Score;
                     scoring.Recompute();
@@ -428,6 +433,10 @@ namespace Virtuademy.SDK.Environments.Tasks
                     AddTimeline(step, result.Outcome != ETaskOutcome.Wrong, lost, result.Reason, result);
                     ResultScored?.Invoke(step, result, lost, EResultKind.Completion);
                     procedure.RaiseScoreChanged();
+                    if (result.CountsAsError)
+                    {
+                        CheckMaxErrors();
+                    }
                 }
             }
             else if (status == TaskStatus.Failed)

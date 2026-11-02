@@ -56,6 +56,10 @@ namespace Virtuademy.Environments.ScriptingApi.Tasks
         /// Set by the task system.</summary>
         public string ActorName { get; internal set; }
 
+        /// <summary>Whether a completion with this result also counts as a wrong attempt in the procedure's error count
+        /// (the summary's Errors, Max Errors). Set by the SDK: a question element answered below its Wrong Below.</summary>
+        internal bool CountsAsError { get; set; }
+
         private static float DefaultScore(ETaskOutcome outcome) => outcome switch
         {
             ETaskOutcome.Right => 1f,

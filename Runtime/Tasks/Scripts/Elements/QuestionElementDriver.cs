@@ -231,12 +231,14 @@ namespace Virtuademy.SDK.Environments.Tasks
             float score = scoreSum / drawn.Count;
             // Below the creator's threshold the question is answered wrong (2026-11-02, Elements: one wrong answer of three
             // scored 1/3, a Partial, and the procedure gave the positive feedback)
-            if (score < Question.WrongBelow)
+            // and counts as one error in a procedure, which Max Errors can end (user, 2026-11-02)
+            bool below = score < Question.WrongBelow;
+            if (below)
             {
                 score = 0f;
             }
             ETaskOutcome outcome = score >= 1f ? ETaskOutcome.Right : score <= 0f ? ETaskOutcome.Wrong : ETaskOutcome.Partial;
-            Report(new TaskResult(outcome, score, gameObject, "", ""), true);
+            Report(new TaskResult(outcome, score, gameObject, "", "") { CountsAsError = below }, true);
         }
     }
 }

@@ -35,6 +35,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             Outcome = result != null ? (int)result.Outcome : 0,
             Score = result != null ? result.Score : 0f,
             Reason = result != null ? result.Reason : "",
+            CountsAsError = result != null && result.CountsAsError,
         };
 
         private static ProcedureRun ProcedureOf(Task task)

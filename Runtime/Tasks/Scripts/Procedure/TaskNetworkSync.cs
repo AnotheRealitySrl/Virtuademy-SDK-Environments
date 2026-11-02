@@ -64,6 +64,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             {
                 IsLocalActor = false,
                 ActorName = actorName ?? "",
+                CountsAsError = e.Kind == ProcedureNetworkEvent.Complete && e.CountsAsError,
             };
             switch (e.Kind)
             {
