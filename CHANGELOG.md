@@ -1,6 +1,36 @@
 # Release notes
 
-## Unreleased
+## v10.1.0
+
+Platform 2026.7. Minor: backward compatible for published environments and for creator projects that use the
+placeholders and the scripting API, with two exceptions for editor code, noted where they are: the removal of
+`AddressablesBundleScriptableObject` (three editor types) and of the `SpawnableObjectEditor` inspector.
+**Requires Virtuademy-SDK-Core 0.4.0 and SPACS-Tasks 3.1.0.**
+
+In short:
+
+- **Interactions** (scripts and graphs): per-click interaction, hover and select events for scripts,
+  `InteractablePlaceholder.VRControllers` (ray, hands or both, replacing the Visual Scripting component's own
+  setting) and `IsBlocked`.
+- **Theme and UI Toolkit**: the Virtuademy theme as USS tokens, tenant colours applied at runtime, UI Toolkit panels for
+  environments (panel, choice, list, label, HUD, check mark), toasts and popups from scripts and graphs, `SafeFrame`
+  for the screen areas the application keeps, Poppins SemiBold, `IHelpApi.IsOpen`/`Opened`,
+  `IVirtuademyGameplay.Tablet`, `ILocalizationApi.TranslateOr` and a missing-translations check. In VR the panels
+  follow the player's body and let rays through wherever nothing is shown. Nothing runs per frame.
+- **Interaction cue**: highlight, mark and flash on the objects a task asks for, shown or not by the experience's
+  mode.
+- **Tasks**: procedures (guided and assessed runs, scoring, right and wrong feedback, hints, a summary), task
+  elements (item on target, tool on target, collect and others, with their targets and state), `ITasksApi`, the
+  task nodes Fail Task, Unlock Task, On Task Unlocked and On Task Failed, and the task panel placed per platform
+  (in the world, with the player, hidden), one panel with the player at a time.
+- **Tools and inventory**: tool use events and the held tool's model, `ToolItemPlaceholder.useMode`, the inventory
+  set up and changed during the experience (`InventoryPlaceholder`), equipment slots declared by the environment,
+  wearables with their slot and events, starting items, quantities per slot, item targets that refuse items once
+  done, the pickable's drag mode and a third-person hold preview.
+- **Publishing**: the Environment Details window, the experiences of an environment, thumbnails and localization
+  files per place, the scene's defaults and default files in Publish Environments, new scenes built for every
+  platform, the single-group rule with one Fix dialog, logins as named connections shared by the window and the
+  command line, and the menu regrouped.
 
 - **`AddressablesBundleScriptableObject` removed** (major: three public editor types go, `AddressablesBundleScriptableObject`,
   `EnvironmentAssetDefinition` and `AddressablesBundleScriptableObjectEditor`). The 2024 asset that set up the Addressables groups
