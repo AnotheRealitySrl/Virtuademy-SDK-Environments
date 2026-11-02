@@ -737,6 +737,9 @@ and the exit codes 37 and 38; the Environment Details window and the scene row's
   lacked it.
 - `AnimatedScreenCanvas`: its 36 objects on layer 0 are on layer 5 (UI), so a click on the HUD no longer reaches the
   object behind it (the application's interaction gate ignores a 3D click only over UI on layer 5).
+- `TasksLogic` (and `TasksLogic_Procedure`, which nests it): the task panel's texts use the package's
+  Poppins-Regular SDF in place of TMP Essentials' LiberationSans, which lives in a project's `Assets` and not in a
+  package. With SPACS-Tasks 3.1.0 the prefab and everything it nests resolve to package assets only.
 
 ## v10.0.0
 
