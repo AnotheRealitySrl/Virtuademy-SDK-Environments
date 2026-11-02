@@ -53,6 +53,7 @@ namespace Virtuademy.SDK.Environments.UIKit
         private readonly List<Button> optionButtons = new();
         private int selected = -1;
         private bool visible;
+        private PanelRayBlocking rays;
         private bool listening;
 
         public UnityEvent<int> OnOptionSelected => onOptionSelected;
@@ -85,12 +86,15 @@ namespace Virtuademy.SDK.Environments.UIKit
             }
             listening = PanelEnvironment.SubscribeLanguage(OnLanguageChanged);
             WatchForRebuild(panel);
+            rays ??= new PanelRayBlocking(this);
+            rays.Bind(root);
             Refresh();
             return true;
         }
 
         protected override void UnbindFromTree()
         {
+            rays?.Unbind();
             if (confirmButton != null)
             {
                 confirmButton.clicked -= Confirm;
@@ -193,6 +197,8 @@ namespace Virtuademy.SDK.Environments.UIKit
                 return;
             }
             panel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            // Hidden, its world document lets rays and clicks through (no collider in front of the scene)
+            rays?.Set(visible);
             SetText(titleLabel, title.Resolve());
             SetText(promptLabel, prompt.Resolve());
 

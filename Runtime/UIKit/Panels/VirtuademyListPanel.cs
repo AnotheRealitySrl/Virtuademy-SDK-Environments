@@ -46,6 +46,7 @@ namespace Virtuademy.SDK.Environments.UIKit
         private Label titleLabel;
         private VisualElement list;
         private bool visible;
+        private PanelRayBlocking rays;
         private bool listening;
 
         public UnityEvent<int> OnItemDone => onItemDone;
@@ -71,12 +72,15 @@ namespace Virtuademy.SDK.Environments.UIKit
             PanelEnvironment.IgnoreExceptControls(root);
             listening = PanelEnvironment.SubscribeLanguage(OnLanguageChanged);
             WatchForRebuild(panel);
+            rays ??= new PanelRayBlocking(this);
+            rays.Bind(root);
             Refresh();
             return true;
         }
 
         protected override void UnbindFromTree()
         {
+            rays?.Unbind();
             if (listening)
             {
                 PanelEnvironment.UnsubscribeLanguage(OnLanguageChanged);
@@ -167,6 +171,8 @@ namespace Virtuademy.SDK.Environments.UIKit
                 return;
             }
             panel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+            // Hidden, its world document lets rays and clicks through (no collider in front of the scene)
+            rays?.Set(visible);
             if (titleLabel != null)
             {
                 titleLabel.text = title.Resolve();

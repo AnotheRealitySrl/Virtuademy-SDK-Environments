@@ -504,6 +504,11 @@ one usable connection, which changes what a script that relied on the project's 
   waited frame by frame. A popup queued before its host was bound is answered with -1 when the host goes away.
 - **The Visual Scripting inventory nodes throw** (Set Inventory Mode, Set Inventory Slot Counts, Add Equipment Slot)
   when they have no `InventoryPlaceholder`, instead of continuing without doing anything.
+- **A hidden world panel lets rays and clicks through**: `VirtuademyPanel`, `VirtuademyChoicePanel` and
+  `VirtuademyListPanel` catch rays and clicks in the world only while shown (`VirtuademyPanel`: while shown with a
+  button). UI Toolkit keeps a world document's collider while the panel is hidden, and in VR an overlay panel's
+  1.6 x 1 m collider stood in front of the user; now `OverlayPanelPlacement.BlocksRay` follows the panel, and a world
+  document without the placement switches its colliders (re-applied after each layout).
 - **SDK panels run nothing per frame**: `SafeFrame` applies its insets on screen and zone changes, `OverlayPanelPlacement`
   in VR goes with the player's body by a constraint after being placed in front of them (its `followAngle` and
   `followSpeed` are gone) and reads the help state from its events, `VirtuademyLabel` faces the camera with an

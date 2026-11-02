@@ -90,6 +90,7 @@ namespace Virtuademy.SDK.Environments.UIKit
         private Button primary;
         private Button secondary;
         private bool visible;
+        private PanelRayBlocking rays;
         private bool listening;
 
         public UnityEvent OnShown => onShown;
@@ -141,12 +142,15 @@ namespace Virtuademy.SDK.Environments.UIKit
             }
             listening = PanelEnvironment.SubscribeLanguage(OnLanguageChanged);
             WatchForRebuild(panel);
+            rays ??= new PanelRayBlocking(this);
+            rays.Bind(root);
             Refresh();
             return true;
         }
 
         protected override void UnbindFromTree()
         {
+            rays?.Unbind();
             if (primary != null)
             {
                 primary.clicked -= PressPrimary;
@@ -255,7 +259,6 @@ namespace Virtuademy.SDK.Environments.UIKit
 
             // display:none, not visibility: a hidden panel must not take picks either.
             panel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-
             for (int i = 1; i < variantClasses.Length; i++)
             {
                 panel.EnableInClassList(variantClasses[i], (int)variant == i);
@@ -272,11 +275,16 @@ namespace Virtuademy.SDK.Environments.UIKit
             Apply(bodyLabel, body.Resolve());
             Apply(primary, primaryButton.Resolve());
             Apply(secondary, secondaryButton.Resolve());
+            // In the world it catches rays and clicks only while shown with a button to press: hidden, or showing text
+            // only, it lets them reach the objects behind it (2026-11-02, a hidden feedback panel took the VR ray)
+            rays?.Set(visible && (Shown(primary) || Shown(secondary)));
             if (TryGetComponent(out ThemedDocument themed))
             {
                 themed.Reapply();
             }
         }
+
+        private static bool Shown(VisualElement element) => element != null && element.style.display != DisplayStyle.None;
 
         private static void Apply(TextElement element, string text)
         {
