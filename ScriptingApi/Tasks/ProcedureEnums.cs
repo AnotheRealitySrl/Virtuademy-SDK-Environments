@@ -9,13 +9,12 @@ namespace Virtuademy.Environments.ScriptingApi.Tasks
         Assessed = 1,
     }
 
-    /// <summary>When a hint costs points.</summary>
+    /// <summary>When a hint costs points. A hint asked again on the same task never costs again (user decision,
+    /// 2026-11-02: the hint is a pop-up the user may reopen at will; there is no "every request" charge).</summary>
     public enum EHintCharge
     {
         /// <summary>The first hint on a task costs the hint penalty; more on the same task are free.</summary>
         OncePerTask = 0,
-        /// <summary>Every hint costs the hint penalty.</summary>
-        EveryRequest = 1,
         /// <summary>Hints are free.</summary>
         Never = 2,
     }

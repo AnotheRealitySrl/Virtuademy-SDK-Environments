@@ -248,7 +248,7 @@ one usable connection, which changes what a script that relied on the project's 
   (2026.7, minor): which VR controllers can hover, select and interact with the object.
 - **Procedures** (2026.7, minor): `ProcedurePlaceholder` on a task system's object turns it into a procedure: scored
   tasks (each worth `maxScore x weight / total weight`, largest-remainder rounding), wrong attempts (`errorPenalty`),
-  hints (`hintsEnabled`, `hintPenalty`, `hintCharge`: OncePerTask, EveryRequest, Never), errors (`maxErrors`), time
+  hints (`hintsEnabled`, `hintPenalty`, `hintCharge`: OncePerTask, Never; a hint asked again on a task never costs again), errors (`maxErrors`), time
   (`timeLimitSeconds`), fail conditions (`onFailCondition`: EndNow, ContinueAsFailed), failed tasks (`onTaskFailed`:
   Continue, EndProcedure), out-of-order actions (`outOfOrderIsError`), pass percentage, timeline mode, retry mode.
   Live state (`Score`, `MaxScore`, `PassingScore`, `Percent`, `Errors`, `HintsUsed`, `ElapsedSeconds`,
@@ -294,8 +294,8 @@ one usable connection, which changes what a script that relied on the project's 
   panel of TasksLogic (`MainUIWorldSpaceCanvas`) is off in it. **Summary**: `ProcedureSummary.prefab` (a Virtuademy panel on the screen, in front of the user in
   VR) shows the outcome and fail reason, score and percentage, time, errors, hints, one row per scored task and, with
   `timeline` not Off, "What happened" (time, step, actor, good or mistake, points lost, reason; at most
-  `timelineMaxRows`), in a list that scrolls past 360 px (mm in a world panel), so the buttons always show, with a thin
-  themed scroller (`ProcedureSummary.uss`); in VR a 1 x 0.86 m panel whose list grows to 560 mm, with Up and Down
+  `timelineMaxRows`), in a list that scrolls past 360 px (mm in a world panel), so the buttons always show, with a slim
+  themed scroller (`ProcedureSummary.uss`: a rounded thumb in the action colour on a faint rounded track, no arrows); in VR a 1 x 0.86 m panel whose list grows to 560 mm, with Up and Down
   buttons beside it while it overflows (the ray presses buttons but does not drag a list); Retry and Exit; on the screen it is centred and keeps clear of the
   application's zones (Safe Frame on the panel's root, not the task HUD's, which the summary replaces). `ProcedurePlaceholder.summaryPanel` (set in `TasksLogic_Procedure`).
   **Analytics** (`sendAnalytics`): one run per procedure run, its key the prefix (`analyticsKeyPrefix`, else the scene's

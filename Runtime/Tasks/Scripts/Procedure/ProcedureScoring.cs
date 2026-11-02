@@ -52,7 +52,6 @@ namespace Virtuademy.SDK.Environments.Tasks
         public int ChargedHints(TaskScore task) => HintCharge switch
         {
             EHintCharge.OncePerTask => Math.Min(task.HintRequests, 1),
-            EHintCharge.EveryRequest => task.HintRequests,
             _ => 0,
         };
 
