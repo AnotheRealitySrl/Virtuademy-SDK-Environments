@@ -103,9 +103,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Virtuademy.SDK.Environments::Virtuademy.SDK.Environments.UIKit.OverlayPanelPlacement
   screenPanelSettings: {fileID: 11400000, guid: 6945dfd24a9145bbacfe071fb50b1ebd, type: 2}
   worldPanelSettings: {fileID: 11400000, guid: 395a867d243e41bf997bbeaaef826fa8, type: 2}
-  vrSize: {x: 520, y: 380}
+  vrSize: {x: 1000, y: 860}
   vrDistance: 1.6
-  vrHeightOffset: -0.55
+  vrHeightOffset: -0.35
   vrSideOffset: 0.9
   vrFollowHead: 0
   vrHideWhileHelpOpen: 1

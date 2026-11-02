@@ -20,6 +20,9 @@ namespace Virtuademy.SDK.Environments.Tasks
         /// <summary>The tallest the list of tasks or of events gets before it scrolls.</summary>
         private const float MaxListHeight = 360f;
 
+        /// <summary>In VR (millimetres): taller, the panel stands 1.6 m away (2026-11-02, Quest: too short to read).</summary>
+        private const float MaxListHeightVR = 560f;
+
         [SerializeField, Tooltip("The list's scroller in the theme's look (ProcedureSummary.uss): thin, no arrow buttons.")]
         private StyleSheet listStyle;
 
@@ -114,15 +117,20 @@ namespace Virtuademy.SDK.Environments.Tasks
             secondary.text = PanelEnvironment.Text("Procedure/Summary/Exit", "Exit");
 
             // Page 1: the numbers and one row per scored task. Page 2: the timeline.
-            content.Q<VisualElement>("proc-pages")?.RemoveFromHierarchy();
+            content.Q<VisualElement>("proc-list")?.RemoveFromHierarchy();
+            // The panel never outgrows its document (in VR a fixed world size): the list gives way first
+            panelRoot.style.maxHeight = Length.Percent(100);
             // A list that scrolls past MaxListHeight, so a long timeline never pushes the buttons off the panel (editor
             // round 8: 19 rows covered What happened, Exit and Retry). On the screen that is reference pixels, in a world
             // panel millimetres.
             ScrollView pages = new(ScrollViewMode.Vertical) { name = "proc-pages" };
             pages.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
             pages.touchScrollBehavior = ScrollView.TouchScrollBehavior.Clamped;
-            pages.style.maxHeight = MaxListHeight;
+            bool vr = PanelEnvironment.IsVR;
+            pages.style.maxHeight = vr ? MaxListHeightVR : MaxListHeight;
             pages.style.flexShrink = 1;
+            pages.style.flexGrow = 1;
+            pages.style.minHeight = 0;
             pages.contentContainer.pickingMode = PickingMode.Ignore;
             pages.AddToClassList("vd-summary-list");
             if (listStyle != null)
@@ -151,7 +159,16 @@ namespace Virtuademy.SDK.Environments.Tasks
             }
             pages.Add(tasksPage);
             pages.Add(timelinePage);
-            content.Add(pages);
+            VisualElement list = new() { name = "proc-list", pickingMode = PickingMode.Ignore };
+            list.style.flexDirection = FlexDirection.Row;
+            list.style.flexShrink = 1;
+            list.style.minHeight = 0;
+            list.Add(pages);
+            if (vr)
+            {
+                list.Add(PageButtons(pages));
+            }
+            content.Add(list);
             ShowPage();
 
             toggle?.RemoveFromHierarchy();
@@ -164,6 +181,47 @@ namespace Virtuademy.SDK.Environments.Tasks
                 secondary.parent.Insert(0, toggle);
             }
             ShowPage();
+        }
+
+        /// <summary>
+        /// VR: page up and page down beside the list. The XR ray clicks buttons, but it does not drag a list's content
+        /// (UI Toolkit scrolls that on touch) and rarely hits the thin scroller (2026-11-02, Quest: the list did not
+        /// scroll). Shown only while the list is longer than its view.
+        /// </summary>
+        private static VisualElement PageButtons(ScrollView pages)
+        {
+            VisualElement column = new() { name = "proc-page-buttons", pickingMode = PickingMode.Ignore };
+            column.style.justifyContent = Justify.SpaceBetween;
+            column.style.marginLeft = 12;
+            Button up = new(() => Page(pages, -1)) { name = "proc-page-up", text = PanelEnvironment.Text("Procedure/Summary/PageUp", "Up") };
+            Button down = new(() => Page(pages, 1)) { name = "proc-page-down", text = PanelEnvironment.Text("Procedure/Summary/PageDown", "Down") };
+            foreach (Button b in new[] { up, down })
+            {
+                b.AddToClassList("vd-button");
+                b.AddToClassList("vd-button--secondary");
+                column.Add(b);
+            }
+            void Fit(GeometryChangedEvent _)
+            {
+                bool overflows = pages.contentContainer.layout.height > pages.contentViewport.layout.height + 1f;
+                DisplayStyle wanted = overflows ? DisplayStyle.Flex : DisplayStyle.None;
+                if (column.style.display != wanted)
+                {
+                    column.style.display = wanted;
+                }
+            }
+            pages.contentContainer.RegisterCallback<GeometryChangedEvent>(Fit);
+            pages.contentViewport.RegisterCallback<GeometryChangedEvent>(Fit);
+            return column;
+        }
+
+        // Scrolls by most of a view, so a line stays in sight across pages
+        private static void Page(ScrollView pages, int direction)
+        {
+            float view = pages.contentViewport.layout.height;
+            float max = Mathf.Max(0f, pages.contentContainer.layout.height - view);
+            float y = Mathf.Clamp(pages.scrollOffset.y + direction * view * 0.8f, 0f, max);
+            pages.scrollOffset = new Vector2(pages.scrollOffset.x, y);
         }
 
         private void ShowPage()
