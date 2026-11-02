@@ -191,7 +191,8 @@ one usable connection, which changes what a script that relied on the project's 
   tap outside it, reporting -1: `NotificationHost.closePopupOnOutsideClick` (off by default), the `ShowPopup`
   overload with `closeOnOutsideClick`, and the node's Close On Outside Click input. The HUD's hint button shows its
   `Hint On Request` text (a second press hides it); with that text empty it only raises On Hint Requested.
-  `SafeFrame.area`: `Content` (centred column on mobile) or `Edges` (to the side edges, clear of the bars and the
+  `SafeFrame.area`: `Content` (centred: the same inset on both sides, the larger, so a zone on one side such as the
+  desktop task HUD narrows it without pushing toasts and dialogs off centre) or `Edges` (to the side edges, clear of the bars and the
   corner controls); the HUD uses Edges and sits at the top right of the frame.
   Popups close by themselves without a timer of the creator's: `ShowPopup(..., closeOnOutsideClick, autoCloseSeconds)`
   returns the popup's id, its timer belongs to that popup (it can never close a later one, which a delay followed by
@@ -280,7 +281,9 @@ one usable connection, which changes what a script that relied on the project's 
   so the detector's own check or cross does not show too, `InventoryItemTriggerDetectorPlaceholder.ElementShowsFeedback`).
   The elements' placeholder models use a URP Lit material (`Elements/Materials/ElementModel.mat`). Target, Choice and Distractor act on one click: they take the select state out of the Visual Scripting
   interactable beside them (a Target that completes on select keeps it). A Question element shows each quiz's own
-  recap (Continue only) before the next quiz of its pool. Without a task an element raises its events and shows
+  recap (Continue only) before the next quiz of its pool, and on desktop and mobile pans the camera to the quiz when
+  its step comes (`panToQuiz`, on). **Collect** (`ProcCollect`, `CollectElementPlaceholder`): the pickable collected
+  into the inventory completes the task (a Wearable on it goes to its Wear Slot). Without a task an element raises its events and shows
   its cue. `TasksLogic_Procedure.prefab`: TasksLogic with a Procedure placeholder, its success and error panels,
   shared cue feedback and a Task UI placeholder (`TaskPanel`, wired to its task system, default placements: the app's
   task panel with the errors strip, timer and hint button; set a platform to Hidden to drop it); the legacy uGUI task

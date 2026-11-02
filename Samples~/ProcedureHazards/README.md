@@ -6,7 +6,8 @@ as models. Not registered in `package.json` yet (workstream G).
 - `TasksLogic_Procedure`: Guided, max 5 errors, hints on, 300 s time limit, summary with the timeline, analytics key
   prefix `hazards`. Its task panel (`TaskPanel`) stands beside the path to the entrance: on the screen on desktop and
   mobile, in the world there in VR.
-- Tasks: go to the entrance (Reach Zone), put on the protective equipment (3 Targets, parallel sub-tasks), find the 5
+- Tasks: go to the entrance (Reach Zone), put on the protective equipment (3 Collect elements: helmet, gloves and vest
+  are collected into the inventory and worn in its Head, Hands and Body slots; parallel sub-tasks), find the 5
   hazards (5 Targets, parallel sub-tasks; 3 Distractors cost 5 points each), answer the safety questions (Question
   pool: 2 drawn from 4).
 - Every task is completed by an element: no task listener, no graph.

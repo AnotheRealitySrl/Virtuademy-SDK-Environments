@@ -31,8 +31,9 @@ namespace Virtuademy.SDK.Environments.UIKit
     {
         public enum EArea
         {
-            /// <summary>Clear of every zone: on mobile a centred column between the joystick and the
-            /// jump button. For content in the middle: toasts, dialogs.</summary>
+            /// <summary>Clear of every zone, the same width on both sides so it stays centred: on mobile a
+            /// centred column between the joystick and the jump button. For content in the middle: toasts,
+            /// dialogs.</summary>
             Content = 0,
 
             /// <summary>Up to the side edges, clear of the bars and of the corner controls. For a
@@ -145,6 +146,14 @@ namespace Virtuademy.SDK.Environments.UIKit
             var device = new ReservedScreenZones.Insets(topLeft.y, full.y - bottomRight.y, topLeft.x, full.x - bottomRight.x);
 
             ReservedScreenZones.Insets insets = ReservedScreenZones.Insets.Max(reserved, device);
+            if (area == EArea.Content)
+            {
+                // Content is centred (toasts, dialogs, the procedure's summary): the same inset on both sides, the larger,
+                // so a zone on one side only (the task HUD on the left on desktop) narrows the frame without pushing its
+                // content off centre (2026-11-02, editor test: the summary and the hints sat over the inventory).
+                float side = Mathf.Max(insets.left, insets.right);
+                insets = new ReservedScreenZones.Insets(insets.top, insets.bottom, side, side);
+            }
             insets = new ReservedScreenZones.Insets(insets.top + margin, insets.bottom + margin,
                 insets.left + margin, insets.right + margin);
             Current = insets;

@@ -4,6 +4,7 @@ using SPACS.Tasks;
 
 using UnityEngine;
 
+using Virtuademy.Environments.ScriptingApi;
 using Virtuademy.Environments.ScriptingApi.Placeholders;
 using Virtuademy.Environments.ScriptingApi.Tasks;
 
@@ -21,6 +22,7 @@ namespace Virtuademy.SDK.Environments.Tasks
         private int current;
         private float scoreSum;
         private Task watchedTask;
+        private bool panned;
 
         private QuestionElementPlaceholder Question => (QuestionElementPlaceholder)Element;
 
@@ -62,8 +64,40 @@ namespace Virtuademy.SDK.Environments.Tasks
         {
             if (watchedTask.Node.Status == TaskStatus.Locked && previous != TaskStatus.Locked)
             {
+                ExitPan();
                 Draw();
             }
+            else if (IsToDo(watchedTask.Node.Status) && !IsToDo(previous))
+            {
+                PanToCurrent();
+            }
+        }
+
+        private static bool IsToDo(TaskStatus status) => status == TaskStatus.Todo || status == TaskStatus.InProgress;
+
+        // Desktop and mobile, Pan To Quiz (2026-11-02, editor test: the sample's quiz was out of reach, nothing took the
+        // camera to it): the pan state the POIs use, at the quiz's camera point.
+        private void PanToCurrent()
+        {
+            if (!Question.PanToQuiz || current >= drawn.Count || !IVirtuademyGameplay.IsAvailable
+                || IVirtuademyGameplay.Current.Platform.IsVR)
+            {
+                return;
+            }
+            QuizPlaceholder quiz = drawn[current];
+            Transform point = quiz.CameraPanTransform != null ? quiz.CameraPanTransform : quiz.transform;
+            panned = true;
+            StartCoroutine(IVirtuademyGameplay.Current.Player.PanCameraAround(point));
+        }
+
+        private void ExitPan()
+        {
+            if (!panned || !IVirtuademyGameplay.IsAvailable)
+            {
+                return;
+            }
+            panned = false;
+            StartCoroutine(IVirtuademyGameplay.Current.Player.ExitCameraPan());
         }
 
         /// <summary>Draws the quizzes of this run (the single quiz without a pool) and shows the first.</summary>
@@ -200,11 +234,21 @@ namespace Virtuademy.SDK.Environments.Tasks
         {
             QuizPlaceholder done = drawn[current - 1];
             done.onContinue.RemoveListener(OnQuizContinued);
+            if (current >= drawn.Count)
+            {
+                // The last quiz: its recap stays, movement comes back
+                ExitPan();
+                return;
+            }
             if (Question.Pool.Count > 0)
             {
                 done.gameObject.SetActive(false);
             }
             ShowCurrent();
+            if (panned)
+            {
+                PanToCurrent();
+            }
         }
 
         private void OnQuizFinished()
@@ -216,10 +260,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             // The quiz's own recap (each answer right or wrong), with Continue only: Confirm alone shows nothing more
             // (2026-11-02, editor test: the quizzes ended without it). The next quiz of a pool shows on Continue.
             quiz.onContinue ??= new UnityEngine.Events.UnityEvent();
-            if (current + 1 < drawn.Count)
-            {
-                quiz.onContinue.AddListener(OnQuizContinued);
-            }
+            quiz.onContinue.AddListener(OnQuizContinued);
             quiz.VSNode_GoToResults(false, false, true);
             current++;
             if (current < drawn.Count)

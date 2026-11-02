@@ -27,10 +27,15 @@ namespace Virtuademy.Environments.ScriptingApi.Placeholders
         [SerializeField, Tooltip("Draw at random (otherwise in the pool's order).")]
         private bool shuffle = true;
 
+        [SerializeField, Tooltip("Desktop and mobile: when the task becomes the one to do, the camera pans to the quiz (its " +
+            "Camera Pan Transform), as it does to a POI, and gives movement back after the last quiz's Continue. Not in VR.")]
+        private bool panToQuiz = true;
+
         public QuizPlaceholder Quiz { get => quiz; set => quiz = value; }
         public IReadOnlyList<QuizPlaceholder> Pool => pool;
         public int DrawCount { get => drawCount; set => drawCount = Mathf.Max(0, value); }
         public bool Shuffle { get => shuffle; set => shuffle = value; }
+        public bool PanToQuiz { get => panToQuiz; set => panToQuiz = value; }
 
         /// <summary>The quizzes drawn for the current run, in the order they are shown (filled by the runtime).</summary>
         public QuizPlaceholder[] Drawn { get; internal set; } = new QuizPlaceholder[0];

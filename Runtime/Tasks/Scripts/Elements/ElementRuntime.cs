@@ -37,6 +37,7 @@ namespace Virtuademy.SDK.Environments.Tasks
             WatchElementPlaceholder => typeof(WatchElementDriver),
             QuestionElementPlaceholder => typeof(QuestionElementDriver),
             ItemOnTargetElementPlaceholder => typeof(ItemOnTargetElementDriver),
+            CollectElementPlaceholder => typeof(CollectElementDriver),
             _ => null,
         };
     }
