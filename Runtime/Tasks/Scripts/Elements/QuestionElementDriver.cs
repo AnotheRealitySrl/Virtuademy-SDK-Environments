@@ -12,7 +12,7 @@ using static SPACS.Tasks.TaskNode;
 namespace Virtuademy.SDK.Environments.Tasks
 {
     /// <summary>Question element: a quiz (or the quizzes drawn from the pool) answered to the end completes the task
-    /// with its normalised score.</summary>
+    /// with its normalised score, 0 (Wrong) below the element's Wrong Below.</summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("")]
     public class QuestionElementDriver : ElementDriver
@@ -229,6 +229,12 @@ namespace Virtuademy.SDK.Environments.Tasks
                 return;
             }
             float score = scoreSum / drawn.Count;
+            // Below the creator's threshold the question is answered wrong (2026-11-02, Elements: one wrong answer of three
+            // scored 1/3, a Partial, and the procedure gave the positive feedback)
+            if (score < Question.WrongBelow)
+            {
+                score = 0f;
+            }
             ETaskOutcome outcome = score >= 1f ? ETaskOutcome.Right : score <= 0f ? ETaskOutcome.Wrong : ETaskOutcome.Partial;
             Report(new TaskResult(outcome, score, gameObject, "", ""), true);
         }

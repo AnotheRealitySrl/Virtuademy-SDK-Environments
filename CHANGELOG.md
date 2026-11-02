@@ -80,6 +80,11 @@ The files commands add five `EnvironmentsCli` commands (`published`, `save-files
 and the exit codes 37 and 38; the Environment Details window and the scene row's default files are new editor UI (minor).
 
 #### Added
+- **`QuestionElementPlaceholder.wrongBelow`** (Wrong Below, 0 to 1, default 0): below this normalised score the question
+  counts as answered wrong, so a procedure gives the wrong feedback, the error sound and a Mistake row, and the step
+  scores 0. At the default a question is wrong only when nothing scores, as before; 1 makes anything short of the whole
+  quiz wrong. Each answer scores when it is set right, picked or not, so one wrong answer picked of three scores 1/3
+  (Partial, the positive feedback) unless Wrong Below is above it.
 - **The Environment Details window** (minor). The `i` button at the end of a scene's row in Publish Environments opens `EnvironmentDetailsWindow`
   (title *Environment Details*, one window for the project, minimum 760 x 480; its size and the last scene it showed are kept per user in `EditorPrefs`)
   on that scene; **Virtuademy > Environment Details** (under Publish Environments) opens it on the scene it showed last. It reads every connection of the computer each time it opens, on **Refresh** and when the scene changes, each connection on its own (a
